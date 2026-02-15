@@ -14,20 +14,28 @@ FX_URL = "https://api.exchangerate.host/historical"
 def upload_txt(text):
     target = os.path.join(API_URL, "upload_text")
     r = requests.post(target,
-                      headers={
-        "Content-Type": "text/plain",
-        "Authorization": f"Bearer {UPLOAD_TOKEN}"
-        },
+                      headers={"Content-Type": "text/plain", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
                       data=text)
     return r.text
 
 def upload_json(json):
     target = os.path.join(API_URL, "upload_json")
     r = requests.post(target,
-                      headers={
-                          "Content-Type": "application/json",
-                          "Authorization": f"Bearer {UPLOAD_TOKEN}"
-                      },
+                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
+                      json=json)
+    return r.text
+
+def upload_loc(json):
+    target = os.path.join(API_URL, "upload_loc")
+    r = requests.post(target,
+                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
+                      json=json)
+    return r.text
+
+def upload_fx(json):
+    target = os.path.join(API_URL, "upload_fx")
+    r = requests.post(target,
+                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
                       json=json)
     return r.text
 
@@ -44,5 +52,3 @@ def get_fx_rate_at_date(date_string, *currencies, **kwargs):
         return response.json()
     except ValueError:
         return None
-
-#fx_data = get_fx_rate_at_date("2020-02-01", "GBP", "USD", "AUD", "NZD", source="EUR")
