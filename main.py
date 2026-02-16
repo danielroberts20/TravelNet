@@ -1,47 +1,10 @@
 import calendar
-import os
-from datetime import datetime
 import time
+from datetime import datetime
 
 import requests
-from dotenv import load_dotenv
-
-load_dotenv()
-
-ACCESS_KEY = os.environ["FX_API_KEY"]
-UPLOAD_TOKEN = os.environ["UPLOAD_TOKEN"]
-CURRENCIES = ["GBP", "USD", "CAN", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"]
-SOURCE = "GBP"
-API_URL = "http://pi-server:8000"
-FX_URL = "https://api.exchangerate.host/historical"
-
-def upload_txt(text):
-    target = os.path.join(API_URL, "upload_text")
-    r = requests.post(target,
-                      headers={"Content-Type": "text/plain", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
-                      data=text)
-    return r.text
-
-def upload_json(json):
-    target = os.path.join(API_URL, "upload_json")
-    r = requests.post(target,
-                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
-                      data=json)
-    return r.text
-
-def upload_loc(json):
-    target = os.path.join(API_URL, "upload_loc")
-    r = requests.post(target,
-                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
-                      data=json)
-    return r.text
-
-def upload_fx(json):
-    target = os.path.join(API_URL, "upload_fx")
-    r = requests.post(target,
-                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
-                      data=json)
-    return r.text
+from config import ACCESS_KEY, FX_URL, CURRENCIES, SOURCE, SERVER_URL
+from server import upload_fx
 
 def get_fx_rate_at_date(date_string, *currencies, **kwargs):
     try:
@@ -66,6 +29,6 @@ def get_fx_for_month(month=None, year=None):
         time.sleep(2.5)
 
 def get_recent_locations(num_days=7):
-    return requests.get(f"{API_URL}/locations/recent?days={num_days}").json()
+    return requests.get(f"{SERVER_URL}/locations/recent?days={num_days}").json()
 
 print(get_recent_locations(21))
