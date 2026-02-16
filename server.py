@@ -29,3 +29,6 @@ def upload_fx(json):
                       headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
                       data=json)
     return r.text
+
+def get_recent_locations(num_days=7):
+    return requests.get(f"{SERVER_URL}/locations/recent?days={num_days}").json()
