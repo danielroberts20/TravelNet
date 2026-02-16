@@ -5,7 +5,7 @@ from datetime import datetime
 import requests
 
 from config import ACCESS_KEY, FX_URL, CURRENCIES, SOURCE
-from server import upload_fx
+from server_interaction import upload_fx
 
 
 def get_fx_rate_at_date(date_string, *currencies, **kwargs):
