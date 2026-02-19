@@ -3,4 +3,4 @@
 __pycache__
 .env
 .gitignore
-.DS_Store
+server/data/
