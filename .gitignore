@@ -3,4 +3,4 @@
 __pycache__
 .env
 .gitignore
-server/data/
+client/data/database_snapshot.db
