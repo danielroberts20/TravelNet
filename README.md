@@ -4,7 +4,9 @@ A project completed while I travelled across the USA, Australia, New Zealand, Ca
 
 TO-DO:
 -
-- Include timezone, source (phone/watch) in location updates
+- Enabling watch logs
+  - Check if there is multiple logs within +/- 0.5*log frequency
+  - Prefer data from watch logs, fill gaps with phone logs
 - Server-side, calculate country (and state?) from lat/lon
 - Additional GET endpoints
 - Machine Learning
