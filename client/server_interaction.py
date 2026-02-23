@@ -1,59 +1,22 @@
+import logging
+
 import requests
 
+from client.config import DATA_DIR
 from config import SERVER_URL, UPLOAD_TOKEN
 
-def upload_txt(text):
-    """
-    Upload plain text to the server
-    :param text: str. the text to be uploaded
-    :return: The HTTP response
-    """
-    target = f"{SERVER_URL}/upload_text"
-    r = requests.post(target,
-                      headers={"Content-Type": "text/plain", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
-                      data=text)
-    return r.text
+logger = logging.getLogger(__name__)
 
-def upload_json(json):
-    """
-        Upload JSON to the server
-        :param json: dict. the json to be uploaded
-        :return: The HTTP response
-        """
-    target = f"{SERVER_URL}/upload_json"
-    r = requests.post(target,
-                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
-                      data=json)
-    return r.text
+def download_database():
+    logger.info('Downloading database')
+    with requests.get(SERVER_URL / "database", headers={'Authorization': f'Bearer {UPLOAD_TOKEN}'}, stream=True) as response:
+        response.raise_for_status()  # Raises error if not 200
+        output_path = DATA_DIR / "database_snapshot.db"
 
-def upload_loc(json):
-    """
-    Upload a location to the server
-    :param json: dict. the location to be uploaded. Must contain "lat", "lon" and "timestamp"
-    :return: The HTTP response
-    """
-    target = f"{SERVER_URL}/upload_loc"
-    r = requests.post(target,
-                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
-                      data=json)
-    return r.text
+        with open(output_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
 
-def upload_fx(json):
-    """
-    Upload FX data to the server
-    :param json: str. the json response of a FX query
-    :return: The HTTP response
-    """
-    target = f"{SERVER_URL}/upload_fx"
-    r = requests.post(target,
-                      headers={"Content-Type": "application/json", "Authorization": f"Bearer {UPLOAD_TOKEN}"},
-                      data=json)
-    return r.text
-
-def get_recent_locations(num_days=7):
-    """
-    Get the location history for the last `num_days` days
-    :param num_days: int. The number of days to look for. Default is 7.
-    :return: List of JSON location entries
-    """
-    return requests.get(f"{SERVER_URL}/locations/recent?days={num_days}").json()
+    logger.info(f"Database snapshot saved to {output_path}")
+    return output_path
