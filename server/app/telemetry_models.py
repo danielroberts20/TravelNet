@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-import json
 
-from parsers import parse_float, parse_bool_yes_no, parse_int
+from parsers import parse_float, parse_bool_yes_no, parse_int, parse_string, parse_cellular_states
 
 @dataclass
 class CellularState:
@@ -23,7 +22,6 @@ class CellularState:
 class Log:
     timestamp: int
     timezone: str | None
-    country_code: str | None
     latitude: float
     longitude: float
     altitude: float | None
@@ -41,21 +39,17 @@ class Log:
     def from_strings(self, **kwargs):
         return self(
             timestamp=parse_int(kwargs["timestamp"]),
-            timezone=kwargs["timezone"],
-            country_code=kwargs["country_code"],
+            timezone=parse_string(kwargs["timezone"]),
             latitude=parse_float(kwargs["latitude"]),
             longitude=parse_float(kwargs["longitude"]),
             altitude=parse_float(kwargs["altitude"]),
-            activity=kwargs["activity"],
-            device=kwargs["device"],
-            is_locked=kwargs["is_locked"].lower() == "yes",
+            activity=parse_string(kwargs["activity"]),
+            device=parse_string(kwargs["device"]),
+            is_locked=parse_bool_yes_no(kwargs["is_locked"]),
             battery=parse_int(kwargs["battery"]),
-            is_charging=kwargs["charging"].lower() == "yes",
+            is_charging=parse_bool_yes_no(kwargs["charging"]),
             is_connected_charger=parse_bool_yes_no(kwargs["connected_charger"]),
-            BSSID=kwargs["BSSID"],
+            BSSID=parse_string(kwargs["BSSID"]),
             RSSI=parse_int(kwargs["RSSI"]),
-            cellular_states=[
-                CellularState.from_json(**i)
-                for i in json.loads(kwargs["cellular_states"])
-                ]
+            cellular_states=parse_cellular_states(kwargs["cellular_states"])
         )
