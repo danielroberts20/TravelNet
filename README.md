@@ -1,6 +1,8 @@
 Temporary README.
 
-A project completed while I travelled across the USA, Australia, New Zealand, Canada and South-East Asia.
+# TravelNet &mdash; Cost of Time & Space
+
+A project completed while I travelled across the USA, Australia, New Zealand, South-East Asia and Canada.
 
 TO-DO:
 -
@@ -8,6 +10,10 @@ TO-DO:
   - Check if there is multiple logs within +/- 0.5*log frequency
   - Prefer data from watch logs, fill gaps with phone logs
 - Server-side, calculate country (and state?) from lat/lon
+- Document/write-ups
+  - Describe docker containers
+  - ML GPU compute service on PC
+  - Full documentation for all functions and methods
 - Additional GET endpoints
 - Machine Learning
     - Travel segmentation
@@ -18,7 +24,7 @@ TO-DO:
       - Time series regression
     - Cluster locations to meaningful  locations
       - Automatically discover "home" in each country/city
-      - Auto discover cafes, airports, workplace etc.
+      - Auto discover cafés, airports, workplace etc.
       - Clustering models
     - Detect unusual movement
       - Detect if I do something out of the ordinary
