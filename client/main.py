@@ -13,7 +13,7 @@ def submit_jobs():
     job_response_1 = submit_data_job(
         code_path="enrichment.py",
         requirements_path="../requirements.txt",
-        data_file_path=".gitignore"
+        data_file_path="../.gitignore"
     )
     job_response_2 = submit_sql_job(
         code_path="enrichment.py",
