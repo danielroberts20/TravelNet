@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def download_database():
     logger.info('Downloading database')
-    with requests.get(SERVER_URL / "database", headers={'Authorization': f'Bearer {UPLOAD_TOKEN}'}, stream=True) as response:
+    with requests.get(SERVER_URL / "database" / "download", headers={'Authorization': f'Bearer {UPLOAD_TOKEN}'}, stream=True) as response:
         response.raise_for_status()  # Raises error if not 200
         output_path = DATA_DIR / "database_snapshot.db"
 
