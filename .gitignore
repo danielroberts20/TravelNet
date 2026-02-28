@@ -5,3 +5,6 @@ __pycache__
 .gitignore
 client/data/database_snapshot.db
 /server/data/
+/requirements.txt
+/server/logs/
+/server/wake-pc.sh
