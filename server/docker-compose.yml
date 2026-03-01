@@ -1,6 +1,6 @@
 services:
   ingest:
-    build: ./app
+    build: app
     container_name: pi_ingest
     env_file: .env
     volumes:
