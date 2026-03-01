@@ -30,3 +30,4 @@ TO-DO:
     - Detect unusual movement
       - Detect if I do something out of the ordinary
       - Anomaly detection
+- Include *much* smaller DB on Github (ensure no personal information) to be used with the demonstration website.
