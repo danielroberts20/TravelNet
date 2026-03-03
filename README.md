@@ -4,6 +4,7 @@ Temporary README.
 ![Pixel art zoomed in view of Earth with a map pin and wire traces](/assets/icon.jpg)
 
 A project completed while I travelled across the USA, Australia, New Zealand, South-East Asia and Canada.
+Check out the [website](https://danielroberts20.github.io/TravelNet)!
 
 TO-DO:
 -
