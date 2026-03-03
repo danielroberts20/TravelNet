@@ -1,2 +1,0 @@
-2026-02-28 22:56:57,251 | ERROR | uploads.endpoints | Unexpected header format for metric Sleep Analysis. Expected first column to be 'Date/Time'.
-Most likely cause: sleep analysis CSV. Received header: ['Start', 'End', 'Duration (hr)', 'Value', 'Source']
