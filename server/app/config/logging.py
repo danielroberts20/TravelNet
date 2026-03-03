@@ -1,6 +1,5 @@
 import logging
 import sys
-import os
 from logging.handlers import RotatingFileHandler
 
 from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
