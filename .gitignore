@@ -10,3 +10,4 @@ client/data/database_snapshot.db
 server/app/wake-pc.sh
 server/travel.db
 server/app/logs/
+.vscode/
