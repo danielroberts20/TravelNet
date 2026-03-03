@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
 
-from yarl import URL
+from yarl import URL # type: ignore
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 
 load_dotenv()
 
