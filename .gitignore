@@ -9,3 +9,4 @@ client/data/database_snapshot.db
 /server/logs/
 server/app/wake-pc.sh
 server/travel.db
+server/app/logs/
