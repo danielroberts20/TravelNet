@@ -20,7 +20,7 @@ rebuild_db()
 backup_db(include_timestamp=True)
 logger.info("Database initialized and backup created.")
 
-app = FastAPI(title="TravelNet API", version="1.0.0")
+app = FastAPI(title="TravelNet API", version="1.0.1")
 
 app.include_router(jobs_router, prefix="/jobs")
 app.include_router(uploads_router, prefix="/upload")
