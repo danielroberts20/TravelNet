@@ -18,7 +18,7 @@ HEALTH_BACKUP_DIR.mkdir(exist_ok=True)
 LOCATION_BACKUP_DIR.mkdir(exist_ok=True)
 
 LOG_DIR = Path("./logs/")
-JOBS_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / "server.log"
 WARN_FILE = LOG_DIR / "server.warn.log"
 ERROR_FILE = LOG_DIR / "server.error.log"
