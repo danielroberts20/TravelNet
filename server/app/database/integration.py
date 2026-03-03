@@ -18,7 +18,6 @@ def init_db():
     init_transactions()
     init_jobs()
 
-
 # -----------------------------
 # Insertion helpers
 # -----------------------------

@@ -1,7 +1,12 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
+import requests
+import logging
 
+from config.general import CURRENCIES, FX_API_KEY, FX_URL, SOURCE_CURRENCY
 from database.util import get_conn
+
+logger = logging.getLogger(__name__)
 
 def init():
     with get_conn() as conn:
@@ -35,6 +40,7 @@ def init():
 # FX helpers
 # -----------------------------
 def insert_fx_rate(date: str, source_currency: str, target_currency: str, rate: float, ts: Optional[int] = None) -> int:
+    logger.info(f"Inserting FX rate: {date} {source_currency}->{target_currency} = {rate}")
     """Insert FX rate. ts defaults to now if not provided."""
     if ts is None:
         ts = int(datetime.now().timestamp())
@@ -43,6 +49,7 @@ def insert_fx_rate(date: str, source_currency: str, target_currency: str, rate: 
             "INSERT INTO fx_rates (date, source_currency, target_currency, rate, timestamp) VALUES (?, ?, ?, ?, ?)",
             (date, source_currency, target_currency, rate, ts)
         )
+        logger.info(f"Inserted FX rate with ID {cursor.lastrowid}")
         return cursor.lastrowid
 
 def fetch_fx_rates(limit: int = 100) -> List[Dict]:
@@ -57,10 +64,15 @@ def fetch_fx_rates(limit: int = 100) -> List[Dict]:
 # -----------------------------
 # Helper to fetch latest FX rate for a currency pair
 # -----------------------------
-def get_latest_fx(source_currency: str, target_currency: str) -> Optional[Dict]:
+def get_latest_fx(source_currency: str, target_currency: str, return_full_row: bool = False) -> Union[float, Dict, None]:
     with get_conn() as conn:
         row = conn.execute(
             "SELECT * FROM fx_rates WHERE source_currency=? AND target_currency=? ORDER BY timestamp DESC LIMIT 1",
             (source_currency, target_currency)
         ).fetchone()
-        return dict(row) if row else None
+        if row:
+            d = dict(row)
+            if return_full_row:
+                return d
+            return d["rate"]
+        return None

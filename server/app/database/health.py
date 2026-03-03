@@ -5,21 +5,21 @@ def init():
         conn.execute("""
         CREATE TABLE IF NOT EXISTS health_data (
             id INTEGER PRIMARY KEY,
-            timestamp INTEGER NOT NULL,        -- Unix seconds
-            device TEXT NOT NULL,              -- "Apple Watch" or "Xiaomi Band"
-            heart_rate INTEGER,                -- bpm
-            hrv REAL,                          -- optional, milliseconds
-            steps INTEGER,                      -- steps since last log
-            activity TEXT,                      -- e.g., "Walking", "Running", "Stationary"
-            sleep_stage TEXT,                   -- e.g., "Awake", "Light", "Deep", "REM"
-            spO2 REAL,                          -- optional, %
-            stress REAL,                        -- optional, arbitrary units from band
-            temperature REAL,                   -- optional skin temperature
-            source TEXT,                        -- optional, name of app or raw source
+            timestamp INTEGER NOT NULL,      -- Unix seconds
+            metric TEXT NOT NULL,            -- e.g., "Heart Rate"
+            value_json TEXT,                 -- JSON of metric sub-values
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(timestamp, device)           -- ensures no duplicate rows per device
+            UNIQUE(timestamp, metric)
         );
         """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS health_sources (
+            health_id INTEGER NOT NULL,
+            source TEXT NOT NULL,           -- e.g., "Apple Watch", "iPhone"
+            PRIMARY KEY(health_id, source),
+            FOREIGN KEY (health_id) REFERENCES health_data(id)
+        );""")
 
         # Indexes for performance
         conn.execute("""
@@ -27,7 +27,17 @@ def init():
             ON health_data(timestamp);
         """)
 
-        conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_health_device_timestamp
-            ON health_data(device, timestamp);
-        """)
+def insert_health_entry(timestamp: int, metric: str, value_json: str, sources: list[str]):
+    with get_conn() as conn:
+        cursor = conn.execute("""
+        INSERT OR IGNORE INTO health_data (timestamp, metric, value_json)
+        VALUES (?, ?, ?);
+        """, (timestamp, metric, value_json))
+        health_id = cursor.lastrowid
+
+        if sources != ['']:
+            for source in sources:
+                conn.execute("""
+                INSERT OR IGNORE INTO health_sources (health_id, source)
+                VALUES (?, ?);
+                """, (health_id, source))

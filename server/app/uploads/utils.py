@@ -6,7 +6,7 @@ import logging
 from database.integration import init_db, insert_log
 from telemetry_models import Log
 from database.util import get_conn
-from config.general import DATA_DIR
+from config.general import DATA_DIR, HEALTH_BACKUP_DIR
 
 
 logger = logging.getLogger(__name__)
@@ -20,9 +20,9 @@ def rebuild_db():
 
     init_db()
 
-    for file in sorted(os.listdir(DATA_DIR / "csv_logs" / "location")):
+    for file in sorted(os.listdir(HEALTH_BACKUP_DIR)):
         if file.endswith(".csv"):
-            input_csv(open(DATA_DIR / "csv_logs" / "location" / file, "r"))
+            input_csv(open(HEALTH_BACKUP_DIR / file, "r"))
     logger.info("Finished rebuilding database")
             
 def input_csv(csv_file):
