@@ -1,5 +1,6 @@
 import calendar
 from datetime import datetime
+import json
 from dateutil.relativedelta import relativedelta
 import logging
 import time
@@ -8,8 +9,8 @@ from typing import Dict, Optional
 import requests
 
 from config.logging import configure_logging
-from database.exchange import insert_fx_rate
-from config.general import CURRENCIES, FX_API_KEY, FX_URL, SOURCE_CURRENCY
+from config.general import CURRENCIES, FX_API_KEY, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
+from database.exchange.util import insert_fx_json
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ def get_fx_for_month(month=None, year=None):
     month = now.month - 1 if month is None else month
     month = max(1, min(month, 12)) # Clamp between 1-12
 
+    responses = []
+
     year = now.year if year is None else year
     year = max(1970, min(year, now.year)) # Clamp between 1970-current year
     for day in range(1, calendar.monthrange(year, month)[1]+1): # Loop through days in month
@@ -65,20 +68,15 @@ def get_fx_for_month(month=None, year=None):
         if fx_data is None or fx_data.get("success") is not True:
             logger.error(f"Failed to fetch FX for {year}-{month:02}-{day:02}")
             continue
-        quotes = fx_data.get("quotes", {})
-        for source_target_pair in quotes.keys(): # Loop through returned FX rates (e.g. "GBPUSD", "GBPCAD" etc.)
-            source_currency, target_currency = source_target_pair[:3], source_target_pair[3:] # Extract source and target currency from pair string
-            if source_currency != SOURCE_CURRENCY: # Sanity check - should always be the same as config.SOURCE_CURRENCY
-                logger.warning(f"Unexpected source currency in FX data: {source_currency} (expected {SOURCE_CURRENCY})")
-                continue
-            rate = quotes[source_target_pair] # Extract rate from response
-            insert_fx_rate(
-                date=f"{year}-{month:02}-{day:02}", 
-                source_currency=source_currency, 
-                target_currency=target_currency, 
-                rate=float(rate),
-                ts=int(fx_data.get("timestamp"))) # Insert into DB
+
+        responses.append(fx_data)
+        insert_fx_json(fx_data)
+
     logger.info(f"Done fetching FX rates for {year}-{month:02}")
+
+    with open(FX_BACKUP_DIR / f"{year}-{month:02}.json", "w") as f:
+        json.dump(responses, f, indent=2)
+    logger.info(f"Successfully saved FX rates to {FX_BACKUP_DIR / f'{year}-{month:02}.json'}")
 
 def run():
     configure_logging()
