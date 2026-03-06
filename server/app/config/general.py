@@ -10,12 +10,25 @@ DATA_DIR.mkdir(exist_ok=True)
 JOBS_DIR = Path("../data/jobs")
 JOBS_DIR.mkdir(exist_ok=True)
 
+
 DATA_BACKUP_DIR = DATA_DIR / "log_backup"
-DATA_BACKUP_DIR.mkdir(exist_ok=True)
 HEALTH_BACKUP_DIR = DATA_BACKUP_DIR / "health"
 LOCATION_BACKUP_DIR = DATA_BACKUP_DIR / "location"
-HEALTH_BACKUP_DIR.mkdir(exist_ok=True)
-LOCATION_BACKUP_DIR.mkdir(exist_ok=True)
+WISE_TRANSACTION_BACKUP_DIR = DATA_BACKUP_DIR / "wise"
+REVOLUT_TRANSACTION_BACKUP_DIR = DATA_BACKUP_DIR / "revolut"
+FX_BACKUP_DIR = DATA_BACKUP_DIR / "fx"
+
+BACKUP_DIRS = [
+    DATA_BACKUP_DIR,
+    HEALTH_BACKUP_DIR,
+    LOCATION_BACKUP_DIR,
+    WISE_TRANSACTION_BACKUP_DIR,
+    REVOLUT_TRANSACTION_BACKUP_DIR,
+    FX_BACKUP_DIR
+]
+
+for backup_dir in BACKUP_DIRS:
+    backup_dir.mkdir(exist_ok=True)
 
 LOG_DIR = Path("./logs/")
 LOG_DIR.mkdir(exist_ok=True)
