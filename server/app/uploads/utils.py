@@ -3,34 +3,18 @@ import csv
 from datetime import datetime
 import io
 import json
-import os
 import statistics
 from typing import Any
 from fastapi import HTTPException  # type: ignore
 import logging
 
-from database.integration import init_db, insert_log
-from database.health import insert_health_entry
+from database.integration import insert_log
+from database.health.table import insert_health_entry
 from telemetry_models import Log
-from database.util import get_conn
-from config.general import HEALTH_BACKUP_DIR, INTERVAL_MINUTES, METRIC_AGGREGATION, METRICS
+from config.general import INTERVAL_MINUTES, METRIC_AGGREGATION, METRICS
 
 
 logger = logging.getLogger(__name__)
-
-def rebuild_db():
-    logger.info("Rebuilding database from CSV logs...")
-    with get_conn() as conn:
-        conn.execute("DROP TABLE IF EXISTS cellular_states;")
-        conn.execute("DROP TABLE IF EXISTS locations;")
-        conn.commit()   
-
-    init_db()
-
-    for file in sorted(os.listdir(HEALTH_BACKUP_DIR)):
-        if file.endswith(".csv"):
-            input_csv(open(HEALTH_BACKUP_DIR / file, "r"))
-    logger.info("Finished rebuilding database")
             
 def input_csv(csv_file):
     reader = csv.DictReader(csv_file)
