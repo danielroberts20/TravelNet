@@ -5,3 +5,4 @@ pandas
 yarl
 requests
 pytest
+pydantic
