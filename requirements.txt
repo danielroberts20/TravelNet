@@ -1,0 +1,9 @@
+python-dotenv
+pandas
+scikit-learn
+geopy
+openmeteo-requests
+requests-cache
+retry-requests
+yarl
+numpy
