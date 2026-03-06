@@ -135,14 +135,14 @@ def insert(csv_path: str, source: str = "revolut"):
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO transactions (
-                        id, source, timestamp, amount, currency, amount_gbp,
+                        id, source, bank, timestamp, amount, currency, amount_gbp,
                         description, payment_reference, payer, payee, merchant,
                         fees, transaction_type, transaction_detail, state,
                         is_internal, is_interest, running_balance, raw
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        tx_id, source, timestamp, amount, currency, amount_gbp,
+                        tx_id, source, "Revolut", timestamp, amount, currency, amount_gbp,
                         description, None, None, None, None,
                         fees, transaction_type, detail_type, state,
                         internal, interest, running_balance, raw_json,
