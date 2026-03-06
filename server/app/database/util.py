@@ -1,3 +1,4 @@
+import csv
 import logging
 import os
 import sqlite3
@@ -5,7 +6,9 @@ import uuid
 from datetime import datetime
 
 from config.database import BACKUP_DIR, DB_FILE
-from config.general import FX_BACKUP_DIR, HEALTH_BACKUP_DIR
+from config.general import FX_BACKUP_DIR, HEALTH_BACKUP_DIR, LOCATION_BACKUP_DIR
+from database.integration import insert_log
+from telemetry_models import Log
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +61,20 @@ def rebuild_db():
     for f in sorted(os.listdir(HEALTH_BACKUP_DIR)):
         if f.endswith(".csv"):
             input_csv(open(HEALTH_BACKUP_DIR / f, "r"))
+    
+    for f in sorted(os.listdir(LOCATION_BACKUP_DIR)):
+        if f.endswith(".csv"):
+            reader = csv.DictReader(LOCATION_BACKUP_DIR / f)
+            for idx, row in enumerate(reader):
+                try:
+                    log = Log.from_strings(**row)
+                    insert_log(log)
+                    inserted += 1
+                except Exception as e:
+                    # Skip bad rows
+                    logger.warning(f"Bad row on line {idx+2}.\t CSV entry: {row}\tException: {e}")
+                    continue
+    
         
     for f in sorted(os.listdir(FX_BACKUP_DIR)):
         if f.endswith(".json"):
