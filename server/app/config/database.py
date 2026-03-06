@@ -1,6 +1,9 @@
 from pathlib import Path
 
+from config.general import DATA_DIR
 
-DB_DIR = Path("../data")
-DB_DIR.mkdir(exist_ok=True, parents=True)
-DB_FILE = DB_DIR / "travel.db"
+
+DB_FILE = DATA_DIR / "travel.db"
+
+BACKUP_DIR = DATA_DIR / "database_backup"
+BACKUP_DIR.mkdir(exist_ok=True)
