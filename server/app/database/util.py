@@ -7,7 +7,6 @@ from datetime import datetime
 
 from config.database import BACKUP_DIR, DB_FILE
 from config.general import FX_BACKUP_DIR, HEALTH_BACKUP_DIR, LOCATION_BACKUP_DIR
-from database.integration import insert_log
 from telemetry_models import Log
 
 logger = logging.getLogger(__name__)
@@ -46,6 +45,7 @@ def rebuild_db():
     from database.integration import init_db
     from uploads.utils import input_csv
     from database.exchange.util import insert_fx_file
+    from database.integration import insert_log
     
     logger.info("Rebuilding database from CSV logs...")
     with get_conn() as conn:
