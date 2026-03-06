@@ -1,10 +1,10 @@
 services:
   ingest:
-    build: app
+    build: ./app
     container_name: pi_ingest
     env_file: .env
     volumes:
-      - /home/dan/services/travel-ingest/data:/data         # persistent DB
+      - /mnt/linux/docker/services/travelnet/data:/data         # persistent DB
       - ./app:/app                          # live code mount
     ports:
       - "8000:8000"

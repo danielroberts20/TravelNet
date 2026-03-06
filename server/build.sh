@@ -1,0 +1,1 @@
+sudo docker stop pi_ingest; docker rm pi_ingest; docker compose build; docker compose up -d

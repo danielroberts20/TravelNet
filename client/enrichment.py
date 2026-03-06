@@ -1,2 +1,2 @@
-def dummy_func(param):
-    return None
+def dummy_func():
+    pass

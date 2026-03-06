@@ -7,4 +7,7 @@ client/data/database_snapshot.db
 /server/data/
 /requirements.txt
 /server/logs/
-/server/wake-pc.sh
+server/app/wake-pc.sh
+server/travel.db
+server/app/logs/
+.vscode/
