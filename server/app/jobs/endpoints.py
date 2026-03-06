@@ -6,7 +6,7 @@ from fastapi import Header, UploadFile, File, Form, HTTPException, APIRouter, Ba
 
 from auth import check_auth
 from jobs.models import DataMode, Status
-from database.jobs import get_next_queued_job, insert_job, update_job
+from database.job.table import get_next_queued_job, insert_job, update_job
 from jobs.utils import store_job
 
 
