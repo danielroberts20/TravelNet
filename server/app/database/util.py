@@ -1,9 +1,13 @@
+import logging
+import os
 import sqlite3
 import uuid
 from datetime import datetime
 
 from config.database import BACKUP_DIR, DB_FILE
+from config.general import FX_BACKUP_DIR, HEALTH_BACKUP_DIR
 
+logger = logging.getLogger(__name__)
 
 def get_conn(read_only=False) -> sqlite3.Connection:
     """Get a new SQLite connection."""
@@ -34,3 +38,29 @@ def get_latest_backup() -> str:
     if not backup_files:
         raise FileNotFoundError("No backup files found.")
     return backup_files[0]
+
+def rebuild_db():
+    from database.integration import init_db
+    from uploads.utils import input_csv
+    from database.exchange.util import insert_fx_file
+    
+    logger.info("Rebuilding database from CSV logs...")
+    with get_conn() as conn:
+        conn.execute("DROP TABLE IF EXISTS cellular_states;")
+        conn.execute("DROP TABLE IF EXISTS locations;")
+        conn.execute("DROP TABLE IF EXISTS health_data;")
+        conn.execute("DROP TABLE IF EXISTS health_sources;")
+        conn.execute("DROP TABLE IF EXISTS fx_rates;")
+        conn.commit()   
+
+    init_db()
+
+    for f in sorted(os.listdir(HEALTH_BACKUP_DIR)):
+        if f.endswith(".csv"):
+            input_csv(open(HEALTH_BACKUP_DIR / f, "r"))
+        
+    for f in sorted(os.listdir(FX_BACKUP_DIR)):
+        if f.endswith(".json"):
+            insert_fx_file(FX_BACKUP_DIR / f)
+    
+    logger.info("Finished rebuilding database")
