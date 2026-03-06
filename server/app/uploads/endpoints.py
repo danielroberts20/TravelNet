@@ -3,17 +3,19 @@ from datetime import datetime, timezone
 import hashlib
 import io
 import json
-from fastapi import APIRouter, Header, BackgroundTasks, UploadFile, File, HTTPException  #type: ignore
+from fastapi import APIRouter, Header, BackgroundTasks, UploadFile, File, HTTPException, Depends, status  #type: ignore
 import logging
 from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator
 
-from auth import check_auth
+from auth import check_auth, verify_token
 from config.general import HEALTH_BACKUP_DIR, LOCATION_BACKUP_DIR, REVOLUT_TRANSACTION_BACKUP_DIR, WISE_TRANSACTION_BACKUP_DIR
 from database.transaction.ingest.wise import insert as insert_wise
 from database.transaction.ingest.revolut import insert as insert_revolut
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn
+from database.location.table import insert_location
+from telemetry_models import OverlandPayload
 from uploads.utils import handle_health_upload, input_csv
 
 router = APIRouter()
@@ -232,3 +234,38 @@ async def add_cash_transaction(tx: CashTransactionRequest):
         description=tx.description,
         message="Cash transaction recorded successfully.",
     )
+
+@router.post(
+    "/overland",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(verify_token)],
+)
+async def upload_overland(
+        payload: OverlandPayload,
+):
+    for item in payload.locations:
+        insert_location(
+            conn=get_conn(),
+            timestamp=item.properties.timestamp,
+            timezone="",
+            latitude=item.geometry.coordinates[1],
+            longitude=item.geometry.coordinates[0],
+            altitude=item.properties.altitude,
+            activity=str(item.properties.motion),
+            device="overland",
+            is_locked=None,
+            battery=int(item.properties.battery_level * 100),
+            is_charging=None,
+            is_connected_charger=None,
+            BSSID=None,
+            RSSI=None
+        )
+    return {"result": "ok"}
+
+@router.post(
+    "/discard",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(verify_token)],
+)
+async def discard_overland():
+    return {"result": "ok"}
