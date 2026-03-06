@@ -1,9 +1,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional, Union
-import requests
 import logging
 
-from config.general import CURRENCIES, FX_API_KEY, FX_URL, SOURCE_CURRENCY
 from database.util import get_conn
 
 logger = logging.getLogger(__name__)
