@@ -14,3 +14,4 @@ server/app/logs/
 /client/.cache.sqlite
 /client/weather_data.csv
 /server/wake-pc.sh
+/logs
