@@ -5,7 +5,7 @@ from typing import Any
 from auth import check_auth
 from config.general import HEALTH_BACKUP_DIR
 from fastapi import APIRouter, BackgroundTasks, Header #type: ignore
-from upload.utils import handle_health_upload 
+from upload.health.util import handle_health_upload 
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
