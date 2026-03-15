@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import json
 import logging
 from typing import Optional
@@ -52,23 +52,73 @@ def convert_to_gbp(amount: float, currency: str, on_date: date, tolerance_days: 
         return None
     return round(amount / rate, 6)
 
-def insert_fx_json(fx_data: dict):
-    quotes = fx_data.get("quotes", {})
-    for source_target_pair in quotes.keys(): # Loop through returned FX rates (e.g. "GBPUSD", "GBPCAD" etc.)
-        source_currency, target_currency = source_target_pair[:3], source_target_pair[3:] # Extract source and target currency from pair string
-        if source_currency != SOURCE_CURRENCY: # Sanity check - should always be the same as config.SOURCE_CURRENCY
-            logger.warning(f"Unexpected source currency in FX data: {source_currency} (expected {SOURCE_CURRENCY})")
-            continue
-        rate = quotes[source_target_pair] # Extract rate from response
-        insert_fx_rate(
-            date=fx_data.get("date"), 
-            source_currency=source_currency, 
-            target_currency=target_currency, 
-            rate=float(rate),
-            ts=int(fx_data.get("timestamp"))) # Insert into DB
+def insert_fx_json(quotes: dict):
+    """
+    Insert FX rates from a timeframe API response.
+    :param quotes: dict of date -> {currency_pair -> rate} (e.g. {"2026-03-01": {"GBPUSD": 1.25, ...}})
+    """
+    for date, pairs in quotes.items():
+        for source_target_pair, rate in pairs.items():
+            source_currency = source_target_pair[:3]
+            target_currency = source_target_pair[3:]
+
+            if source_currency != SOURCE_CURRENCY:
+                logger.warning(f"Unexpected source currency '{source_currency}' in FX data for {date} (expected {SOURCE_CURRENCY})")
+                continue
+
+            insert_fx_rate(
+                date=date,
+                source_currency=source_currency,
+                target_currency=target_currency,
+                rate=float(rate),
+                ts=int(datetime.strptime(date, "%Y-%m-%d").timestamp()),
+            )
 
 def insert_fx_file(fx_path: str):
     with open(fx_path) as f:
         fx_data = json.load(f)
     for fx in fx_data:
         insert_fx_json(fx)
+
+def increment_api_usage(service: str = "exchangerate.host"):
+    """Increment the API usage count for the current month."""
+    month = datetime.now().strftime("%Y-%m")
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO api_usage (service, count, month)
+            VALUES (?, 1, ?)
+            ON CONFLICT(service) DO UPDATE SET count = count + 1
+        """, (service, month))
+
+
+def get_api_usage(service: str = "exchangerate.host") -> dict:
+    """Return current usage count and month for a service."""
+    with get_conn(read_only=True) as conn:
+        row = conn.execute(
+            "SELECT count, month FROM api_usage WHERE service = ?", (service,)
+        ).fetchone()
+    return {"service": service, "count": row["count"], "month": row["month"]} if row else {"service": service, "count": 0, "month": None}
+
+
+def reset_api_usage(service: str = "exchangerate.host"):
+    """Reset the API usage count to 0 for a service."""
+    month = datetime.now().strftime("%Y-%m")
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO api_usage (service, count, month)
+            VALUES (?, 0, ?)
+            ON CONFLICT(service) DO UPDATE SET count = 0, month = ?
+        """, (service, month, month))
+    logger.info(f"Reset API usage for {service} (month: {month})")
+
+
+def set_api_usage(service: str = "exchangerate.host", count: int = 0):
+    """Manually set the API usage count — use to initialise or correct the count."""
+    month = datetime.now().strftime("%Y-%m")
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO api_usage (service, count, month)
+            VALUES (?, ?, ?)
+            ON CONFLICT(service) DO UPDATE SET count = ?, month = ?
+        """, (service, count, month, count, month))
+    logger.info(f"Set API usage for {service} to {count} (month: {month})")
