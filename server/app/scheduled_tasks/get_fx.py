@@ -78,9 +78,7 @@ def get_fx_for_month(month=None, year=None):
         json.dump(responses, f, indent=2)
     logger.info(f"Successfully saved FX rates to {FX_BACKUP_DIR / f'{year}-{month:02}.json'}")
 
-def run():
+if __name__ == "__main__":
     configure_logging()
     logger.info(f"Getting FX rates for previous month ({(datetime.now() - relativedelta(months=1)).strftime('%B')})...")
     get_fx_for_month()
-
-run()
