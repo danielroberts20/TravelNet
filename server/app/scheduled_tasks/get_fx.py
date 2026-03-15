@@ -10,9 +10,13 @@ import requests
 
 from config.logging import configure_logging
 from config.general import CURRENCIES, FX_API_KEY, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
-from database.exchange.util import insert_fx_json
+from database.exchange.util import increment_api_usage, insert_fx_json
 
 logger = logging.getLogger(__name__)
+
+def _extract_quotes(response: dict) -> dict:
+    """Extract quotes from API response, checking both 'quotes' and 'rates' keys."""
+    return response.get("quotes") or response.get("rates") or {}
 
 def get_fx_rate_at_date(date_string: str, retry_time: int = 5, *currencies: str, **kwargs: str) -> Optional[Dict]:
     """
@@ -33,6 +37,8 @@ def get_fx_rate_at_date(date_string: str, retry_time: int = 5, *currencies: str,
             "currencies": ",".join(list(currencies)),
         }
         response = requests.get(FX_URL, params=params)
+        increment_api_usage("exchangerate.host") # Keep track of API calls
+        
         if response.json().get("success") is not True or "error" in response.json():
             if response.json().get("error", {}).get("type", {}) == "rate_limit_reached":
                 logger.warning(f"FX API rate limit reached. Re-trying in {retry_time} seconds...")
@@ -47,38 +53,50 @@ def get_fx_rate_at_date(date_string: str, retry_time: int = 5, *currencies: str,
     except ValueError:
         return None
     
-def get_fx_for_month(month=None, year=None):
+def get_fx_for_month(month: int = None, year: int = None):
     """
-    Get daily FX rates for currencies specified by config.
-    :param month: int (1-12 inc.). If no month is specified, previous month is used.
-    :param year: int (1970<=). If no year is specified, current year is used.
-    :return:
+    Fetch and store daily FX rates for an entire month in a single API call.
+    :param month: 1-12, defaults to previous month
+    :param year: defaults to current year
     """
     now = datetime.now()
-    month = now.month - 1 if month is None else month
-    month = max(1, min(month, 12)) # Clamp between 1-12
+    month = max(1, min(month if month is not None else now.month - 1, 12))
+    year = max(1970, min(year if year is not None else now.year, now.year))
 
-    responses = []
+    start_date = f"{year}-{month:02}-01"
+    end_date = f"{year}-{month:02}-{calendar.monthrange(year, month)[1]:02}"
 
-    year = now.year if year is None else year
-    year = max(1970, min(year, now.year)) # Clamp between 1970-current year
-    for day in range(1, calendar.monthrange(year, month)[1]+1): # Loop through days in month
-        logger.info(f"Getting FX for {year}-{month:02}-{day:02}...")
-        fx_data = get_fx_rate_at_date(f"{year}-{month:02}-{day:02}") # Get FX for day (defaults to config currencies and source currency)
-        if fx_data is None or fx_data.get("success") is not True:
-            logger.error(f"Failed to fetch FX for {year}-{month:02}-{day:02}")
-            continue
+    logger.info(f"Fetching FX rates for {year}-{month:02} ({start_date} to {end_date})...")
 
-        responses.append(fx_data)
-        insert_fx_json(fx_data)
+    params = {
+        "access_key": FX_API_KEY,
+        "start_date": start_date,
+        "end_date": end_date,
+        "source": SOURCE_CURRENCY,
+        "currencies": ",".join(CURRENCIES),
+    }
 
-    logger.info(f"Done fetching FX rates for {year}-{month:02}")
+    response = requests.get(FX_URL, params=params).json()
+    increment_api_usage("exchangerate.host")
 
-    with open(FX_BACKUP_DIR / f"{year}-{month:02}.json", "w") as f:
-        json.dump(responses, f, indent=2)
-    logger.info(f"Successfully saved FX rates to {FX_BACKUP_DIR / f'{year}-{month:02}.json'}")
+    if response.get("success") is not True:
+        logger.error(f"FX API error for {year}-{month:02}: {response.get('error')}")
+        return
+
+    quotes = _extract_quotes(response)
+    if not quotes:
+        logger.warning(f"No quotes returned for {year}-{month:02}")
+        return
+
+    insert_fx_json(quotes)
+
+    backup_path = FX_BACKUP_DIR / f"{year}-{month:02}.json"
+    with open(backup_path, "w") as f:
+        json.dump(response, f, indent=2)
+    logger.info(f"Saved FX rates to {backup_path}")
 
 if __name__ == "__main__":
     configure_logging()
-    logger.info(f"Getting FX rates for previous month ({(datetime.now() - relativedelta(months=1)).strftime('%B')})...")
+    prev_month = datetime.now() - relativedelta(months=1)
+    logger.info(f"Getting FX rates for previous month ({prev_month.strftime('%B %Y')})...")
     get_fx_for_month()
