@@ -1,0 +1,116 @@
+# scheduled_tasks/get_fx_up_to_date.py
+
+import json
+import logging
+from datetime import date, timedelta
+from typing import Optional
+
+import requests
+
+from config.general import CURRENCIES, FX_API_KEY, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
+from config.logging import configure_logging
+from database.exchange.util import get_api_usage, increment_api_usage, insert_fx_json
+from database.util import get_conn
+
+logger = logging.getLogger(__name__)
+
+def _get_missing_dates(target_date: date) -> list[str]:
+    """
+    Return sorted list of dates (YYYY-MM-DD) missing from fx_rates
+    between the earliest date in the DB and target_date.
+    """
+    with get_conn(read_only=True) as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT date FROM fx_rates WHERE source_currency = ?",
+            (SOURCE_CURRENCY,)
+        ).fetchall()
+
+    if not rows:
+        logger.warning("No existing FX data in DB — run get_fx_for_month first")
+        return []
+
+    dates_in_db = {row["date"] for row in rows}
+    earliest = date.fromisoformat(min(dates_in_db))
+
+    expected = {
+        (earliest + timedelta(days=i)).isoformat()
+        for i in range((target_date - earliest).days + 1)
+    }
+
+    return sorted(expected - dates_in_db)
+
+
+def get_fx_up_to_date(target_date: date = None):
+    """
+    Backfill any missing FX rates from the earliest date in the DB up to target_date.
+    Uses a single timeframe API call spanning the earliest to latest missing date.
+    :param target_date: date to backfill up to (defaults to today)
+    """
+    target_date = target_date or date.today()
+
+    # Check quota before doing anything
+    used = get_api_usage("exchangerate.host").get("count")
+    remaining = None if used is None else 100 - used
+    if remaining is None:
+        logger.error("Could not verify API quota, aborting")
+        return
+    if remaining < 1:
+        logger.error(f"No API quota remaining, aborting")
+        return
+    logger.info(f"{remaining} API call(s) remaining this month")
+
+    missing_dates = _get_missing_dates(target_date)
+    if not missing_dates:
+        logger.info(f"No missing dates found up to {target_date}, nothing to do")
+        return
+
+    start_date = missing_dates[0]
+    end_date = missing_dates[-1]
+
+    start = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date)
+    if (end - start).days > 365:
+        logger.error(
+            f"Date range exceeds 365 day API limit "
+            f"({(end - start).days} days) — use get_fx_for_month to backfill manually"
+        )
+        return
+
+    logger.info(
+        f"{len(missing_dates)} missing date(s) between "
+        f"{start_date} and {end_date}, fetching..."
+    )
+
+    params = {
+        "access_key": FX_API_KEY,
+        "start_date": start_date,
+        "end_date": end_date,
+        "source": SOURCE_CURRENCY,
+        "currencies": ",".join(CURRENCIES),
+    }
+
+    response = requests.get(FX_URL, params=params).json()
+    increment_api_usage("exchangerate.host")
+
+    if response.get("success") is not True:
+        logger.error(f"API error: {response.get('error')}")
+        return
+
+    quotes = response.get("quotes") or response.get("rates") or {}
+    if not quotes:
+        logger.warning(f"No quotes returned for {start_date} to {end_date}")
+        return
+
+    insert_fx_json(quotes)
+    logger.info(f"Successfully backfilled {len(quotes)} date(s)")
+
+    backup_path = FX_BACKUP_DIR / f"backfill_{date.today().isoformat()}.json"
+    with open(backup_path, "w") as f:
+        json.dump(response, f, indent=2)
+    logger.info(f"Saved backup to {backup_path}")
+
+
+if __name__ == "__main__":
+    configure_logging()
+    logger.info("Running get_fx_up_to_date...")
+    get_fx_up_to_date()
