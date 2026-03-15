@@ -18,7 +18,7 @@ from database.util import get_conn
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.post("/new_wise")
+@router.post("/wise")
 async def upload_new_wise(file: UploadFile = File(...),
                           authorization: str = Header(...)):
     check_auth(authorization)
@@ -53,37 +53,6 @@ async def upload_new_wise(file: UploadFile = File(...),
         raise HTTPException(status_code=400, detail="Invalid or corrupted zip file")
     
     return {"processed": results, "errors": errors}
-
-@router.post("/wise")
-async def upload_wise(file: UploadFile = File(...),
-                      authorization: str = Header(None),
-                      source: str = Header(None)):
-    check_auth(authorization)
-
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="File must be a CSV")
-
-    print(source)
-    
-    contents = await file.read()
-
-    # Decode bytes → string
-    decoded = contents.decode("utf-8")
-    now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d"))-1
-    csv_path = WISE_TRANSACTION_BACKUP_DIR / f"{year_month}-{day}.csv"
-    with open(csv_path, "w+") as f:
-        f.write(decoded)
-        f.close()
-
-    inserted, skipped, errors = insert_wise(csv_path, source)
-
-    return {
-        "inserted": inserted,
-        "skipped": skipped,
-        "errors": errors
-    }
 
 @router.post("/revolut")
 async def upload_revolut(file: UploadFile = File(...),
