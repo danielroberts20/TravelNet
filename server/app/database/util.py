@@ -43,7 +43,7 @@ def get_latest_backup() -> str:
 
 def rebuild_db():
     from database.integration import init_db
-    from uploads.utils import input_csv
+    from upload.utils import input_csv
     from database.exchange.util import insert_fx_file
     from database.integration import insert_log
     
