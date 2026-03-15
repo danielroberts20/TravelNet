@@ -41,7 +41,7 @@ def get_latest_backup() -> str:
         raise FileNotFoundError("No backup files found.")
     return backup_files[0]
 
-def rebuild_db():
+def rebuild_db(*table_names):
     from database.integration import init_db
     from upload.utils import input_csv
     from database.exchange.util import insert_fx_file
@@ -49,35 +49,37 @@ def rebuild_db():
     
     logger.info("Rebuilding database from CSV logs...")
     with get_conn() as conn:
-        conn.execute("DROP TABLE IF EXISTS cellular_states;")
-        conn.execute("DROP TABLE IF EXISTS locations;")
-        conn.execute("DROP TABLE IF EXISTS health_data;")
-        conn.execute("DROP TABLE IF EXISTS health_sources;")
-        conn.execute("DROP TABLE IF EXISTS fx_rates;")
+        for table in table_names:
+            try:
+                conn.execute(f"DROP TABLE IF EXISTS {table};")
+            except Exception:
+                continue
         conn.commit()   
 
     init_db()
 
-    for f in sorted(os.listdir(HEALTH_BACKUP_DIR)):
-        if f.endswith(".csv"):
-            input_csv(open(HEALTH_BACKUP_DIR / f, "r"))
+    if "health_data" in table_names and "health_sources" in table_names:
+        for f in sorted(os.listdir(HEALTH_BACKUP_DIR)):
+            if f.endswith(".csv"):
+                input_csv(open(HEALTH_BACKUP_DIR / f, "r"))
     
-    for f in sorted(os.listdir(LOCATION_BACKUP_DIR)):
-        if f.endswith(".csv"):
-            reader = csv.DictReader(LOCATION_BACKUP_DIR / f)
-            for idx, row in enumerate(reader):
-                try:
-                    log = Log.from_strings(**row)
-                    insert_log(log)
-                    inserted += 1
-                except Exception as e:
-                    # Skip bad rows
-                    logger.warning(f"Bad row on line {idx+2}.\t CSV entry: {row}\tException: {e}")
-                    continue
+    if "location_history" in table_names and "location_overland" in table_names:
+        for f in sorted(os.listdir(LOCATION_BACKUP_DIR)):
+            if f.endswith(".csv"):
+                reader = csv.DictReader(LOCATION_BACKUP_DIR / f)
+                for idx, row in enumerate(reader):
+                    try:
+                        log = Log.from_strings(**row)
+                        insert_log(log)
+                        inserted += 1
+                    except Exception as e:
+                        # Skip bad rows
+                        logger.warning(f"Bad row on line {idx+2}.\t CSV entry: {row}\tException: {e}")
+                        continue
     
-        
-    for f in sorted(os.listdir(FX_BACKUP_DIR)):
-        if f.endswith(".json"):
-            insert_fx_file(FX_BACKUP_DIR / f)
+    if "fx_rates" in table_names:
+        for f in sorted(os.listdir(FX_BACKUP_DIR)):
+            if f.endswith(".json"):
+                insert_fx_file(FX_BACKUP_DIR / f)
     
-    logger.info("Finished rebuilding database")
+    logger.info(f"Finished rebuilding database tables: {','.join(table_names)}")
