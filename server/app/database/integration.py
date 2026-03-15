@@ -6,6 +6,7 @@ from database.location.table import init as init_location, insert_location
 from database.health.table import init as init_health
 from database.transaction.table import init as init_transactions
 from database.job.table import init as init_jobs
+from database.location.overland.table import init as init_overland
 
 # -----------------------------
 # Initialization
@@ -17,6 +18,7 @@ def init_db():
     init_health()
     init_transactions()
     init_jobs()
+    init_overland()
 
 # -----------------------------
 # Insertion helpers

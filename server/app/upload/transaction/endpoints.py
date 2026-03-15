@@ -1,75 +1,58 @@
-import csv
 from datetime import datetime, timezone
 import hashlib
 import io
 import json
-from fastapi import APIRouter, Header, BackgroundTasks, UploadFile, File, HTTPException  #type: ignore
 import logging
-from typing import Any, Optional
-from pydantic import BaseModel, Field, field_validator
+from typing import Optional
+import zipfile
+from fastapi import APIRouter, UploadFile, File, Header, HTTPException #type: ignore
+from pydantic import BaseModel, Field, field_validator #type: ignore
 
-from auth import check_auth
-from config.general import HEALTH_BACKUP_DIR, LOCATION_BACKUP_DIR, REVOLUT_TRANSACTION_BACKUP_DIR, WISE_TRANSACTION_BACKUP_DIR
+from config.general import REVOLUT_TRANSACTION_BACKUP_DIR, WISE_SOURCE_MAP, WISE_TRANSACTION_BACKUP_DIR
+from auth import check_auth 
 from database.transaction.ingest.wise import insert as insert_wise
 from database.transaction.ingest.revolut import insert as insert_revolut
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn
-from uploads.utils import handle_health_upload, input_csv
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.post("/health")
-async def upload_health(data: dict[str, Any],
-                        background_tasks: BackgroundTasks,
-                        authorization: str = Header(...)):
-
+@router.post("/new_wise")
+async def upload_new_wise(file: UploadFile = File(...),
+                          authorization: str = Header(...)):
     check_auth(authorization)
 
-    now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d"))-1
-    with open(HEALTH_BACKUP_DIR / f"{year_month}-{day}.json", "w+") as f:
-        f.write(str(data))
-        f.close()
-
-    background_tasks.add_task(handle_health_upload, data)    
-    logger.info(f"Successfully uploaded {len(data)} health entries")
-    return {
-        "status": "success",
-        "csvs_received": len(data)
-    }
-
-@router.post("/csv")
-async def upload_csv(file: UploadFile = File(...),
-                     authorization: str = Header(None)):
-
-    check_auth(authorization)
-
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="File must be a CSV")
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="File must be a .zip")
 
     contents = await file.read()
+    results = []
+    errors = []
 
-    # Decode bytes → string
-    decoded = contents.decode("utf-8")
-    now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d"))-1
-    with open(LOCATION_BACKUP_DIR / f"{year_month}-{day}.csv", "w+") as f:
-        f.write(decoded)
-        f.close()
+    try:
+        with zipfile.ZipFile(io.BytesIO(contents)) as zf:
+            csv_files = [f for f in zf.namelist() if f.endswith(".csv")]
+            if not csv_files:
+                raise HTTPException(status_code=400, detail="No CSV files found in zip")
+            
+            for filename in csv_files:
+                try:
+                    split_filename = filename.split("_")
+                    source = "_".join([split_filename[1], split_filename[2]])
+                    if source not in WISE_SOURCE_MAP.keys():
+                        logger.warning(f"No friendly name found for Wise source: {source}")
+                    
+                    file_results, file_errors = insert_wise(zf, filename, source)
+                    results.extend(file_results)
+                    errors.extend(file_errors)
+                except Exception as e:
+                    logger.error(f"Error while processing Wise transaction ({filename}): {str(e)}")
 
-    # Convert string → file-like object
-    csv_file = io.StringIO(decoded)
+    except zipfile.BadZipFile as e:
+        raise HTTPException(status_code=400, detail="Invalid or corrupted zip file")
     
-    inserted, skipped_rows = input_csv(csv_file)
-
-    return {
-        "status": "success",
-        "rows_inserted": inserted,
-        "skipped_rows": skipped_rows
-    }
+    return {"processed": results, "errors": errors}
 
 @router.post("/wise")
 async def upload_wise(file: UploadFile = File(...),

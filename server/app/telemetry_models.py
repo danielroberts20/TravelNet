@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from parsers import parse_float, parse_bool_yes_no, parse_int, parse_string, parse_cellular_states
+from pydantic import BaseModel, Field, field_validator
 
 @dataclass
 class CellularState:
@@ -53,3 +55,48 @@ class Log:
             RSSI=parse_int(kwargs["RSSI"]),
             cellular_states=parse_cellular_states(kwargs["cellular_states"])
         )
+
+# ---------------------------------------------------------------------------
+# Pydantic models — mirrors the Overland GeoJSON schema exactly
+# ---------------------------------------------------------------------------
+
+class OverlandGeometry(BaseModel):
+    type: str
+    coordinates: list[float]          # [lon, lat] — note GeoJSON order
+
+
+class OverlandProperties(BaseModel):
+    timestamp: str                    # ISO 8601 with TZ offset
+    altitude: Optional[float] = None
+    speed: Optional[float] = None     # m/s, -1 if unavailable
+    horizontal_accuracy: Optional[float] = None   # metres
+    vertical_accuracy: Optional[float] = None     # metres, -1 if unavailable
+    motion: Optional[list[str]] = Field(default_factory=list)
+    pauses: Optional[bool] = None
+    activity: Optional[str] = None
+    desired_accuracy: Optional[float] = None
+    deferred: Optional[float] = None
+    significant_change: Optional[str] = None
+    locations_in_payload: Optional[int] = None
+    device_id: Optional[str] = None
+    wifi: Optional[str] = None        # SSID of connected network
+    battery_state: Optional[str] = None   # "charging" | "full" | "unplugged"
+    battery_level: Optional[float] = None  # 0.0–1.0
+
+    @field_validator("speed", "vertical_accuracy", mode="before")
+    @classmethod
+    def negative_to_none(cls, v):
+        """Overland uses -1 to signal 'unavailable'; normalise to NULL."""
+        if v is not None and float(v) < 0:
+            return None
+        return v
+
+
+class OverlandFeature(BaseModel):
+    type: str
+    geometry: OverlandGeometry
+    properties: OverlandProperties
+
+
+class OverlandPayload(BaseModel):
+    locations: list[OverlandFeature]
