@@ -23,6 +23,14 @@ def init():
         )
         """)
 
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS api_usage (
+            service     TEXT PRIMARY KEY,
+            count       INTEGER NOT NULL DEFAULT 0,
+            month       TEXT NOT NULL  -- YYYY-MM, to detect stale data
+        )
+        """)
+
         # Indexes for performance
         conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_fx_date
@@ -44,7 +52,7 @@ def insert_fx_rate(date: str, source_currency: str, target_currency: str, rate: 
         ts = int(datetime.now().timestamp())
     with get_conn() as conn:
         cursor = conn.execute(
-            "INSERT INTO fx_rates (date, source_currency, target_currency, rate, timestamp) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO fx_rates (date, source_currency, target_currency, rate, timestamp) VALUES (?, ?, ?, ?, ?)",
             (date, source_currency, target_currency, rate, ts)
         )
         logger.info(f"Inserted FX rate with ID {cursor.lastrowid}")
