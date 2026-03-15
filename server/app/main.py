@@ -6,7 +6,7 @@ from database.integration import init_db
 from database.util import backup_db, rebuild_db
 
 from jobs.endpoints import router as jobs_router
-from uploads.endpoints import router as uploads_router
+from upload.endpoints import router as uploads_router
 from database.endpoints import router as db_router
 from metadata.endpoints import router as metadata_router
 
