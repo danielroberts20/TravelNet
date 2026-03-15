@@ -1,29 +1,12 @@
 import csv
-import os
 from fastapi import HTTPException  # type: ignore
 import logging
 
-from database.integration import init_db, insert_log
+from database.integration import insert_log
 from telemetry_models import Log
-from database.util import get_conn
-from config.general import DATA_DIR
 
 
 logger = logging.getLogger(__name__)
-
-def rebuild_db():
-    logger.info("Rebuilding database from CSV logs...")
-    with get_conn() as conn:
-        conn.execute("DROP TABLE IF EXISTS cellular_states;")
-        conn.execute("DROP TABLE IF EXISTS locations;")
-        conn.commit()   
-
-    init_db()
-
-    for file in sorted(os.listdir(DATA_DIR / "csv_logs" / "location")):
-        if file.endswith(".csv"):
-            input_csv(open(DATA_DIR / "csv_logs" / "location" / file, "r"))
-    logger.info("Finished rebuilding database")
             
 def input_csv(csv_file):
     reader = csv.DictReader(csv_file)

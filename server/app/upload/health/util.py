@@ -3,47 +3,14 @@ import csv
 from datetime import datetime
 import io
 import json
+import logging
 import statistics
 from typing import Any
-from fastapi import HTTPException  # type: ignore
-import logging
 
-from database.integration import insert_log
-from database.health.table import insert_health_entry
-from telemetry_models import Log
 from config.general import INTERVAL_MINUTES, METRIC_AGGREGATION, METRICS
-
+from database.health.table import insert_health_entry
 
 logger = logging.getLogger(__name__)
-            
-def input_csv(csv_file):
-    reader = csv.DictReader(csv_file)
-
-    required_fields = {"latitude", "longitude", "timestamp"}
-
-    if not required_fields.issubset(reader.fieldnames):
-        raise HTTPException(
-            status_code=400,
-            detail=f"CSV must contain columns: {required_fields}"
-        )
-
-    inserted = 0
-    skipped_rows = []
-    total_rows = 0
-
-    for idx, row in enumerate(reader):
-        total_rows += 1
-        try:
-            log = Log.from_strings(**row)
-            insert_log(log)
-            inserted += 1
-        except Exception as e:
-            # Skip bad rows
-            logger.warning(f"Bad row on line {idx+2}.\t CSV entry: {row}\tException: {e}")
-            skipped_rows.append(idx+2)
-            continue
-    logger.info(f"Successfully uploaded {inserted}/{total_rows} entries")
-    return inserted, skipped_rows
 
 def handle_duration_metric(current_metric: str, header: list[str], reader: csv.reader, timezone: str):
     start = header.index("Start")
