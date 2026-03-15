@@ -56,6 +56,16 @@ WISE_SOURCE_MAP = {
 UPLOAD_TOKEN = os.getenv("UPLOAD_TOKEN", None)
 FX_API_KEY = os.getenv("FX_API_KEY", None)
 OVERLAND_TOKEN = os.getenv("OVERLAND_TOKEN", None)
+
+# Warning/Error Email Log Settings
+SMTP_HOST = os.getenv("ALERT_SMTP_HOST", None)
+smtp_port = os.getenv("ALERT_SMTP_PORT", None)
+SMTP_PORT = 0 if smtp_port is None else smtp_port
+EMAIL_SENDER = os.getenv("ALERT_EMAIL_SENDER", None)
+EMAIL_PASSWORD = os.getenv("ALERT_EMAIL_PASSWORD", None)
+EMAIL_RECIPIENT = os.getenv("ALERT_EMAIL_RECIPIENT", None)
+
+
 INTERVAL_MINUTES = 5
 METRIC_AGGREGATION = {
     "Active Energy": {"Active Energy (kJ)": "sum"},
