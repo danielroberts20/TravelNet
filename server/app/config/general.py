@@ -36,8 +36,8 @@ LOG_FILE = LOG_DIR / "server.log"
 WARN_FILE = LOG_DIR / "server.warn.log"
 ERROR_FILE = LOG_DIR / "server.error.log"
 
-FX_URL = URL("https://api.exchangerate.host/historical")
-CURRENCIES = ["GBP", "USD", "CAN", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"]
+FX_URL = URL("https://api.exchangerate.host/timeframe")
+CURRENCIES = ["GBP", "USD", "CAD", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"]
 SOURCE_CURRENCY = "GBP"
 
 WISE_SOURCE_MAP = {
