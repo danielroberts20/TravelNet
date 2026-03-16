@@ -1,6 +1,9 @@
 import logging
+from smtplib import SMTP_PORT
+from config.general import EMAIL_PASSWORD, EMAIL_RECIPIENT, EMAIL_SENDER, SMTP_HOST
 from config.logging import configure_logging
 from database.util import get_conn
+from notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +76,24 @@ def backfill_gbp():
                     for r in still_null
                 )
             )
+    return {
+        "backfilled": backfilled,
+        "still_null": len(still_null)
+    }
 
 
 if __name__ == "__main__":
     configure_logging()
-    backfill_amount_gbp()
+
+    smtp_cfg = {
+        "host": SMTP_HOST,
+        "port": SMTP_PORT,
+        "sender": EMAIL_SENDER,
+        "password": EMAIL_PASSWORD,
+        "recipient": EMAIL_RECIPIENT,
+    }
+
+    with CronJobMailer("backfill_gbp", smtp_cfg) as job:
+        result = backfill_gbp()
+        job.add_metric("backfilled", result["backfilled"])
+        job.add_metric("still null", result["still_null"])

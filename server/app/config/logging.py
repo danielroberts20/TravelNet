@@ -8,6 +8,7 @@ import smtplib
 
 from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
 from database.util import get_conn
+from notifications import send_email
 
 class DailyDigestHandler(logging.Handler):
     
@@ -43,47 +44,43 @@ class DailyDigestHandler(logging.Handler):
                 self.handleError(record)
     
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient):
-        with self._lock:
-            with get_conn() as conn:
-                rows = conn.execute(
-                    "SELECT ts, level, logger, module, lineno, message FROM log_digest ORDER BY id"
-                ).fetchall()
+       with self._lock:
+           with get_conn() as conn:
+               rows = conn.execute(
+                   "SELECT ts, level, logger, module, lineno, message FROM log_digest ORDER BY id"
+               ).fetchall()
+           if not rows:
+               return
+           with get_conn() as conn:
+               conn.execute("DELETE FROM log_digest")
 
-                if not rows:
-                    return
+       try:
+           now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+           lines = [
+               f"TravelNet daily alert digest — {now}",
+               f"{len(rows)} event(s) at WARNING or above:\n",
+               "=" * 60,
+           ]
+           for ts, level, logger, module, lineno, message in rows:
+               lines.append(f"{ts} | {level} | {logger} | {module}:{lineno} | {message}")
+           lines.append("=" * 60)
 
-                conn.execute("DELETE FROM log_digest")
-
-        try:
-            now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
-            lines = [
-                f"TravelNet daily alert digest — {now}",
-                f"{len(rows)} event(s) at WARNING or above:\n",
-                "=" * 60,
-            ]
-            for ts, level, logger, module, lineno, message in rows:
-                lines.append(f"{ts} | {level} | {logger} | {module}:{lineno} | {message}")
-            lines.append("=" * 60)
-
-            msg = EmailMessage()
-            msg["Subject"] = f"[TravelNet] {len(rows)} alert(s) — {now}"
-            msg["From"] = sender
-            msg["To"] = recipient
-            msg.set_content("\n".join(lines))
-
-            with smtplib.SMTP(smtp_host, smtp_port) as smtp:
-                smtp.starttls()
-                smtp.login(sender, password)
-                smtp.send_message(msg)
-
-        except Exception as e:
-            # Re-insert rows so they aren't lost if sending fails
-            with get_conn() as conn:
-                conn.executemany(
-                    "INSERT INTO log_digest (ts, level, logger, module, lineno, message) VALUES (?, ?, ?, ?, ?, ?)",
-                    rows
-                )
-            raise
+           send_email(
+               subject=f"[TravelNet] {len(rows)} alert(s) — {now}",
+               body="\n".join(lines),
+               smtp_host=smtp_host,
+               smtp_port=smtp_port,
+               sender=sender,
+               password=password,
+               recipient=recipient,
+           )
+       except Exception as e:
+           with get_conn() as conn:                          # restore on failure
+               conn.executemany(
+                   "INSERT INTO log_digest (ts, level, logger, module, lineno, message) VALUES (?, ?, ?, ?, ?, ?)",
+                   rows,
+               )
+           raise
 
 
 digest_handler = DailyDigestHandler()

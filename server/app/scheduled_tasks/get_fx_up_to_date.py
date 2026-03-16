@@ -3,14 +3,18 @@
 import json
 import logging
 from datetime import date, timedelta
+from smtplib import SMTP_PORT
 from typing import Optional
 
 import requests
 
-from config.general import CURRENCIES, FX_API_KEY, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
+from config.general import (
+    CURRENCIES, EMAIL_PASSWORD, EMAIL_RECIPIENT, EMAIL_SENDER, 
+    FX_API_KEY, FX_BACKUP_DIR, FX_URL, SMTP_HOST, SOURCE_CURRENCY)
 from config.logging import configure_logging
 from database.exchange.util import get_api_usage, increment_api_usage, insert_fx_json
 from database.util import get_conn
+from notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +113,30 @@ def get_fx_up_to_date(target_date: date = None):
         json.dump(response, f, indent=2)
     logger.info(f"Saved backup to {backup_path}")
 
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "dates_inserted": len(quotes),
+        "backup_path": str(backup_path),
+    }
+
 
 if __name__ == "__main__":
     configure_logging()
+
+    smtp_cfg = {
+        "host": SMTP_HOST,
+        "port": SMTP_PORT,
+        "sender": EMAIL_SENDER,
+        "password": EMAIL_PASSWORD,
+        "recipient": EMAIL_RECIPIENT,
+    }
+
     logger.info("Running get_fx_up_to_date...")
-    get_fx_up_to_date()
+
+    with CronJobMailer("get_fx_up_to_date", smtp_cfg) as job:
+        result = get_fx_up_to_date()
+        job.add_metric("start date", result["start_date"])
+        job.add_metric("end date", result["end_date"])
+        job.add_metric("dates inserted", result["dates_inserted"])
+        job.add_metric("backup path", result["backup_path"])
