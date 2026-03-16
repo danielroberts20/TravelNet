@@ -7,10 +7,8 @@ import time
 from typing import Dict, Optional
 import requests
 from config.logging import configure_logging
-from config.general import (
-    CURRENCIES, EMAIL_PASSWORD, EMAIL_RECIPIENT, EMAIL_SENDER,
-    FX_API_KEY, FX_BACKUP_DIR, FX_URL, SMTP_HOST, SMTP_PORT, SOURCE_CURRENCY,
-)
+from config.general import CURRENCIES, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
+from config.settings import settings
 from database.exchange.util import increment_api_usage, insert_fx_json
 from notifications import CronJobMailer
 
@@ -36,7 +34,7 @@ def get_fx_rate_at_date(date_string: str, retry_time: int = 5, *currencies: str,
             currencies = CURRENCIES
         datetime.strptime(date_string, "%Y-%m-%d")
         params = {
-            "access_key": FX_API_KEY,
+            "access_key": settings.fx_api_key,
             "date": date_string,
             "source": kwargs.get("source", SOURCE_CURRENCY),
             "currencies": ",".join(list(currencies)),
@@ -76,7 +74,7 @@ def get_fx_for_month(month: int = None, year: int = None) -> dict:
     logger.info(f"Fetching FX rates for {month_label} ({start_date} to {end_date})...")
 
     params = {
-        "access_key": FX_API_KEY,
+        "access_key": settings.fx_api_key,
         "start_date": start_date,
         "end_date": end_date,
         "source": SOURCE_CURRENCY,
@@ -112,18 +110,10 @@ def get_fx_for_month(month: int = None, year: int = None) -> dict:
 if __name__ == "__main__":
     configure_logging()
 
-    smtp_cfg = {
-        "host": SMTP_HOST,
-        "port": SMTP_PORT,
-        "sender": EMAIL_SENDER,
-        "password": EMAIL_PASSWORD,
-        "recipient": EMAIL_RECIPIENT,
-    }
-
     prev_month = datetime.now() - relativedelta(months=1)
     logger.info(f"Getting FX rates for previous month ({prev_month.strftime('%B %Y')})...")
 
-    with CronJobMailer("get_fx", smtp_cfg) as job:
+    with CronJobMailer("get_fx", settings.smtp_cfg()) as job:
         result = get_fx_for_month()
         job.add_metric("month", result["month_label"])
         job.add_metric("dates inserted", result["dates_inserted"])

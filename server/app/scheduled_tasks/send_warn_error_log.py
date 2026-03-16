@@ -1,10 +1,10 @@
-from config.general import EMAIL_PASSWORD, EMAIL_RECIPIENT, EMAIL_SENDER, SMTP_HOST, SMTP_PORT
 from config.logging import digest_handler
+from config.settings import settings
 
 digest_handler.flush_and_send(
-    smtp_host=SMTP_HOST,
-    smtp_port=SMTP_PORT,
-    sender=EMAIL_SENDER,
-    password=EMAIL_PASSWORD,
-    recipient=EMAIL_RECIPIENT
+    smtp_host=settings.smtp_host,
+    smtp_port=settings.smtp_port,
+    sender=settings.email_sender,
+    password=settings.email_password,
+    recipient=settings.email_recipient
 )
