@@ -36,6 +36,11 @@ SAMPLE_ERROR_RESPONSE = {
     "error": {"type": "invalid_access_key", "info": "Invalid key"}
 }
 
+@pytest.fixture(autouse=True)
+def mock_increment_api_usage():
+    """Prevent all tests from hitting the api_usage table."""
+    with patch("scheduled_tasks.get_fx.increment_api_usage"):
+        yield
 
 # --- get_fx_rate_at_date ---
 
@@ -101,12 +106,13 @@ def test_get_fx_for_month_calls_insert_with_quotes():
 
 
 def test_get_fx_for_month_api_failure_logs_error(caplog):
-    """Should log an error and not call insert on API failure."""
+    """Should log an error and raise RuntimeError on API failure."""
     with patch("scheduled_tasks.get_fx.requests.get") as mock_get, \
          patch("scheduled_tasks.get_fx.insert_fx_json") as mock_insert:
         mock_get.return_value.json.return_value = SAMPLE_ERROR_RESPONSE
-        with caplog.at_level("ERROR", logger="get_fx"):
-            get_fx_for_month(month=2, year=2026)
+        with caplog.at_level("ERROR", logger="scheduled_tasks.get_fx"):
+            with pytest.raises(RuntimeError):
+                get_fx_for_month(month=2, year=2026)
     mock_insert.assert_not_called()
     assert "FX API error" in caplog.text
 
