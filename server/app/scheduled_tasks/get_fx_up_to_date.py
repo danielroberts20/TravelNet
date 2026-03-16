@@ -57,16 +57,16 @@ def get_fx_up_to_date(target_date: date = None):
     remaining = None if used is None else 100 - used
     if remaining is None:
         logger.error("Could not verify API quota, aborting")
-        return
+        return None
     if remaining < 1:
         logger.error(f"No API quota remaining, aborting")
-        return
+        return None
     logger.info(f"{remaining} API call(s) remaining this month")
 
     missing_dates = _get_missing_dates(target_date)
     if not missing_dates:
         logger.info(f"No missing dates found up to {target_date}, nothing to do")
-        return
+        return None
 
     start_date = missing_dates[0]
     end_date = missing_dates[-1]
@@ -78,7 +78,7 @@ def get_fx_up_to_date(target_date: date = None):
             f"Date range exceeds 365 day API limit "
             f"({(end - start).days} days) — use get_fx_for_month to backfill manually"
         )
-        return
+        return None
 
     logger.info(
         f"{len(missing_dates)} missing date(s) between "
@@ -98,12 +98,12 @@ def get_fx_up_to_date(target_date: date = None):
 
     if response.get("success") is not True:
         logger.error(f"API error: {response.get('error')}")
-        return
+        return None
 
     quotes = response.get("quotes") or response.get("rates") or {}
     if not quotes:
         logger.warning(f"No quotes returned for {start_date} to {end_date}")
-        return
+        return None
 
     insert_fx_json(quotes)
     logger.info(f"Successfully backfilled {len(quotes)} date(s)")
@@ -136,6 +136,9 @@ if __name__ == "__main__":
 
     with CronJobMailer("get_fx_up_to_date", smtp_cfg) as job:
         result = get_fx_up_to_date()
+        if result is None:
+            raise RuntimeError("get_fx_up_to_date failed — see logs for details")
+        
         job.add_metric("start date", result["start_date"])
         job.add_metric("end date", result["end_date"])
         job.add_metric("dates inserted", result["dates_inserted"])

@@ -19,7 +19,10 @@ def backfill_gbp():
 
         if not null_rows:
             logger.info("No NULL amount_gbp transactions found.")
-            return
+            return {
+                "backfilled": 0,
+                "still_null": 0
+            }
 
         logger.info(f"Found {len(null_rows)} transaction(s) with NULL amount_gbp, attempting backfill...")
 
@@ -97,3 +100,5 @@ if __name__ == "__main__":
         result = backfill_gbp()
         job.add_metric("backfilled", result["backfilled"])
         job.add_metric("still null", result["still_null"])
+        if result["still_null"] > 0:
+            job.add_metric("status", "partial - expect daily digest email")
