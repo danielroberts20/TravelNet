@@ -104,12 +104,20 @@ def reset_api_usage(service: str = "exchangerate.host"):
     """Reset the API usage count to 0 for a service."""
     month = datetime.now().strftime("%Y-%m")
     with get_conn() as conn:
+        row = conn.execute("SELECT * FROM api_usage WHERE service = ?", (service))
+        old_service, old_count, old_month = row.fetchone()
+
         conn.execute("""
             INSERT INTO api_usage (service, count, month)
             VALUES (?, 0, ?)
             ON CONFLICT(service) DO UPDATE SET count = 0, month = ?
         """, (service, month, month))
     logger.info(f"Reset API usage for {service} (month: {month})")
+    return {
+        "service": service if service == old_service else old_service,
+        "old_count": old_count,
+        "old_month": old_month
+    }
 
 
 def set_api_usage(service: str = "exchangerate.host", count: int = 0):
