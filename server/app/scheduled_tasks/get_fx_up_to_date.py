@@ -3,14 +3,11 @@
 import json
 import logging
 from datetime import date, timedelta
-from smtplib import SMTP_PORT
-from typing import Optional
 
 import requests
 
-from config.general import (
-    CURRENCIES, EMAIL_PASSWORD, EMAIL_RECIPIENT, EMAIL_SENDER, 
-    FX_API_KEY, FX_BACKUP_DIR, FX_URL, SMTP_HOST, SOURCE_CURRENCY)
+from config.general import CURRENCIES, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
+from config.settings import settings
 from config.logging import configure_logging
 from database.exchange.util import get_api_usage, increment_api_usage, insert_fx_json
 from database.util import get_conn
@@ -86,7 +83,7 @@ def get_fx_up_to_date(target_date: date = None):
     )
 
     params = {
-        "access_key": FX_API_KEY,
+        "access_key": settings.fx_api_key,
         "start_date": start_date,
         "end_date": end_date,
         "source": SOURCE_CURRENCY,
@@ -124,17 +121,9 @@ def get_fx_up_to_date(target_date: date = None):
 if __name__ == "__main__":
     configure_logging()
 
-    smtp_cfg = {
-        "host": SMTP_HOST,
-        "port": SMTP_PORT,
-        "sender": EMAIL_SENDER,
-        "password": EMAIL_PASSWORD,
-        "recipient": EMAIL_RECIPIENT,
-    }
-
     logger.info("Running get_fx_up_to_date...")
 
-    with CronJobMailer("get_fx_up_to_date", smtp_cfg) as job:
+    with CronJobMailer("get_fx_up_to_date", settings.smtp_config()) as job:
         result = get_fx_up_to_date()
         if result is None:
             raise RuntimeError("get_fx_up_to_date failed — see logs for details")

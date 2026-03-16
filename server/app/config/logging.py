@@ -3,8 +3,6 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 import threading
-from email.message import EmailMessage
-import smtplib
 
 from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
 from database.util import get_conn
