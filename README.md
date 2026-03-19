@@ -84,6 +84,7 @@ Data flows from iOS apps and manual uploads into FastAPI endpoints, is enriched 
 ## 📖 Further Reading
 
 - [Interactive dashboard and demo dataset](https://danielroberts20.github.io/TravelNet)
+- [Blog posts](https://danielroberts20.github.io/blog/) documenting TravelNet's development and design choices
 - [Licence: CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — free to use and adapt with attribution, not for commercial purposes; applies to both code and demo dataset
 
 ---
