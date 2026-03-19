@@ -73,12 +73,6 @@ def _safe_float(value: str) -> Optional[float]:
         return float(value) if value.strip() != "" else None
     except (ValueError, AttributeError):
         return None
-    
-def extract_wise_source(filename: str) -> str:
-    match = re.match(r"(statement_\d+_[A-Z]+)", filename)
-    if not match:
-        raise ValueError(f"Unexpected Wise filename format: {filename}")
-    return match.group(1)
 
 def parse_wise_csv(csv_text: str, source: str) -> list[dict]:
     reader = csv.DictReader(io.StringIO(csv_text))
@@ -98,7 +92,6 @@ def parse_wise_csv(csv_text: str, source: str) -> list[dict]:
         date_time_str = row.get("Date Time", "").strip()
         if not date_time_str:
             logger.warning(f"Row missing Datetime. Skipping... {row}")
-            skipped += 1
             continue
 
         timestamp = _parse_timestamp(date_time_str)
