@@ -2,7 +2,7 @@ from datetime import datetime
 import io
 import logging
 
-from fastapi import APIRouter, Header, UploadFile, File, HTTPException, status, Depends, BackgroundTasks #type: ignore
+from fastapi import APIRouter, Header, Query, UploadFile, File, HTTPException, status, Depends, BackgroundTasks #type: ignore
 from config.general import LOCATION_BACKUP_DIR
 from auth import check_auth, verify_token
 from database.location.overland.table import insert_overland
@@ -51,29 +51,12 @@ async def upload_csv(file: UploadFile = File(...),
 async def upload_overland(
         payload: OverlandPayload,
         background_tasks: BackgroundTasks,
+        device_id: str = Query(default="unknown"),
 ):
-    """for item in payload.locations:
-        insert_location(
-            conn=get_conn(),
-            timestamp=item.properties.timestamp,
-            timezone="",
-            latitude=item.geometry.coordinates[1],
-            longitude=item.geometry.coordinates[0],
-            altitude=item.properties.altitude,
-            activity=str(item.properties.motion),
-            device="overland",
-            is_locked=None,
-            battery=int(item.properties.battery_level * 100),
-            is_charging=None,
-            is_connected_charger=None,
-            BSSID=None,
-            RSSI=None
-        )
-    logger.info(f"Inserted Overland payload with {len(payload.locations)} entries.")"""
 
     #insert_overland(payload)
     logger.info(f"Received Overland payload with {len(payload.locations)} entries.")
-    background_tasks.add_task(insert_overland, payload)    
+    background_tasks.add_task(insert_overland, payload, device_id)    
     return {"result": "ok"}
 
 @router.post(
