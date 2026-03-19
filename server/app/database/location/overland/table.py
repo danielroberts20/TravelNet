@@ -42,7 +42,7 @@ def init():
             ON location_overland(device_id, timestamp);
         """)        
 
-def insert_overland(payload: OverlandPayload):
+def insert_overland(payload: OverlandPayload, device_id: str):
     inserted = 0
     skipped = 0
     import json
@@ -73,7 +73,7 @@ def insert_overland(payload: OverlandPayload):
                     )
                     """,
                     {
-                        "device_id":           props.device_id or "unknown",
+                        "device_id":           device_id,
                         "timestamp":           _normalise_ts(props.timestamp),
                         "lat":                 lat,
                         "lon":                 lon,
