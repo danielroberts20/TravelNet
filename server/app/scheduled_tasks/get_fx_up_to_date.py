@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     logger.info("Running get_fx_up_to_date...")
 
-    with CronJobMailer("get_fx_up_to_date", settings.smtp_config()) as job:
+    with CronJobMailer("get_fx_up_to_date", settings.smtp_config) as job:
         result = get_fx_up_to_date()
         if result is None:
             raise RuntimeError("get_fx_up_to_date failed — see logs for details")
