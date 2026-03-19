@@ -1,5 +1,5 @@
 # Storage directory (Docker volume)
-import os
+from datetime import datetime
 from pathlib import Path
 from yarl import URL # type: ignore
 
@@ -10,12 +10,27 @@ DATA_DIR.mkdir(exist_ok=True)
 JOBS_DIR = Path("../data/jobs")
 JOBS_DIR.mkdir(exist_ok=True)
 
+
 DATA_BACKUP_DIR = DATA_DIR / "log_backup"
-DATA_BACKUP_DIR.mkdir(exist_ok=True)
 HEALTH_BACKUP_DIR = DATA_BACKUP_DIR / "health"
 LOCATION_BACKUP_DIR = DATA_BACKUP_DIR / "location"
-HEALTH_BACKUP_DIR.mkdir(exist_ok=True)
-LOCATION_BACKUP_DIR.mkdir(exist_ok=True)
+WISE_TRANSACTION_BACKUP_DIR = DATA_BACKUP_DIR / "wise"
+REVOLUT_TRANSACTION_BACKUP_DIR = DATA_BACKUP_DIR / "revolut"
+FX_BACKUP_DIR = DATA_BACKUP_DIR / "fx"
+
+BACKUP_DIRS = [
+    DATA_BACKUP_DIR,
+    HEALTH_BACKUP_DIR,
+    LOCATION_BACKUP_DIR,
+    WISE_TRANSACTION_BACKUP_DIR,
+    REVOLUT_TRANSACTION_BACKUP_DIR,
+    FX_BACKUP_DIR
+]
+
+TRAVEL_START_DATE = datetime(year=2026, month=6, day=11)
+
+for backup_dir in BACKUP_DIRS:
+    backup_dir.mkdir(exist_ok=True)
 
 LOG_DIR = Path("./logs/")
 LOG_DIR.mkdir(exist_ok=True)
@@ -23,12 +38,23 @@ LOG_FILE = LOG_DIR / "server.log"
 WARN_FILE = LOG_DIR / "server.warn.log"
 ERROR_FILE = LOG_DIR / "server.error.log"
 
-FX_URL = URL("https://api.exchangerate.host/historical")
-CURRENCIES = ["GBP", "USD", "CAN", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"]
+FX_URL = URL("https://api.exchangerate.host/timeframe")
+CURRENCIES = ["GBP", "USD", "CAD", "EUR", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"]
 SOURCE_CURRENCY = "GBP"
 
-UPLOAD_TOKEN = os.getenv("UPLOAD_TOKEN", None)
-FX_API_KEY = os.getenv("FX_API_KEY", None)
+WISE_SOURCE_MAP = {
+    "137103728_USD": "🇺🇸 USD",
+    "137103780_AUD": "🇦🇺 AUD",
+    "137103867_CAD": "🇨🇦 CAD",
+    "138167086_AUD": "🇦🇺 Melbourne Fund",
+    "148241577_USD": "🐲 South East Asia",
+    "137103719_GBP": "🇬🇧 GBP",
+    "138167566_NZD": "🇳🇿 NZD",
+    "140828771_USD": "🇺🇸 US Travel",
+    "147924418_EUR": "🇪🇺 EUR",
+    "148241731_NZD": "🇳🇿 New Zealand Travel"
+}
+
 INTERVAL_MINUTES = 5
 METRIC_AGGREGATION = {
     "Active Energy": {"Active Energy (kJ)": "sum"},

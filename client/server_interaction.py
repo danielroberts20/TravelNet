@@ -2,8 +2,8 @@ import logging
 
 import requests
 
-from client.config import DATA_DIR
-from config import SERVER_URL, UPLOAD_TOKEN
+from client.config.general import DATA_DIR
+from client.config.general import SERVER_URL, UPLOAD_TOKEN
 
 logger = logging.getLogger(__name__)
 
