@@ -5,17 +5,16 @@ Temporary README.
 
 A project completed while I travelled across the USA, Australia, New Zealand, South-East Asia and Canada. Check out the [website](https://danielroberts20.github.io/TravelNet)!
 
+## Licence
+
+This project is licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) — free to use and adapt with attribution, but not for commercial purposes. This applies to both the code and the public demo dataset.
+
 TO-DO:
 -
-- Enabling watch logs
-  - Check if there is multiple logs within +/- 0.5*log frequency
-  - Prefer data from watch logs, fill gaps with phone logs
-- Server-side, calculate country (and state?) from lat/lon
 - Document/write-ups
   - Describe docker containers
   - ML GPU compute service on PC
   - Full documentation for all functions and methods
-- Additional GET endpoints
 - Machine Learning
     - Travel segmentation
       - Automatically segment into different cities/activities/daytrip/country
