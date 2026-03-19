@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import logging
+import queue
 import sys
 from logging.handlers import RotatingFileHandler
 import threading
@@ -13,7 +14,9 @@ class DailyDigestHandler(logging.Handler):
     def __init__(self):
         super().__init__(level=logging.WARNING)
         self._lock = threading.Lock()
+        self._queue: queue.Queue = queue.Queue()
         self._init_table()
+        self._start_worker()
 
     def _init_table(self):
         with get_conn() as conn:
@@ -28,8 +31,31 @@ class DailyDigestHandler(logging.Handler):
                     message   TEXT NOT NULL
                 )
             """)
+    
+    def _start_worker(self):
+        t = threading.Thread(target=self._worker, daemon=True)
+        t.start()
+
+    def _worker(self):
+        while True:
+            record = self._queue.get()
+            if record is None:
+                break
+            try:
+                with get_conn() as conn:
+                    conn.execute(
+                        "INSERT INTO log_digest (ts, level, logger, module, lineno, message) VALUES (?, ?, ?, ?, ?, ?)",
+                        record
+                    )
+                    conn.commit()
+            except Exception as e:
+                pass
 
     def emit(self, record: logging.LogRecord):
+        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        self._queue.put((ts, record.levelname, record.name, record.module, record.lineno, record.getMessage()))
+
+    """def emit(self, record: logging.LogRecord):
         with self._lock:
             try:
                 ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -39,7 +65,7 @@ class DailyDigestHandler(logging.Handler):
                         (ts, record.levelname, record.name, record.module, record.lineno, record.getMessage())
                     )
             except Exception:
-                self.handleError(record)
+                self.handleError(record)"""
     
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient):
        with self._lock:
