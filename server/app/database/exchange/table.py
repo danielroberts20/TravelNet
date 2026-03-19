@@ -1,9 +1,7 @@
 from datetime import datetime
 from typing import Dict, List, Optional, Union
-import requests
 import logging
 
-from config.general import CURRENCIES, FX_API_KEY, FX_URL, SOURCE_CURRENCY
 from database.util import get_conn
 
 logger = logging.getLogger(__name__)
@@ -22,6 +20,14 @@ def init():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         
             UNIQUE(date, source_currency, target_currency)
+        )
+        """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS api_usage (
+            service     TEXT PRIMARY KEY,
+            count       INTEGER NOT NULL DEFAULT 0,
+            month       TEXT NOT NULL  -- YYYY-MM, to detect stale data
         )
         """)
 
@@ -46,7 +52,7 @@ def insert_fx_rate(date: str, source_currency: str, target_currency: str, rate: 
         ts = int(datetime.now().timestamp())
     with get_conn() as conn:
         cursor = conn.execute(
-            "INSERT INTO fx_rates (date, source_currency, target_currency, rate, timestamp) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO fx_rates (date, source_currency, target_currency, rate, timestamp) VALUES (?, ?, ?, ?, ?)",
             (date, source_currency, target_currency, rate, ts)
         )
         logger.info(f"Inserted FX rate with ID {cursor.lastrowid}")

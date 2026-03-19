@@ -1,9 +1,11 @@
+from datetime import datetime, timezone
 import logging
 from fastapi import APIRouter, Header, Query  # type: ignore
 from fastapi.responses import Response  # type: ignore
 
 from auth import check_auth
-from metadata.util import read_last_lines_efficient
+from database.exchange.util import get_api_usage
+from metadata.util import get_db_stats, get_fx_latest_date, get_last_uploads, get_pending_digest_count, get_uptime, read_last_lines_efficient
 from config.general import LOG_FILE
 
 
@@ -20,3 +22,15 @@ async def get_logs(lines: int = Query(200, ge=1, le=1000), authorization: str = 
 
     logs = read_last_lines_efficient(LOG_FILE, n=lines)
     return Response(content=logs, media_type="text/plain")
+
+@router.get("/status")
+async def get_status():
+    return {
+        "uptime": get_uptime(),
+        "db": get_db_stats(),
+        "last_upload": get_last_uploads(),
+        "fx_latest_date": get_fx_latest_date(),
+        "fx_api_usage": get_api_usage("exchangerate.host"),
+        "pending_digest_records": get_pending_digest_count(),
+        "generated_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+    }
