@@ -151,7 +151,7 @@ def insert(csv_path: str, source: str = "revolut"):
                 if cursor.rowcount == 1:
                     inserted += 1
                 else:
-                    logger.warning(f"Duplicate transaction ID. Skipping... {tx_id} ({currency}) ({description[:40]})")
+                    logger.info(f"Duplicate transaction ID. Skipping... {tx_id} ({currency}) ({description[:40]})")
                     skipped += 1
 
             except Exception as e:
