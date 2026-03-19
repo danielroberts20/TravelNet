@@ -51,6 +51,10 @@ class Settings(BaseSettings):
             "password": self.email_password,
             "recipient": self.email_recipient,
         }
+    
+    @property
+    def smtp_config(self) -> dict:
+        return self.smtp_cfg
 
 
 settings = Settings()
