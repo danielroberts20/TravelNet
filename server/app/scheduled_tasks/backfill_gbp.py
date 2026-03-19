@@ -1,5 +1,6 @@
 import logging
 from smtplib import SMTP_PORT
+from config.general import WISE_SOURCE_MAP
 from config.settings import settings
 from config.logging import configure_logging
 from database.util import get_conn
@@ -68,14 +69,14 @@ def backfill_gbp():
             """, (amount_gbp, tx_id, currency, source))
             backfilled += 1
 
-        logger.info(f"backfill_amount_gbp: backfilled {backfilled} transaction(s)")
+        logger.info(f"Backfilled {backfilled} transaction(s)")
 
         if still_null:
             logger.warning(
-                f"backfill_amount_gbp: {len(still_null)} transaction(s) still NULL after backfill "
+                f"{len(still_null)} transaction(s) still NULL after backfill "
                 f"(no FX rate available for those dates):\n"
                 + "\n".join(
-                    f"  id={r['id']} source={r['source']} currency={r['currency']} date={r['date']}"
+                    f"  id={r['id']} source={WISE_SOURCE_MAP.get(r['source'], r['source'])} currency={r['currency']} date={r['date']}"
                     for r in still_null
                 )
             )
@@ -88,7 +89,7 @@ def backfill_gbp():
 if __name__ == "__main__":
     configure_logging()
 
-    with CronJobMailer("backfill_gbp", settings.smtp_config()) as job:
+    with CronJobMailer("backfill_gbp", settings.smtp_config) as job:
         result = backfill_gbp()
         job.add_metric("backfilled", result["backfilled"])
         job.add_metric("still null", result["still_null"])
