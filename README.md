@@ -55,20 +55,26 @@ The public demo dataset is coordinate-fuzzed (~1–2 km Gaussian noise) and subs
 
 ## 🏗️ Architecture
 ```
-┌─────────────────────────────────────────┐
-│            Raspberry Pi (Docker)        │
-│                                         │
-│  FastAPI  ──►  SQLite (external HDD)    │
-│     ▲               │                   │
-│  Scheduled      Backfill &              │
-│  cron jobs      FX enrichment           │
-└─────┬───────────────┴───────────────────┘
-      │ Tailscale (remote access)
-      ▼
-  Laptop (local ML / dashboard dev)
-      │
-      ▼
-  GitHub Pages (public demo)
+                 📱 iPhone
+                /          \
+    Overland &         Revolut/Wise
+    Health Auto        CSV uploads
+    Export (3am)            \
+               \              ▼
+                ▼    ┌─────────────────────────────────────┐
+                ──►  │          Raspberry Pi (Docker)       │
+                     │                                      │
+                     │  FastAPI  ──►  SQLite (ext. HDD)     │
+                     │     ▲               │                │
+                     │  Scheduled      Backfill &           │
+                     │  cron jobs      FX enrichment        │
+                     └─────┬───────────────┴────────────────┘
+                           │ Tailscale (remote access)
+                           ▼
+                     Laptop (local ML / dashboard dev)
+                           │
+                           ▼
+                     GitHub Pages (public demo)
 ```
 
 Data flows from iOS apps and manual uploads into FastAPI endpoints, is enriched with FX rates and weather retroactively, and is periodically snapshotted for ML work and dashboard updates.
