@@ -1,1 +1,4 @@
-sudo docker stop pi_ingest; docker rm pi_ingest; docker compose build; docker compose up -d
+sudo docker stop travelnet travelnet-dashboard
+docker rm travelnet travelnet-dashboard
+docker compose build
+docker compose up -d
