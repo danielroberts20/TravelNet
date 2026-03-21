@@ -10,7 +10,7 @@ from upload.health.util import handle_health_upload
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.post("/health")
+@router.post("/data")
 async def upload_health(data: dict[str, Any],
                         background_tasks: BackgroundTasks,
                         authorization: str = Header(...)):
