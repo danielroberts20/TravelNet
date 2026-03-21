@@ -1,6 +1,9 @@
+from config.editable import load_overrides
+load_overrides()
+
 import logging
 from datetime import date, timedelta
-
+from config.editable import load_overrides
 from config.logging import configure_logging
 from database.util import get_conn
 from notifications import CronJobMailer

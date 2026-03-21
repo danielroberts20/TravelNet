@@ -49,13 +49,15 @@ def get_value(key: str, default=None):
     return entry["value"] if entry else default
 
 def load_overrides() -> None:
-    from config.general import OVERRIDES_PATH
+    import config.general
+    import config.database
+    import config.logging
     
     """Read config_overrides.json and patch module-level constants."""
-    if not OVERRIDES_PATH.exists():
+    if not config.general.OVERRIDES_PATH.exists():
         return
     try:
-        with open(OVERRIDES_PATH) as f:
+        with open(config.general.OVERRIDES_PATH) as f:
             overrides = json.load(f)
         for key, value in overrides.items():
             if key not in _EDITABLE:
