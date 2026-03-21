@@ -1,7 +1,13 @@
 # Storage directory (Docker volume)
 from datetime import datetime
 from pathlib import Path
+from config.editable import editable
 from yarl import URL # type: ignore
+
+
+# ---------------------------------------------------------------------------
+# Directories
+# ---------------------------------------------------------------------------
 
 
 DATA_DIR = Path("../data")
@@ -9,7 +15,6 @@ DATA_DIR.mkdir(exist_ok=True)
 
 JOBS_DIR = Path("../data/jobs")
 JOBS_DIR.mkdir(exist_ok=True)
-
 
 DATA_BACKUP_DIR = DATA_DIR / "log_backup"
 HEALTH_BACKUP_DIR = DATA_BACKUP_DIR / "health"
@@ -29,9 +34,6 @@ BACKUP_DIRS = [
     FX_BACKUP_DIR
 ]
 
-TRAVEL_START_DATE = datetime(year=2026, month=6, day=11)
-TRAVEL_START_DATE_TIMESTAMP = int(TRAVEL_START_DATE.timestamp())
-
 for backup_dir in BACKUP_DIRS:
     backup_dir.mkdir(exist_ok=True)
 
@@ -41,9 +43,50 @@ LOG_FILE = LOG_DIR / "server.log"
 WARN_FILE = LOG_DIR / "server.warn.log"
 ERROR_FILE = LOG_DIR / "server.error.log"
 
+OVERRIDES_PATH = DATA_DIR / "config_overrides.json"
+
+# ---------------------------------------------------------------------------
+# Weather
+# ---------------------------------------------------------------------------
+
+
+OPEN_METEO_URL = (URL("https://archive-api.open-meteo.com/v1/archive"))
+HOURLY_VARS = editable("HOURLY_VARS")([
+    "temperature_2m",
+    "apparent_temperature",
+    "precipitation",
+    "windspeed_10m",
+    "winddirection_10m",
+    "weathercode",
+    "uv_index",
+    "cloudcover",
+    "is_day"
+    ])
+
+
+# Coordinate rounding resolution — matches Open-Meteo's ~10 km grid
+COORD_PRECISION = editable("COORD_PRECISION")(1)
+
+# Seconds between API requests — be a polite free-tier citizen
+REQUEST_DELAY = 0.5
+
+
+# ---------------------------------------------------------------------------
+# Directories
+# ---------------------------------------------------------------------------
+
+TRAVEL_START_DATE = editable("TRAVEL_START_DATE")(datetime(year=2026, month=6, day=11))
+TRAVEL_START_DATE_TIMESTAMP = int(TRAVEL_START_DATE.timestamp())
+
+
+# ---------------------------------------------------------------------------
+# Transaction
+# ---------------------------------------------------------------------------
+
+
 FX_URL = URL("https://api.exchangerate.host/timeframe")
-CURRENCIES = ["GBP", "USD", "CAD", "EUR", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"]
-SOURCE_CURRENCY = "GBP"
+CURRENCIES = editable("CURRENCIES")(["GBP", "USD", "CAD", "EUR", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"])
+SOURCE_CURRENCY = editable("SOURCE_CURRENCY")("GBP")
 
 WISE_SOURCE_MAP = {
     "137103728_USD": "🇺🇸 USD",
@@ -58,7 +101,14 @@ WISE_SOURCE_MAP = {
     "148241731_NZD": "🇳🇿 New Zealand Travel"
 }
 
-INTERVAL_MINUTES = 5
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+
+INTERVAL_MINUTES = editable("INTERVAL_MINTUES")(5)
+
 METRIC_AGGREGATION = {
     "Active Energy": {"Active Energy (kJ)": "sum"},
     "Apple Exercise Time": {"Apple Exercise Time (min)": "sum"},
@@ -198,12 +248,6 @@ METRICS = [
     "Wheelchair Distance",
     "Zinc"
 ]
-
-# Add this to config/general.py alongside METRICS and METRIC_AGGREGATION.
-#
-# Maps Health Auto Export snake_case metric names (as they arrive in the JSON
-# payload) to the display names used throughout the rest of the codebase,
-# in METRIC_AGGREGATION keys, and stored in the health_data table.
 
 SNAKE_TO_DISPLAY = {
     "active_energy": "Active Energy",
