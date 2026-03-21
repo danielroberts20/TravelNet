@@ -1,0 +1,98 @@
+from database.util import get_conn
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def init():
+    with get_conn() as conn:
+        try:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS weather_hourly (
+                    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fetched_at            DATETIME NOT NULL,
+                    timestamp             DATETIME NOT NULL,
+                    latitude              REAL NOT NULL,
+                    longitude             REAL NOT NULL,
+                    temperature_c         REAL,
+                    apparent_temperature_c REAL,
+                    precipitation_mm      REAL,
+                    windspeed_kmh         REAL,
+                    winddirection_deg     REAL,
+                    uv_index              REAL,
+                    cloudcover_pct        REAL,
+                    is_day                INTEGER,
+                    weathercode           INTEGER,
+                    raw_json              TEXT,
+                    UNIQUE(timestamp, latitude, longitude)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_weather_hourly_timestamp
+                    ON weather_hourly(timestamp);
+
+                CREATE INDEX IF NOT EXISTS idx_weather_hourly_lat_lon
+                    ON weather_hourly(latitude, longitude);
+
+                CREATE TABLE IF NOT EXISTS weather_daily (
+                    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fetched_at            DATETIME NOT NULL,
+                    date                  DATE NOT NULL,
+                    latitude              REAL NOT NULL,
+                    longitude             REAL NOT NULL,
+                    sunrise               DATETIME,
+                    sunset                DATETIME,
+                    precipitation_sum_mm  REAL,
+                    precipitation_hours   REAL,
+                    snowfall_sum_cm       REAL,
+                    windspeed_max_kmh     REAL,
+                    windgusts_max_kmh     REAL,
+                    raw_json              TEXT,
+                    UNIQUE(date, latitude, longitude)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_weather_daily_date
+                    ON weather_daily(date);
+
+                CREATE INDEX IF NOT EXISTS idx_weather_daily_lat_lon
+                    ON weather_daily(latitude, longitude);
+
+                CREATE VIEW IF NOT EXISTS location_weather AS
+                SELECT
+                    u.*,
+                    h.temperature_c,
+                    h.apparent_temperature_c,
+                    h.precipitation_mm,
+                    h.windspeed_kmh,
+                    h.winddirection_deg,
+                    h.uv_index,
+                    h.cloudcover_pct,
+                    h.is_day,
+                    h.weathercode,
+                    h.fetched_at AS weather_fetched_at
+                FROM location_unified u
+                LEFT JOIN weather_hourly h
+                    ON  ROUND(u.lat, 2) = h.latitude
+                    AND ROUND(u.lon, 2) = h.longitude
+                    AND strftime('%Y-%m-%dT%H:00', u.timestamp) = h.timestamp;
+
+                CREATE VIEW IF NOT EXISTS location_weather_daily AS
+                SELECT
+                    u.*,
+                    d.sunrise,
+                    d.sunset,
+                    d.precipitation_sum_mm,
+                    d.precipitation_hours,
+                    d.snowfall_sum_cm,
+                    d.windspeed_max_kmh,
+                    d.windgusts_max_kmh,
+                    d.fetched_at AS weather_fetched_at
+                FROM location_unified u
+                LEFT JOIN weather_daily d
+                    ON  ROUND(u.lat, 2) = d.latitude
+                    AND ROUND(u.lon, 2) = d.longitude
+                    AND DATE(u.timestamp) = d.date;
+            """)
+            logger.info("Migration complete: weather_hourly, weather_daily tables and views created.")
+        except Exception:
+            logger.exception("Migration failed.")
+            raise

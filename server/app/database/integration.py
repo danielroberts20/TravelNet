@@ -1,3 +1,4 @@
+from config.editable import load_overrides, log_config_summary
 from database.util import get_conn
 from telemetry_models import Log
 from database.cellular.table import init as init_cellular, insert_cellular_state
@@ -8,6 +9,7 @@ from database.health.workouts.table import init as init_workouts
 from database.transaction.table import init as init_transactions
 from database.job.table import init as init_jobs
 from database.location.overland.table import init as init_overland
+from database.weather.table import init as init_weather
 
 # -----------------------------
 # Initialization
@@ -21,6 +23,9 @@ def init_db():
     init_transactions()
     init_jobs()
     init_overland()
+    init_weather()
+    load_overrides()
+    log_config_summary()
     
     # Must be last
     init_unified_view()
