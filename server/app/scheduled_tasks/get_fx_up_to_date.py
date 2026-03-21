@@ -1,11 +1,13 @@
 # scheduled_tasks/get_fx_up_to_date.py
+from config.editable import load_overrides
+load_overrides()
 
 import json
 import logging
 from datetime import date, timedelta
 
 import requests
-
+from config.editable import load_overrides
 from config.general import CURRENCIES, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
 from config.settings import settings
 from config.logging import configure_logging
