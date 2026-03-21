@@ -140,11 +140,18 @@ class CronJobMailer:
         try:
             send_email(subject=subject, body=body, **self.smtp_cfg)
         except Exception as mail_err:
-            # Never let a notification failure mask the original exception
             print(f"[CronJobMailer] Failed to send email for {self.job_name!r}: {mail_err}")
 
-        return False  # do not suppress the original exception
+        try:
+            _record_cron_run(
+                job=self.job_name,
+                success=exc_type is None,
+                detail=", ".join(f"{k}: {v}" for k, v in self._metrics) if self._metrics else "",
+            )
+        except Exception as tracker_err:
+            print(f"[CronJobMailer] Failed to record cron run for {self.job_name!r}: {tracker_err}")
 
+        return False  # do not suppress the original exception
 
 # ---------------------------------------------------------------------------
 # Body builder
@@ -189,3 +196,28 @@ def _format_duration(seconds: float) -> str:
         return f"{minutes}m {secs}s"
     hours, mins = divmod(minutes, 60)
     return f"{hours}h {mins}m {secs}s"
+
+def _record_cron_run(job: str, success: bool, detail: str = "") -> None:
+    """Write last-run status to /data/cron_runs.json for the dashboard."""
+    import json
+    import time
+    from config.general import DATA_DIR
+
+    path = DATA_DIR / "cron_runs.json"
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        data = {}
+
+    data[job] = {
+        "success":   success,
+        "detail":    detail,
+        "timestamp": int(time.time()),
+        "ts_human":  time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()),
+    }
+
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "w") as f:
+        json.dump(data, f, indent=2)
+    tmp.replace(path)

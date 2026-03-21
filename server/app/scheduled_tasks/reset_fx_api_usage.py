@@ -13,7 +13,7 @@ if __name__ == "__main__":
     configure_logging()
     logger.info("Resetting FX API usage counter...")
 
-    with CronJobMailer("reset_fx_api_usage", settings.smtp_cfg()) as job:
+    with CronJobMailer("reset_fx_api_usage", settings.smtp_config) as job:
         result = reset_api_usage("exchangerate.host")
         job.add_metric("service", result["service"])
         job.add_metric("old count", result["old_count"])
