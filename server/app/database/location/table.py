@@ -51,6 +51,42 @@ def init():
         CREATE INDEX IF NOT EXISTS idx_location_lat_lon
             ON location_history(latitude, longitude);
         """)
+    
+def init_unified_view():
+    """Create the location_unified view merging Overland and Shortcuts sources."""
+    with get_conn() as conn:
+        conn.execute("""
+            CREATE VIEW IF NOT EXISTS location_unified AS
+            SELECT
+                timestamp                    AS timestamp,
+                lat                          AS lat,
+                lon                          AS lon,
+                altitude                     AS altitude,
+                activity                     AS activity,
+                battery_level                AS battery,
+                speed                        AS speed,
+                device_id                    AS device,
+                horizontal_accuracy          AS accuracy,
+                'overland'                   AS source
+            FROM location_overland
+
+            UNION ALL
+
+            SELECT
+                datetime(timestamp, 'unixepoch') AS timestamp,
+                latitude                         AS lat,
+                longitude                        AS lon,
+                altitude                         AS altitude,
+                activity                         AS activity,
+                CAST(battery AS REAL) / 100.0    AS battery,
+                NULL                             AS speed,
+                device                           AS device,
+                NULL                             AS accuracy,
+                'shortcuts'                      AS source
+
+            FROM location_history
+            ORDER BY timestamp ASC
+        """)
 
 def insert_location(conn: sqlite3.Connection, timestamp: int, timezone: str, latitude: float, longitude: float, altitude: Optional[float],
                     activity: Optional[str], device: str, is_locked: Optional[bool], battery: Optional[int],
