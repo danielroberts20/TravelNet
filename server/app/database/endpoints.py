@@ -32,9 +32,12 @@ async def reset_table(table: str, authorization: str = Header(None)):
         "fx_rates",
         "api_usage",
         "log_digest",
-        "location_overland",
-        "location_shortcuts",
         "health_data",
+        "health_sources",
+        "workouts",
+        "workout_route",
+        "jobs",
+        "cellular_state",
     ]
     if table not in RESETTABLE_TABLES:
         raise HTTPException(status_code=400, detail=f"Table '{table}' is not resettable")
