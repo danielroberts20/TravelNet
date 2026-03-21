@@ -74,6 +74,9 @@ def get_last_uploads() -> dict:
             "fx_rates": latest(
                 "SELECT MAX(created_at) FROM fx_rates"
             ),
+            "workouts": latest(
+                "SELECT MAX(created_at) FROM workouts"
+            )
         }
 
 def get_fx_latest_date() -> str | None:
