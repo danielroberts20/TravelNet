@@ -9,6 +9,23 @@ from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
 from database.util import get_conn
 from notifications import send_email
 
+class ColouredFormatter(logging.Formatter):
+    COLOURS = {
+        "DEBUG":    "\033[36m",   # cyan
+        "INFO":     "\033[32m",   # green
+        "WARNING":  "\033[33m",   # yellow
+        "ERROR":    "\033[31m",   # red
+        "CRITICAL": "\033[35m",   # magenta
+    }
+    RESET = "\033[0m"
+
+    def format(self, record):
+        colour = self.COLOURS.get(record.levelname, "")
+        # Copy the record to avoid mutating the original (shared across handlers)
+        record = logging.makeLogRecord(record.__dict__)
+        record.levelname = f"{colour}{record.levelname}{self.RESET}"
+        return super().format(record)
+
 class DailyDigestHandler(logging.Handler):
     
     def __init__(self):
@@ -110,6 +127,7 @@ class DailyDigestHandler(logging.Handler):
 digest_handler = DailyDigestHandler()
 
 def configure_logging():
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
     # All INFO+ logs
@@ -127,10 +145,12 @@ def configure_logging():
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(formatter)
 
-    # Stream logs to stdout
+    # Stream logs to stdout (coloured)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
+    console_handler.setFormatter(ColouredFormatter(
+        "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+    ))
 
     # Daily email digest (WARNING+, only if events exist)
     digest_handler.setFormatter(formatter)
