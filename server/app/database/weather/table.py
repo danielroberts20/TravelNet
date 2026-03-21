@@ -55,10 +55,11 @@ def init():
 
                 CREATE INDEX IF NOT EXISTS idx_weather_daily_lat_lon
                     ON weather_daily(latitude, longitude);
-
+                
                 CREATE VIEW IF NOT EXISTS location_weather AS
                 SELECT
                     u.*,
+                    -- hourly
                     h.temperature_c,
                     h.apparent_temperature_c,
                     h.precipitation_mm,
@@ -68,25 +69,19 @@ def init():
                     h.cloudcover_pct,
                     h.is_day,
                     h.weathercode,
-                    h.fetched_at AS weather_fetched_at
-                FROM location_unified u
-                LEFT JOIN weather_hourly h
-                    ON  ROUND(u.lat, 2) = h.latitude
-                    AND ROUND(u.lon, 2) = h.longitude
-                    AND strftime('%Y-%m-%dT%H:00', u.timestamp) = h.timestamp;
-
-                CREATE VIEW IF NOT EXISTS location_weather_daily AS
-                SELECT
-                    u.*,
+                    -- daily
                     d.sunrise,
                     d.sunset,
                     d.precipitation_sum_mm,
                     d.precipitation_hours,
                     d.snowfall_sum_cm,
                     d.windspeed_max_kmh,
-                    d.windgusts_max_kmh,
-                    d.fetched_at AS weather_fetched_at
+                    d.windgusts_max_kmh
                 FROM location_unified u
+                LEFT JOIN weather_hourly h
+                    ON  ROUND(u.lat, 2) = h.latitude
+                    AND ROUND(u.lon, 2) = h.longitude
+                    AND strftime('%Y-%m-%dT%H:00', u.timestamp) = h.timestamp
                 LEFT JOIN weather_daily d
                     ON  ROUND(u.lat, 2) = d.latitude
                     AND ROUND(u.lon, 2) = d.longitude

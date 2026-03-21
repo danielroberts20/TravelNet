@@ -23,7 +23,7 @@ import requests
 from config.general import COORD_PRECISION, DAILY_VARS, HOURLY_VARS, OPEN_METEO_URL, REQUEST_DELAY
 from config.logging import configure_logging
 from config.settings import settings
-from database.util import get_conn
+from database.util import get_conn, increment_api_usage
 from notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,7 @@ def _fetch_hourly(lat: float, lon: float, start_date: date, end_date: date) -> d
     }
     try:
         resp = requests.get(OPEN_METEO_URL, params=params, timeout=30)
+        increment_api_usage(service="open-meteo")
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as exc:
@@ -81,6 +82,7 @@ def _fetch_daily(lat: float, lon: float, start_date: date, end_date: date) -> di
     }
     try:
         resp = requests.get(OPEN_METEO_URL, params=params, timeout=30)
+        increment_api_usage(service="open-meteo")
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as exc:

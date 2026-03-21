@@ -80,17 +80,6 @@ def insert_fx_file(fx_path: str):
     for fx in fx_data:
         insert_fx_json(fx)
 
-def increment_api_usage(service: str = "exchangerate.host"):
-    """Increment the API usage count for the current month."""
-    month = datetime.now().strftime("%Y-%m")
-    with get_conn() as conn:
-        conn.execute("""
-            INSERT INTO api_usage (service, count, month)
-            VALUES (?, 1, ?)
-            ON CONFLICT(service) DO UPDATE SET count = count + 1
-        """, (service, month))
-
-
 def get_api_usage(service: str = "exchangerate.host") -> dict:
     """Return current usage count and month for a service."""
     with get_conn(read_only=True) as conn:

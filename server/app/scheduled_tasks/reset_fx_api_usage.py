@@ -16,9 +16,11 @@ logger = logging.getLogger(__name__)
 if __name__ == "__main__":
     configure_logging()
     logger.info("Resetting FX API usage counter...")
+    services = ["exchangerate.host", "open-meteo"]
 
     with CronJobMailer("reset_fx_api_usage", settings.smtp_config) as job:
-        result = reset_api_usage("exchangerate.host")
-        job.add_metric("service", result["service"])
-        job.add_metric("old count", result["old_count"])
-        job.add_metric("old month", result["old_month"])
+        for service in services:
+            result = reset_api_usage(services)
+            job.add_metric("service", result["service"])
+            job.add_metric(f"{service} old count", result["old_count"])
+            job.add_metric(f"{service} old month", result["old_month"])
