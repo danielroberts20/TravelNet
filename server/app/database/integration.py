@@ -4,6 +4,7 @@ from database.cellular.table import init as init_cellular, insert_cellular_state
 from database.exchange.table import init as init_fx
 from database.location.table import init as init_location, init_unified_view, insert_location
 from database.health.table import init as init_health
+from database.health.workouts.table import init as init_workouts
 from database.transaction.table import init as init_transactions
 from database.job.table import init as init_jobs
 from database.location.overland.table import init as init_overland
@@ -16,6 +17,7 @@ def init_db():
     init_fx()
     init_location()
     init_health()
+    init_workouts()
     init_transactions()
     init_jobs()
     init_overland()
