@@ -1,9 +1,13 @@
+from config.editable import load_overrides
+load_overrides()
+
 import calendar
 from datetime import datetime
 import json
 from dateutil.relativedelta import relativedelta
 import logging
 import time
+from config.editable import load_overrides
 from typing import Dict, Optional
 import requests
 from config.logging import configure_logging

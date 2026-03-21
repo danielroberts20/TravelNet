@@ -1,9 +1,13 @@
+from config.editable import load_overrides
+load_overrides()
+
 import logging
 
 from config.logging import configure_logging
 from config.settings import settings
 from database.exchange.util import reset_api_usage
 from notifications import CronJobMailer
+from config.editable import load_overrides
 
 
 logger = logging.getLogger(__name__)

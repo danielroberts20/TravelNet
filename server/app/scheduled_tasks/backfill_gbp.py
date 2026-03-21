@@ -1,5 +1,8 @@
+from config.editable import load_overrides
+load_overrides()
+
 import logging
-from smtplib import SMTP_PORT
+from config.editable import load_overrides
 from config.general import WISE_SOURCE_MAP
 from config.settings import settings
 from config.logging import configure_logging

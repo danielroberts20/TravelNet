@@ -51,6 +51,7 @@ OVERRIDES_PATH = DATA_DIR / "config_overrides.json"
 
 
 OPEN_METEO_URL = (URL("https://archive-api.open-meteo.com/v1/archive"))
+
 HOURLY_VARS = editable("HOURLY_VARS")([
     "temperature_2m",
     "apparent_temperature",
@@ -62,6 +63,15 @@ HOURLY_VARS = editable("HOURLY_VARS")([
     "cloudcover",
     "is_day"
     ])
+
+DAILY_VARS = editable("DAILY_VARS")([
+    "sunrise,sunset",
+    "precipitation_sum",
+    "precipitation_hours",
+    "snowfall_sum",
+    "wind_speed_10m_max",
+    "wind_gusts_10m_max"
+])
 
 
 # Coordinate rounding resolution — matches Open-Meteo's ~10 km grid
