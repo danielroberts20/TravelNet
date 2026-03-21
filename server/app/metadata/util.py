@@ -72,10 +72,10 @@ def get_last_uploads() -> dict:
                 "SELECT MAX(timestamp) FROM transactions"
             ),
             "fx_rates": latest(
-                "SELECT MAX(created_at) FROM fx_rates"
+                "SELECT MAX(date) FROM fx_rates"
             ),
             "workouts": latest(
-                "SELECT MAX(created_at) FROM workouts"
+                "SELECT MAX(end_ts) FROM workouts"
             )
         }
 
