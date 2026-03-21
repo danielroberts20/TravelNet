@@ -11,8 +11,8 @@ from config.editable import load_overrides
 from config.general import CURRENCIES, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
 from config.settings import settings
 from config.logging import configure_logging
-from database.exchange.util import get_api_usage, increment_api_usage, insert_fx_json
-from database.util import get_conn
+from database.exchange.util import get_api_usage, insert_fx_json
+from database.util import get_conn, increment_api_usage
 from notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
