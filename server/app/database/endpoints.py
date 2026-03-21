@@ -1,9 +1,9 @@
 import logging
 import os
-from fastapi import APIRouter, BackgroundTasks, Header  # type: ignore
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException  # type: ignore
 from fastapi.responses import FileResponse  # type: ignore
 
-from database.util import backup_db
+from database.util import backup_db, get_conn
 from auth import check_auth
 
 
@@ -23,3 +23,23 @@ async def download(background_tasks: BackgroundTasks, authorization: str = Heade
         filename=backup_path.name,
         media_type="application/octet-stream"
     )
+
+@router.get("/reset")
+async def reset_table(table: str, authorization: str = Header(None)):
+    check_auth(authorization)
+    RESETTABLE_TABLES = [
+        "transactions",
+        "fx_rates",
+        "api_usage",
+        "log_digest",
+        "location_overland",
+        "location_shortcuts",
+        "health_data",
+    ]
+    if table not in RESETTABLE_TABLES:
+        raise HTTPException(status_code=400, detail=f"Table '{table}' is not resettable")
+    with get_conn() as conn:
+        conn.execute(f"DELETE FROM [{table}]")
+        conn.commit()
+        logger.warning(f"Table {table} was cleared!")
+    return {"message": f"Table '{table}' cleared successfully"}
