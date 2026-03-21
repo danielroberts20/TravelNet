@@ -10,10 +10,11 @@ import time
 from config.editable import load_overrides
 from typing import Dict, Optional
 import requests
+from database.util import increment_api_usage
 from config.logging import configure_logging
 from config.general import CURRENCIES, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
 from config.settings import settings
-from database.exchange.util import increment_api_usage, insert_fx_json
+from database.exchange.util import insert_fx_json
 from notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)

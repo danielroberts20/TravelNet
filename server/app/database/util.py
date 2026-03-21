@@ -85,3 +85,13 @@ def rebuild_db(*table_names):
                 insert_fx_file(FX_BACKUP_DIR / f)
     
     logger.info(f"Finished rebuilding database tables: {','.join(table_names)}")
+
+def increment_api_usage(service: str = "exchangerate.host"):
+    """Increment the API usage count for the current month."""
+    month = datetime.now().strftime("%Y-%m")
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT INTO api_usage (service, count, month)
+            VALUES (?, 1, ?)
+            ON CONFLICT(service) DO UPDATE SET count = count + 1
+        """, (service, month))
