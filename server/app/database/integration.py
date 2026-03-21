@@ -2,7 +2,7 @@ from database.util import get_conn
 from telemetry_models import Log
 from database.cellular.table import init as init_cellular, insert_cellular_state
 from database.exchange.table import init as init_fx
-from database.location.table import init as init_location, insert_location
+from database.location.table import init as init_location, init_unified_view, insert_location
 from database.health.table import init as init_health
 from database.transaction.table import init as init_transactions
 from database.job.table import init as init_jobs
@@ -19,6 +19,9 @@ def init_db():
     init_transactions()
     init_jobs()
     init_overland()
+    
+    # Must be last
+    init_unified_view()
 
 # -----------------------------
 # Insertion helpers
