@@ -1,7 +1,7 @@
 services:
   ingest:
     build: ./app
-    container_name: pi_ingest
+    container_name: travelnet
     env_file: .env
     volumes:
       - /mnt/linux/docker/services/travelnet/data:/data         # persistent DB
@@ -9,3 +9,23 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ../../Dashboard
+    container_name: travelnet-dashboard
+    restart: unless-stopped
+    ports:
+      - "8080:5000"
+    environment:
+      DASHBOARD_PASSWORD: "${DASHBOARD_PASSWORD}"
+      FLASK_SECRET_KEY:   "${FLASK_SECRET_KEY}"
+      DB_PATH:            "/data/travel.db"
+      FASTAPI_URL:        "http://ingest:8000"
+      FASTAPI_API_KEY:    "${UPLOAD_TOKEN}"
+      DOCKER_CONTAINER_NAME: "travelnet"
+    volumes:
+      - /mnt/linux/docker/services/travelnet/data:/data:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - ingest
