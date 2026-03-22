@@ -13,25 +13,35 @@ from yarl import URL # type: ignore
 DATA_DIR = Path("../data")
 DATA_DIR.mkdir(exist_ok=True)
 
+DB_FILE = DATA_DIR / "travel.db"
+
 JOBS_DIR = Path("../data/jobs")
 JOBS_DIR.mkdir(exist_ok=True)
 
-DATA_BACKUP_DIR = DATA_DIR / "log_backup"
-HEALTH_BACKUP_DIR = DATA_BACKUP_DIR / "health"
+DATA_BACKUP_DIR = DATA_DIR / "backups"
+DATABASE_BACKUP_DIR = DATA_BACKUP_DIR / "db"
+UPLOADS_BACKUP_DIR = DATA_BACKUP_DIR / "uploads"
+FX_BACKUP_DIR = UPLOADS_BACKUP_DIR / "fx"
+HEALTH_BACKUP_DIR = UPLOADS_BACKUP_DIR / "health"
 WORKOUT_BACKUP_DIR = HEALTH_BACKUP_DIR / "workouts"
-LOCATION_BACKUP_DIR = DATA_BACKUP_DIR / "location"
-WISE_TRANSACTION_BACKUP_DIR = DATA_BACKUP_DIR / "wise"
-REVOLUT_TRANSACTION_BACKUP_DIR = DATA_BACKUP_DIR / "revolut"
-FX_BACKUP_DIR = DATA_BACKUP_DIR / "fx"
+LOCATION_BACKUP_DIR = UPLOADS_BACKUP_DIR / "location"
+LOCATION_SHORTCUTS_BACKUP_DIR = LOCATION_BACKUP_DIR / "shortcuts"
+LOCATION_OVERLAND_BACKUP_DIR = LOCATION_BACKUP_DIR / "overland"
+REVOLUT_BACKUP_DIR = UPLOADS_BACKUP_DIR / "revolut"
+WISE_BACKUP_DIR = UPLOADS_BACKUP_DIR / "wise"
 
 BACKUP_DIRS = [
     DATA_BACKUP_DIR,
+    DATABASE_BACKUP_DIR,
+    UPLOADS_BACKUP_DIR,
+    FX_BACKUP_DIR,
     HEALTH_BACKUP_DIR,
     WORKOUT_BACKUP_DIR,
     LOCATION_BACKUP_DIR,
-    WISE_TRANSACTION_BACKUP_DIR,
-    REVOLUT_TRANSACTION_BACKUP_DIR,
-    FX_BACKUP_DIR
+    LOCATION_SHORTCUTS_BACKUP_DIR,
+    LOCATION_OVERLAND_BACKUP_DIR,
+    REVOLUT_BACKUP_DIR,
+    WISE_BACKUP_DIR
 ]
 
 for backup_dir in BACKUP_DIRS:
@@ -48,6 +58,8 @@ OVERRIDES_PATH = DATA_DIR / "config_overrides.json"
 # ---------------------------------------------------------------------------
 # Weather
 # ---------------------------------------------------------------------------
+
+STALE_DAYS = editable("STALE_DAYS", "Number of days for a database backup to be deleted")(7)
 
 
 OPEN_METEO_URL = (URL("https://archive-api.open-meteo.com/v1/archive"))
