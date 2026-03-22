@@ -8,7 +8,7 @@ from fastapi.responses import Response  # type: ignore
 
 from auth import check_auth
 from database.exchange.util import get_api_usage
-from metadata.util import get_db_stats, get_fx_latest_date, get_last_uploads, get_pending_digest_count, get_uptime, read_last_lines_efficient
+from metadata.util import get_db_stats, get_fx_latest_date, get_last_uploads, get_local_backups, get_pending_digest_count, get_remote_backups, get_uptime, read_last_lines_efficient
 from config.general import LOG_FILE, OVERRIDES_PATH
 from pydantic import BaseModel # type: ignore
 
@@ -115,3 +115,11 @@ async def reset_config(key: str, authorization: str = Header(None)):
     tmp.replace(OVERRIDES_PATH)
     logger.info(f"Config reset to default: {key}")
     return {"message": f"'{key}' reset to default. Restart the server to apply."}
+
+@router.get("/backups")
+async def get_backups(authorization: str = Header(None)):
+    check_auth(authorization)
+    return {
+        "local":  get_local_backups(),
+        "remote": get_remote_backups(),
+    }
