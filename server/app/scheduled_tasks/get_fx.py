@@ -100,7 +100,7 @@ def get_fx_for_month(month: int = None, year: int = None) -> dict:
 
     insert_fx_json(quotes)
 
-    backup_path = FX_BACKUP_DIR / f"{month_label}.json"
+    backup_path = FX_BACKUP_DIR / f"{datetime.now().strftime('%Y-%m')}.json"
     with open(backup_path, "w") as f:
         json.dump(response, f, indent=2)
     logger.info(f"Saved FX rates to {backup_path}")
