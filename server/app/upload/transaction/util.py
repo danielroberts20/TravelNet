@@ -1,16 +1,13 @@
-from datetime import datetime
 import io
 import logging
 import zipfile
 
-from config.general import REVOLUT_TRANSACTION_BACKUP_DIR, WISE_SOURCE_MAP
-from database.transaction.ingest.revolut import insert as insert_revolut
+from config.general import WISE_SOURCE_MAP
 from database.transaction.ingest.wise import insert as insert_wise
 
 logger = logging.getLogger(__name__)
 
-async def parse_wise_upload(zip_file):
-    contents = await zip_file.read()
+async def parse_wise_upload(contents):
     results = []
     errors = []
 
@@ -35,18 +32,3 @@ async def parse_wise_upload(zip_file):
 
     except zipfile.BadZipFile as e:
         logger.error("Invalid or corrupted zip file")
-
-async def parse_revolut_upload(csv_file):
-    contents = await csv_file.read()
-
-    # Decode bytes → string
-    decoded = contents.decode("utf-8")
-    now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d"))-1
-    csv_path = REVOLUT_TRANSACTION_BACKUP_DIR / f"{year_month}-{day}.csv"
-    with open(csv_path, "w+") as f:
-        f.write(decoded)
-        f.close()
-
-    inserted, skipped, errors = insert_revolut(csv_path)
