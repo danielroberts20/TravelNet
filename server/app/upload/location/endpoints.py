@@ -3,7 +3,7 @@ import io
 import logging
 
 from fastapi import APIRouter, Header, Query, UploadFile, File, HTTPException, status, Depends, BackgroundTasks #type: ignore
-from config.general import LOCATION_BACKUP_DIR
+from config.general import LOCATION_SHORTCUTS_BACKUP_DIR
 from auth import check_auth, verify_token
 from database.location.overland.table import insert_overland
 from telemetry_models import OverlandPayload
@@ -26,11 +26,8 @@ async def upload_csv(file: UploadFile = File(...),
     # Decode bytes → string
     decoded = contents.decode("utf-8")
     now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d"))-1
-    with open(LOCATION_BACKUP_DIR / f"{year_month}-{day}.csv", "w+") as f:
+    with open(LOCATION_SHORTCUTS_BACKUP_DIR / f"{now.strftime('%Y-%m-%d')}.csv", "w") as f:
         f.write(decoded)
-        f.close()
 
     # Convert string → file-like object
     csv_file = io.StringIO(decoded)

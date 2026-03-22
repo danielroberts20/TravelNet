@@ -10,6 +10,7 @@ Revolut exports all currencies in a single file. The source label is always 'rev
 import argparse
 import csv
 import hashlib
+import io
 import json
 from datetime import datetime
 import logging
@@ -82,14 +83,13 @@ def _safe_float(value: str) -> Optional[float]:
         return None
 
 
-def insert(csv_path: str, source: str = "revolut"):
+def insert(csv_text: str, source: str = "revolut"):
     inserted = 0
     skipped = 0
     errors = 0
 
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
+    reader = csv.DictReader(io.StringIO(csv_text))
+    rows = list(reader)
 
     logger.info(f"Inserting {len(rows)} transactions from {source}...")
 

@@ -4,7 +4,7 @@ from fastapi import FastAPI  # type: ignore
 
 from config.logging import configure_logging
 from database.integration import init_db
-from database.util import backup_db, rebuild_db
+from database.util import rebuild_db
 
 from jobs.endpoints import router as jobs_router
 from upload.endpoints import router as uploads_router
@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 init_db()
 # rebuild_db("fx_rates")
-backup_db(include_timestamp=True)
-logger.info("Database initialized and backup created.")
+logger.info("Database initialized.")
 
 app = FastAPI(title="TravelNet API", version="1.0.1")
 
