@@ -2,11 +2,9 @@ import csv
 import logging
 import os
 import sqlite3
-import uuid
 from datetime import datetime
 
-from config.database import BACKUP_DIR, DB_FILE
-from config.general import FX_BACKUP_DIR, HEALTH_BACKUP_DIR, LOCATION_BACKUP_DIR
+from config.general import DATABASE_BACKUP_DIR, DB_FILE, FX_BACKUP_DIR, HEALTH_BACKUP_DIR, LOCATION_BACKUP_DIR
 from telemetry_models import Log
 
 logger = logging.getLogger(__name__)
@@ -23,25 +21,16 @@ def get_conn(read_only=False) -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL;")
     return conn
 
-def backup_db(include_timestamp=False) -> str:
-    if include_timestamp:
-        backup_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4()}.db"
-    else:
-        backup_name = f"{uuid.uuid4()}.db"
-    backup_path = BACKUP_DIR / backup_name
-
+def backup_db() -> str:
+    now = datetime.now()
+    backup_path = DATABASE_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.db"
     source = sqlite3.connect(DB_FILE)
-    dest = sqlite3.connect(backup_path)
+    dest   = sqlite3.connect(backup_path)
     source.backup(dest)
     dest.close()
     source.close()
+    logger.info(f"DB backup created: {backup_path}")
     return backup_path
-
-def get_latest_backup() -> str:
-    backup_files = sorted(BACKUP_DIR.glob("*.db"), key=lambda f: f.stat().st_mtime, reverse=True)
-    if not backup_files:
-        raise FileNotFoundError("No backup files found.")
-    return backup_files[0]
 
 def rebuild_db(*table_names):
     from database.integration import init_db
