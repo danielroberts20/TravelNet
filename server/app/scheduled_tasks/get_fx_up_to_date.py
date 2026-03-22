@@ -4,7 +4,7 @@ load_overrides()
 
 import json
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import requests
 from config.editable import load_overrides
@@ -65,7 +65,12 @@ def get_fx_up_to_date(target_date: date = None):
     missing_dates = _get_missing_dates(target_date)
     if not missing_dates:
         logger.info(f"No missing dates found up to {target_date}, nothing to do")
-        return None
+        return {
+            "start_date": "",
+            "end_date": "",
+            "dates_inserted": "",
+            "backup_path": "",
+        }
 
     start_date = missing_dates[0]
     end_date = missing_dates[-1]
@@ -107,7 +112,7 @@ def get_fx_up_to_date(target_date: date = None):
     insert_fx_json(quotes)
     logger.info(f"Successfully backfilled {len(quotes)} date(s)")
 
-    backup_path = FX_BACKUP_DIR / f"backfill_{date.today().isoformat()}.json"
+    backup_path = FX_BACKUP_DIR / f"backfill_{datetime.now().strftime('%Y-%m-%d')}.json"
     with open(backup_path, "w") as f:
         json.dump(response, f, indent=2)
     logger.info(f"Saved backup to {backup_path}")
