@@ -3,13 +3,15 @@ import hashlib
 import json
 import logging
 from typing import Optional
+from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
 from fastapi import APIRouter, UploadFile, File, Header, HTTPException, BackgroundTasks #type: ignore
 from pydantic import BaseModel, Field, field_validator #type: ignore
+from database.transaction.ingest.revolut import insert as insert_revolut
 
 from auth import check_auth 
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn
-from upload.transaction.util import parse_revolut_upload, parse_wise_upload
+from upload.transaction.util import parse_wise_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -19,12 +21,20 @@ async def upload_wise(background_tasks: BackgroundTasks,
                       file: UploadFile = File(...),
                       authorization: str = Header(...)):
     check_auth(authorization)
-
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="File must be a .zip")
 
-    background_tasks.add_task(parse_wise_upload, file)
-    
+    # Read file contents first before anything else consumes the stream
+    contents = await file.read()
+
+    # Write backup immediately (synchronously, before background task)
+    now = datetime.now()
+    backup_path = WISE_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.zip"
+    with open(backup_path, "wb") as f:
+        f.write(contents)
+
+    # Pass contents to background task rather than the UploadFile stream
+    background_tasks.add_task(parse_wise_upload, contents)
     return {"status": "ok"}
 
 @router.post("/revolut")
@@ -35,9 +45,15 @@ async def upload_revolut(background_tasks: BackgroundTasks,
 
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    now = datetime.now()
+    contents = await file.read()
+    decoded = contents.decode("utf-8")
+    backup_path = REVOLUT_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+    with open(backup_path, "w+") as f:
+        f.write(decoded)
 
-    background_tasks.add_task(parse_revolut_upload, file)
-
+    background_tasks.add_task(insert_revolut, contents.decode("utf-8"))
     return {"status": "ok"}
 
 class CashTransactionRequest(BaseModel):
