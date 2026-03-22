@@ -24,7 +24,7 @@ def revolut_client(db, tmp_path):
     with patch("upload.transaction.endpoints.insert_revolut") as mock_insert, \
          patch("upload.transaction.endpoints.convert_to_gbp", return_value=-8.0), \
          patch("upload.transaction.endpoints.check_auth"), \
-         patch("config.general.REVOLUT_TRANSACTION_BACKUP_DIR", tmp_path):
+         patch("config.general.REVOLUT_BACKUP_DIR", tmp_path):
         mock_insert.return_value = (1, 0, 0)
         with TestClient(app) as c:
             yield c, mock_insert
