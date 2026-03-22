@@ -53,8 +53,6 @@ async def upload_workout(
     check_auth(authorization)
  
     now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d")) - 1
  
     backup_path = WORKOUT_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"
     with open(backup_path, "w+", encoding="utf-8") as f:
