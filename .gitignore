@@ -18,3 +18,4 @@ server/app/logs/
 server/restore_db.sh
 server/runcron.sh
 server/build.sh
+.claude
