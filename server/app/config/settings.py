@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     upload_token: str = Field(alias="UPLOAD_TOKEN")
     overland_token: str = Field(alias="OVERLAND_TOKEN")
 
+    # --- Notification webhooks ---
+    custom_notification_time_sensitive: str = Field(alias="CUSTOM_NOTIFICATION_TIME_SENSITIVE")
+    custom_notification_not_time_sensitive: str = Field(alias="CUSTOM_NOTIFICATION_NOT_TIME_SENSITIVE")
+    warning_notification: str = Field(alias="WARNING_NOTIFICATION")
+    error_notification: str = Field(alias="ERROR_NOTIFICATION")
+
     # --- External APIs ---
     fx_api_key: str = Field(alias="FX_API_KEY")
 
@@ -42,7 +48,7 @@ class Settings(BaseSettings):
     }
 
     @property
-    def smtp_cfg(self) -> dict:
+    def smtp_config(self) -> dict:
         """Ready-to-unpack dict for send_email() and CronJobMailer."""
         return {
             "smtp_host": self.smtp_host,
@@ -51,10 +57,7 @@ class Settings(BaseSettings):
             "password": self.email_password,
             "recipient": self.email_recipient,
         }
-    
-    @property
-    def smtp_config(self) -> dict:
-        return self.smtp_cfg
+
 
 
 settings = Settings()

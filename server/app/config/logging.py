@@ -7,11 +7,23 @@ import threading
 
 from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
 from database.util import get_conn
-from notifications import send_email
+
+# Custom level: below INFO, for high-frequency upload acknowledgement messages
+UPLOAD_LEVEL = 15
+logging.addLevelName(UPLOAD_LEVEL, "UPLOAD")
+
+def _upload(self, message, *args, **kwargs):
+    """Log at the custom UPLOAD level (15), below INFO."""
+    if self.isEnabledFor(UPLOAD_LEVEL):
+        self._log(UPLOAD_LEVEL, message, args, **kwargs)
+
+logging.Logger.upload = _upload
+
 
 class ColouredFormatter(logging.Formatter):
     COLOURS = {
         "DEBUG":    "\033[36m",   # cyan
+        "UPLOAD":   "\033[93m",   # bright yellow
         "INFO":     "\033[32m",   # green
         "WARNING":  "\033[33m",   # yellow
         "ERROR":    "\033[31m",   # red
@@ -20,6 +32,7 @@ class ColouredFormatter(logging.Formatter):
     RESET = "\033[0m"
 
     def format(self, record):
+        """Wrap the level name in ANSI colour codes before delegating to the base formatter."""
         colour = self.COLOURS.get(record.levelname, "")
         # Copy the record to avoid mutating the original (shared across handlers)
         record = logging.makeLogRecord(record.__dict__)
@@ -27,8 +40,14 @@ class ColouredFormatter(logging.Formatter):
         return super().format(record)
 
 class DailyDigestHandler(logging.Handler):
-    
+    """Logging handler that persists WARNING+ records to the DB for a daily digest email.
+
+    Records are written via a background thread to avoid blocking the logging call-site.
+    Call flush_and_send() (e.g. from a cron job) to drain the table and send the email.
+    """
+
     def __init__(self):
+        """Initialise the handler, create the DB table, and start the worker thread."""
         super().__init__(level=logging.WARNING)
         self._lock = threading.Lock()
         self._queue: queue.Queue = queue.Queue()
@@ -36,6 +55,7 @@ class DailyDigestHandler(logging.Handler):
         self._start_worker()
 
     def _init_table(self):
+        """Create the log_digest table if it does not already exist."""
         with get_conn() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS log_digest (
@@ -48,12 +68,14 @@ class DailyDigestHandler(logging.Handler):
                     message   TEXT NOT NULL
                 )
             """)
-    
+
     def _start_worker(self):
+        """Spawn the daemon thread that drains the queue into the DB."""
         t = threading.Thread(target=self._worker, daemon=True)
         t.start()
 
     def _worker(self):
+        """Continuously consume records from the queue and INSERT them into the DB."""
         while True:
             record = self._queue.get()
             if record is None:
@@ -65,10 +87,11 @@ class DailyDigestHandler(logging.Handler):
                         record
                     )
                     conn.commit()
-            except Exception as e:
-                pass
+            except Exception:
+                pass  # Never let the digest handler crash the server
 
     def emit(self, record: logging.LogRecord):
+        """Enqueue a log record tuple for async DB insertion."""
         ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         self._queue.put((ts, record.levelname, record.name, record.module, record.lineno, record.getMessage()))
 
@@ -85,6 +108,7 @@ class DailyDigestHandler(logging.Handler):
                 self.handleError(record)"""
     
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient):
+       from notifications import send_email
        with self._lock:
            with get_conn() as conn:
                rows = conn.execute(
@@ -127,12 +151,21 @@ class DailyDigestHandler(logging.Handler):
 digest_handler = DailyDigestHandler()
 
 def configure_logging():
+    """Configure root logger with file, console, and digest handlers.
+
+    Sets up four handlers:
+      - info_handler:    RotatingFile at UPLOAD+ (all user-facing events)
+      - warn_handler:    RotatingFile at WARNING+
+      - error_handler:   RotatingFile at ERROR+
+      - console_handler: coloured stdout at UPLOAD+
+      - digest_handler:  DB-backed WARNING+ handler for daily email digest
+    """
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-    # All INFO+ logs
+    # All UPLOAD+ logs
     info_handler = RotatingFileHandler(LOG_FILE, maxBytes=5*1024*1024, backupCount=5)
-    info_handler.setLevel(logging.INFO)
+    info_handler.setLevel(UPLOAD_LEVEL)
     info_handler.setFormatter(formatter)
 
     # WARN+ logs
@@ -145,9 +178,9 @@ def configure_logging():
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(formatter)
 
-    # Stream logs to stdout (coloured)
+    # Stream logs to stdout (coloured) — UPLOAD+ so the /logs page can filter them
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(UPLOAD_LEVEL)
     console_handler.setFormatter(ColouredFormatter(
         "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
     ))
@@ -156,7 +189,7 @@ def configure_logging():
     digest_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(UPLOAD_LEVEL)
     root_logger.addHandler(info_handler)
     root_logger.addHandler(warn_handler)
     root_logger.addHandler(error_handler)
