@@ -3,29 +3,30 @@ import json
 import logging
 from typing import Any
 from config.editable import get_editable, get_value
-from fastapi import APIRouter, Header, Query, HTTPException, Body  # type: ignore
+from fastapi import APIRouter, Query, HTTPException, Body, Depends  # type: ignore
 from fastapi.responses import Response  # type: ignore
 
-from auth import check_auth
+from auth import require_upload_token
 from database.exchange.util import get_api_usage
+from database.location.gap_annotations.table import insert_annotation, list_annotations
 from metadata.util import get_db_stats, get_fx_latest_date, get_last_uploads, get_local_backups, get_pending_digest_count, get_remote_backups, get_uptime, read_last_lines_efficient
-from config.general import LOG_FILE, OVERRIDES_PATH, STALE_DAYS
-from pydantic import BaseModel # type: ignore
+from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES, LOG_FILE, OVERRIDES_PATH, STALE_DAYS
+from pydantic import BaseModel  # type: ignore
 
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.get("/logs")
-async def get_logs(lines: int = Query(200, ge=1, le=1000), authorization: str = Header(None)):
-    """
-    Return the last `lines` lines of the main server logs.
-    - `lines`: number of lines to return, default 200, min 1, max 1000
-    """
-    check_auth(authorization)
 
+@router.get("/logs", dependencies=[Depends(require_upload_token)])
+async def get_logs(lines: int = Query(200, ge=1, le=1000)):
+    """Return the last `lines` lines of the main server log file.
+
+    - `lines`: number of lines to return (default 200, min 1, max 1000)
+    """
     logs = read_last_lines_efficient(LOG_FILE, n=lines)
     return Response(content=logs, media_type="text/plain")
+
 
 @router.get("/status")
 async def get_status():
@@ -40,7 +41,10 @@ async def get_status():
         "generated_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
     }
 
+
 class ConfigUpdate(BaseModel):
+    """Request body for updating a single editable config key."""
+
     key: str
     value: Any
 
@@ -72,10 +76,9 @@ def _coerce_value(value: Any, type_str: str) -> Any:
         raise ValueError(f"Cannot coerce value to {type_str}: {e}")
 
 
-@router.get("/config")
-async def get_config(authorization: str = Header(None)):
+@router.get("/config", dependencies=[Depends(require_upload_token)])
+async def get_config():
     """Return all registered editable config values, including override status."""
-    check_auth(authorization)
     editable = get_editable()
     # Load current overrides to show what's been overridden
     overrides = {}
@@ -99,10 +102,9 @@ async def get_config(authorization: str = Header(None)):
     return result
 
 
-@router.post("/config")
-async def update_config(update: ConfigUpdate, authorization: str = Header(None)):
+@router.post("/config", dependencies=[Depends(require_upload_token)])
+async def update_config(update: ConfigUpdate):
     """Persist a config override to config_overrides.json (requires server restart to apply)."""
-    check_auth(authorization)
     editable = get_editable()
     if update.key not in editable:
         raise HTTPException(status_code=400, detail=f"Key '{update.key}' is not editable")
@@ -135,10 +137,9 @@ async def update_config(update: ConfigUpdate, authorization: str = Header(None))
     return {"message": f"'{update.key}' saved. Restart the server to apply."}
 
 
-@router.delete("/config/{key}")
-async def reset_config(key: str, authorization: str = Header(None)):
+@router.delete("/config/{key}", dependencies=[Depends(require_upload_token)])
+async def reset_config(key: str):
     """Remove a config override for key, restoring its default value on next restart."""
-    check_auth(authorization)
     if not OVERRIDES_PATH.exists():
         raise HTTPException(status_code=404, detail="No overrides file found")
     with open(OVERRIDES_PATH) as f:
@@ -153,28 +154,68 @@ async def reset_config(key: str, authorization: str = Header(None)):
     logger.info(f"Config reset to default: {key}")
     return {"message": f"'{key}' reset to default. Restart the server to apply."}
 
-@router.get("/backups")
-async def get_backups(authorization: str = Header(None)):
+
+@router.get("/backups", dependencies=[Depends(require_upload_token)])
+async def get_backups():
     """Return latest local and remote (Cloudflare R2) backup info for all data types."""
-    check_auth(authorization)
     return {
         "local":  get_local_backups(),
         "remote": get_remote_backups(),
         "stale_days": get_value("STALE_DAYS", STALE_DAYS)
     }
 
-class GapRequest(BaseModel):
-    content: str
 
-@router.post("/describe_gap")
-async def describe_gap(body: GapRequest,
-                       authorization: str = Header(None),
-                       start_time: datetime = Header(None),
-                       end_time: datetime = Header(None)):
-    check_auth(authorization)
+# ---------------------------------------------------------------------------
+# Gap annotations
+# ---------------------------------------------------------------------------
 
+class GapAnnotationRequest(BaseModel):
+    """Request body for annotating a known gap in location or health data."""
+
+    start_time: datetime
+    end_time: datetime
+    description: str
+
+
+@router.post("/annotate_gap", dependencies=[Depends(require_upload_token)])
+async def annotate_gap(body: GapAnnotationRequest):
+    """Record a known gap in location/health data with a human-readable description.
+
+    Gaps are stored as Unix timestamp ranges.  When gap-detection logic later
+    encounters a gap it can call is_gap_covered() to check whether a matching
+    annotation exists within the configured tolerance window
+    (GAP_ANNOTATION_TOLERANCE_MINUTES).
+
+    Example use case: phone was in for battery replacement from ~10:00 to ~10:45.
+    """
+    start_ts = int(body.start_time.timestamp())
+    end_ts = int(body.end_time.timestamp())
+
+    if end_ts <= start_ts:
+        raise HTTPException(status_code=400, detail="end_time must be after start_time")
+
+    annotation_id = insert_annotation(start_ts, end_ts, body.description)
+    logger.info(
+        "Gap annotation created: id=%d, %s → %s (%s)",
+        annotation_id,
+        body.start_time.isoformat(),
+        body.end_time.isoformat(),
+        body.description,
+    )
+
+    tolerance = get_value("GAP_ANNOTATION_TOLERANCE_MINUTES", GAP_ANNOTATION_TOLERANCE_MINUTES)
     return {
-        "start_time": start_time,
-        "end_time": end_time,
-        "content": body.content
+        "id": annotation_id,
+        "start_ts": start_ts,
+        "end_ts": end_ts,
+        "start_time": body.start_time.isoformat(),
+        "end_time": body.end_time.isoformat(),
+        "description": body.description,
+        "tolerance_minutes": tolerance,
     }
+
+
+@router.get("/annotations", dependencies=[Depends(require_upload_token)])
+async def get_annotations():
+    """Return all recorded gap annotations ordered by start time."""
+    return {"annotations": list_annotations()}
