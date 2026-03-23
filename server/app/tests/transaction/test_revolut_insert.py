@@ -3,8 +3,6 @@ test_revolut_insert.py — Tests for Revolut CSV insert() logic.
 """
 
 import json
-import os
-import tempfile
 from unittest.mock import patch
 
 import pytest
@@ -13,17 +11,11 @@ from conftest import db, row_count, make_revolut_csv
 
 
 def run_insert(db, csv_content: str):
-    """Write CSV to a temp file and call insert(), patching get_conn and convert_to_gbp."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
-        f.write(csv_content)
-        path = f.name
-    try:
-        with patch("database.transaction.ingest.revolut.get_conn", return_value=db), \
-             patch("database.transaction.ingest.revolut.convert_to_gbp", return_value=-8.0):
-            from database.transaction.ingest.revolut import insert
-            return insert(path)
-    finally:
-        os.unlink(path)
+    """Call insert() with CSV text, patching get_conn and convert_to_gbp."""
+    with patch("database.transaction.ingest.revolut.get_conn", return_value=db), \
+         patch("database.transaction.ingest.revolut.convert_to_gbp", return_value=-8.0):
+        from database.transaction.ingest.revolut import insert
+        return insert(csv_content)
 
 
 def test_happy_path_inserts_row(db):

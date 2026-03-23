@@ -15,6 +15,11 @@ with patch("database.integration.init_db"), \
      patch("database.util.backup_db", return_value="/tmp/fake.db"):
     from main import app
 
+# Suppress real Pushcut/notification calls for all tests in this suite
+patch("notifications.send_notification").start()
+patch("database.transaction.ingest.revolut.send_notification").start()
+patch("database.transaction.ingest.wise.send_notification").start()
+
 # Prevent main.py side effects when TestClient imports it
 sys.modules.setdefault("config.runtime", MagicMock())
 
