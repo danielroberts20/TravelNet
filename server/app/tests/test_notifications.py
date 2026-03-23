@@ -279,6 +279,7 @@ class TestBuildBody:
         body = _build_body(
             job_name="get_fx",
             status="SUCCESS",
+            detail="SOME DETAIL TEXT",
             started="2026-03-02 02:00:01 UTC",
             finished="2026-03-02 02:00:03 UTC",
             duration="2s",
@@ -286,6 +287,7 @@ class TestBuildBody:
         )
         assert "get_fx" in body
         assert "SUCCESS" in body
+        assert "SOME DETAIL TEXT" in body
         assert "2026-03-02 02:00:01 UTC" in body
         assert "2026-03-02 02:00:03 UTC" in body
         assert "2s" in body
@@ -295,6 +297,7 @@ class TestBuildBody:
             job_name="get_fx",
             status="FAILED",
             started="2026-03-02 02:00:01 UTC",
+            detail="FAIL DETAIL",
             finished="2026-03-02 02:00:02 UTC",
             duration="1s",
             metrics=[],
@@ -302,12 +305,14 @@ class TestBuildBody:
         )
         assert "FAILED" in body
         assert "Traceback" in body
+        assert "FAIL DETAIL" in body
         assert "RuntimeError: boom" in body
 
     def test_metrics_section_absent_when_empty(self):
         body = _build_body(
             job_name="get_fx",
             status="SUCCESS",
+            detail="DETAIL",
             started="2026-03-02 02:00:01 UTC",
             finished="2026-03-02 02:00:02 UTC",
             duration="1s",
@@ -319,6 +324,7 @@ class TestBuildBody:
         body = _build_body(
             job_name="get_fx",
             status="SUCCESS",
+            detail="DETAIL",
             started="2026-03-02 02:00:01 UTC",
             finished="2026-03-02 02:00:02 UTC",
             duration="1s",
@@ -333,6 +339,7 @@ class TestBuildBody:
         body = _build_body(
             job_name="get_fx",
             status="SUCCESS",
+            detail="DETAIL",
             started="2026-03-02 02:00:01 UTC",
             finished="2026-03-02 02:00:02 UTC",
             duration="1s",
