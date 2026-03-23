@@ -9,6 +9,7 @@ from config.runtime import app_start_time
 from database.util import get_conn
 
 def read_last_lines_efficient(filename: str, n: int = 200) -> str:
+    """Return the last n lines of a file as a single string, using a bounded deque."""
     try:
         with open(filename, "r") as f:
             # deque with maxlen automatically keeps only last n lines
@@ -18,6 +19,7 @@ def read_last_lines_efficient(filename: str, n: int = 200) -> str:
         return f"Error reading log file: {e}"
     
 def _format_uptime(seconds: float) -> str:
+    """Format a duration in seconds as 'Xd Yh Zm'."""
     days = int(seconds // 86400)
     hours = int((seconds % 86400) // 3600)
     minutes = int((seconds % 3600) // 60)
@@ -131,7 +133,7 @@ def get_local_backups() -> dict:
         "workouts": _latest_in_dir(WORKOUT_BACKUP_DIR, "*.json"),
         "location": {
             "shortcut": _latest_in_dir(LOCATION_SHORTCUTS_BACKUP_DIR, "*.csv"),
-            #"overland": _latest_in_dir(LOCATION_OVERLAND_BACKUP_DIR, "*.csv")
+            "overland": _latest_in_dir(LOCATION_OVERLAND_BACKUP_DIR, "*.jsonl")
             },
         "revolut":  _latest_in_dir(REVOLUT_BACKUP_DIR, "*.csv"),
         "wise":     _latest_in_dir(WISE_BACKUP_DIR, "*.zip"),
