@@ -102,7 +102,8 @@ def check_health_gaps() -> dict:
 if __name__ == "__main__":
     configure_logging()
 
-    with CronJobMailer("check_health_gaps", settings.smtp_config) as job:
+    with CronJobMailer("check_health_gaps", settings.smtp_config,
+                       detail="Look for missing expected metrics in last week of health data") as job:
         metrics = check_health_gaps()
         job.add_metric("gaps", metrics["gaps"])
         job.add_metric("partial", metrics["partial"])
