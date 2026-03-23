@@ -40,6 +40,28 @@ CRONTAB_FILE: str | None = os.environ.get("CRONTAB_FILE")
 def _backup_path() -> Path | None:
     return Path(CRONTAB_FILE).with_suffix('.bak') if CRONTAB_FILE else None
 
+# Stores the UTC offset (minutes) of the last applied conversion as a plain integer.
+# Used to skip re-conversion when the timezone hasn't changed (e.g. fortnightly shortcut
+# posting the same timezone for months).
+def _last_offset_path() -> Path | None:
+    return Path(CRONTAB_FILE).with_suffix('.last_tz') if CRONTAB_FILE else None
+
+
+def _read_last_offset() -> int | None:
+    path = _last_offset_path()
+    if path and path.exists():
+        try:
+            return int(path.read_text().strip())
+        except ValueError:
+            pass
+    return None
+
+
+def _write_last_offset(offset_min: int) -> None:
+    path = _last_offset_path()
+    if path:
+        path.write_text(str(offset_min))
+
 
 # ---------------------------------------------------------------------------
 # Abbreviation → IANA lookup
@@ -303,6 +325,15 @@ def update_crontab_timezone(tz_str: str) -> dict:
     tz_label, user_offset_min = resolve_timezone(tz_str)
     pi_offset_min = get_pi_utc_offset_minutes()
 
+    if _read_last_offset() == user_offset_min:
+        return {
+            'timezone_label':  tz_label,
+            'pi_offset_min':   pi_offset_min,
+            'user_offset_min': user_offset_min,
+            'changes':         [],
+            'skipped':         True,
+        }
+
     original = read_crontab()
     backup = _backup_path()
     if backup is not None:
@@ -310,12 +341,14 @@ def update_crontab_timezone(tz_str: str) -> dict:
 
     new_crontab, changes = convert_crontab(original, user_offset_min, pi_offset_min)
     write_crontab(new_crontab)
+    _write_last_offset(user_offset_min)
 
     return {
         'timezone_label':  tz_label,
         'pi_offset_min':   pi_offset_min,
         'user_offset_min': user_offset_min,
         'changes':         changes,
+        'skipped':         False,
     }
 
 

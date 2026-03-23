@@ -255,6 +255,15 @@ async def update_crontab_tz(body: CrontabTzRequest):
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+    if result['skipped']:
+        logger.info("Crontab timezone unchanged (%s) — skipped", result['timezone_label'])
+        return {
+            "timezone":     result['timezone_label'],
+            "jobs_changed": 0,
+            "details":      [],
+            "skipped":      True,
+        }
+
     changed_count = sum(1 for c in result['changes'] if c['changed'])
     send_notification(
         title="Cron Updated",
@@ -273,6 +282,7 @@ async def update_crontab_tz(body: CrontabTzRequest):
         "timezone":     result['timezone_label'],
         "jobs_changed": changed_count,
         "details":      result['changes'],
+        "skipped":      False,
     }
 
 

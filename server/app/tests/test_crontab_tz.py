@@ -404,3 +404,27 @@ class TestUpdateCrontabTimezone:
         with patch.object(crontab_tz, "CRONTAB_FILE", None):
             with pytest.raises(RuntimeError, match="CRONTAB_FILE"):
                 reset_crontab_timezone()
+
+    def test_same_timezone_skipped(self, crontab_file):
+        update_crontab_timezone("+09:00")
+        after_first = crontab_file.read_text()
+        result = update_crontab_timezone("+09:00")
+        assert result['skipped'] is True
+        assert crontab_file.read_text() == after_first  # file untouched
+
+    def test_different_timezone_not_skipped(self, crontab_file):
+        update_crontab_timezone("+09:00")
+        result = update_crontab_timezone("+05:30")
+        assert result['skipped'] is False
+
+    def test_skipped_result_has_empty_changes(self, crontab_file):
+        update_crontab_timezone("+09:00")
+        result = update_crontab_timezone("+09:00")
+        assert result['changes'] == []
+
+    def test_backup_not_overwritten_when_skipped(self, crontab_file):
+        original = crontab_file.read_text()
+        update_crontab_timezone("+09:00")
+        update_crontab_timezone("+09:00")  # skipped — backup should still be original
+        backup = crontab_file.with_suffix('.bak')
+        assert backup.read_text() == original
