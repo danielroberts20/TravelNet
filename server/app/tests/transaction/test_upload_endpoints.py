@@ -48,7 +48,7 @@ def test_revolut_valid_csv_returns_200(revolut_client):
     assert resp.status_code == 200
 
 
-def test_revolut_response_contains_counts(revolut_client):
+def test_revolut_response_is_queued(revolut_client):
     c, _ = revolut_client
     csv_content = make_revolut_csv([{
         "Type": "CARD PAYMENT", "Started Date": "2026-03-01 10:00:00",
@@ -60,10 +60,7 @@ def test_revolut_response_contains_counts(revolut_client):
         files={"file": ("statement.csv", csv_content.encode(), "text/csv")},
         headers={"authorization": "Bearer testtoken"},
     )
-    body = resp.json()
-    assert "inserted" in body
-    assert "skipped" in body
-    assert "errors" in body
+    assert resp.json()["status"] == "queued"
 
 
 def test_revolut_non_csv_rejected(revolut_client):
@@ -108,10 +105,11 @@ def test_revolut_insert_called_with_csv_text(revolut_client):
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def wise_client(db):
+def wise_client(db, tmp_path):
     # Bypass token auth for the duration of the test
     app.dependency_overrides[require_upload_token] = lambda: None
-    with patch("upload.transaction.endpoints.insert_wise") as mock_insert:
+    with patch("upload.transaction.endpoints.insert_wise") as mock_insert, \
+         patch("config.general.WISE_BACKUP_DIR", tmp_path):
         mock_insert.return_value = (
             [{"file": "statement_137103719_GBP.csv", "inserted": 2, "parsed": 2}],
             [],
@@ -140,7 +138,7 @@ def test_wise_valid_zip_returns_200(wise_client):
     assert resp.status_code == 200
 
 
-def test_wise_response_contains_processed_and_errors(wise_client):
+def test_wise_response_is_queued(wise_client):
     c, _ = wise_client
     resp = c.post(
         "/upload/transaction/wise",
@@ -148,8 +146,8 @@ def test_wise_response_contains_processed_and_errors(wise_client):
         headers={"authorization": "Bearer testtoken"},
     )
     body = resp.json()
-    assert "processed" in body
-    assert "errors" in body
+    assert body["status"] == "queued"
+    assert "files" in body
 
 
 def test_wise_non_zip_rejected(wise_client):

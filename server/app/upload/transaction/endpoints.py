@@ -8,7 +8,7 @@ from babel import numbers
 from typing import Optional
 from notifications import send_notification
 from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends  # type: ignore
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends  # type: ignore
 from pydantic import BaseModel, Field, field_validator  # type: ignore
 from database.transaction.ingest.revolut import insert as insert_revolut
 from database.transaction.ingest.wise import insert as insert_wise
@@ -22,9 +22,26 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _process_wise(contents: bytes) -> None:
+    """Parse and ingest all CSVs from a Wise zip export (runs in background)."""
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(contents))
+    except zipfile.BadZipFile:
+        logger.error("Wise background task: invalid or corrupted zip")
+        return
+
+    for filename in [f for f in zf.namelist() if f.endswith(".csv")]:
+        try:
+            parts = filename.split("_")
+            source = "_".join([parts[1], parts[2]])
+            insert_wise(zf, filename, source)
+        except Exception as e:
+            logger.error("Wise background task: error processing %s: %s", filename, e)
+
+
 @router.post("/wise", dependencies=[Depends(require_upload_token)])
-async def upload_wise(file: UploadFile = File(...)):
-    """Accept a Wise .zip export, validate, save a backup, and ingest all CSVs inside."""
+async def upload_wise(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Accept a Wise .zip export, validate it, save a backup, and queue ingestion."""
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="File must be a .zip")
 
@@ -35,7 +52,7 @@ async def upload_wise(file: UploadFile = File(...)):
     except zipfile.BadZipFile:
         raise HTTPException(status_code=400, detail="Invalid or corrupted zip file")
 
-    csv_files = [name for name in zf.namelist() if name.endswith(".csv")]
+    csv_files = [f for f in zf.namelist() if f.endswith(".csv")]
     if not csv_files:
         raise HTTPException(status_code=400, detail="No CSV files found in zip")
 
@@ -44,21 +61,13 @@ async def upload_wise(file: UploadFile = File(...)):
     with open(backup_path, "wb") as f:
         f.write(contents)
 
-    processed = []
-    errors = []
-    for filename in csv_files:
-        parts = filename.split("_")
-        source = "_".join([parts[1], parts[2]])
-        file_results, file_errors = insert_wise(zf, filename, source)
-        processed.extend(file_results)
-        errors.extend(file_errors)
-
-    return {"processed": processed, "errors": errors}
+    background_tasks.add_task(_process_wise, contents)
+    return {"status": "queued", "files": csv_files}
 
 
 @router.post("/revolut", dependencies=[Depends(require_upload_token)])
-async def upload_revolut(file: UploadFile = File(...)):
-    """Accept a Revolut CSV export, save a backup, and ingest the transactions."""
+async def upload_revolut(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Accept a Revolut CSV export, save a backup, and queue ingestion."""
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
 
@@ -70,8 +79,8 @@ async def upload_revolut(file: UploadFile = File(...)):
     with open(backup_path, "w+") as f:
         f.write(decoded)
 
-    inserted, skipped, errors = insert_revolut(decoded)
-    return {"inserted": inserted, "skipped": skipped, "errors": errors}
+    background_tasks.add_task(insert_revolut, decoded)
+    return {"status": "queued"}
 
 
 class CashTransactionRequest(BaseModel):
