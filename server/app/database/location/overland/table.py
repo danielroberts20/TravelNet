@@ -7,6 +7,7 @@ from telemetry_models import OverlandPayload
 logger = logging.getLogger(__name__)
 
 def init():
+    """Create the location_overland table and its indexes if they do not exist."""
     with get_conn() as conn:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS location_overland (
@@ -43,6 +44,12 @@ def init():
         """)        
 
 def insert_overland(payload: OverlandPayload, device_id: str):
+    """Upsert all location points from an Overland payload into location_overland.
+
+    Uses INSERT OR IGNORE against a UNIQUE(device_id, timestamp) constraint so
+    duplicate payloads are safe to retry.  Logs a summary at UPLOAD level once
+    the batch is complete.
+    """
     inserted = 0
     skipped = 0
     import json
@@ -102,7 +109,7 @@ def insert_overland(payload: OverlandPayload, device_id: str):
         
         conn.commit()
 
-    logger.info(
+    logger.upload(
         f"Overland batch: {len(payload.locations)} received, "
         + f"{inserted} inserted, {skipped} skipped (duplicates/errors)")
 
