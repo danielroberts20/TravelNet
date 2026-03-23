@@ -8,23 +8,27 @@ logger = logging.getLogger(__name__)
 
 
 def parse_unix(date_str: str) -> int:
+    """Parse a HAE workout datetime string ('2024-02-06 14:30:00 -0800') to Unix timestamp."""
     return int(datetime.strptime(date_str.strip(), "%Y-%m-%d %H:%M:%S %z").timestamp())
 
 
 def _qty(obj: dict | None) -> float | None:
+    """Safely extract the 'qty' field from a HAE quantity dict, or None."""
     if obj is None:
         return None
     return obj.get("qty")
 
 
 def _units(obj: dict | None) -> str | None:
+    """Safely extract the 'units' field from a HAE quantity dict, or None."""
     if obj is None:
         return None
     return obj.get("units")
 
 
 def handle_workout_upload(data: dict[str, Any]):
-    logger.info("Processing workout data in the background...")
+    """Parse and insert all workouts (and their route points) from a HAE workout export."""
+    logger.upload("Processing workout data in the background...")
 
     workouts = data.get("workouts")
     if not workouts:
@@ -146,12 +150,12 @@ def handle_workout_upload(data: dict[str, Any]):
         )
 
         if not was_inserted:
-            logger.info("Workout '%s' (%s) already exists, skipping.", workout_id, name)
+            logger.upload("Workout '%s' (%s) already exists, skipping.", workout_id, name)
             skipped += 1
             continue
 
         inserted += 1
-        logger.info("Inserted workout '%s' (%s).", workout_id, name)
+        logger.upload("Inserted workout '%s' (%s).", workout_id, name)
 
         # Route points - only insert if workout was new to avoid duplicates
         route = w.get("route", [])

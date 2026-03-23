@@ -5,7 +5,8 @@ import logging
 import statistics
 from typing import Any
 
-from config.general import INTERVAL_MINUTES, METRIC_AGGREGATION, SNAKE_TO_DISPLAY
+from config.general import INTERVAL_MINUTES
+from upload.health.constants import METRIC_AGGREGATION, SNAKE_TO_DISPLAY
 from database.health.table import insert_health_entry
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ def parse_unix(date_str: str) -> int:
 
 
 def bucket_timestamp(unix_ts: int, interval_minutes: int) -> int:
+    """Snap a Unix timestamp down to the start of its INTERVAL_MINUTES bucket."""
     interval_seconds = interval_minutes * 60
     return (unix_ts // interval_seconds) * interval_seconds
 
@@ -207,7 +209,7 @@ def _dispatch(snake_name: str, units: str, data: list[dict]):
 # ---------------------------------------------------------------------------
 
 def handle_health_upload(data: dict[str, Any]):
-    logger.info("Processing health data in the background...")
+    logger.upload("Processing health data in the background...")
 
     metrics = data.get("metrics")
     if not metrics:
@@ -228,11 +230,11 @@ def handle_health_upload(data: dict[str, Any]):
             continue
 
         if not points:
-            logger.info("Metric '%s' has no data points, skipping.", snake_name)
+            logger.upload("Metric '%s' has no data points, skipping.", snake_name)
             skipped += 1
             continue
 
-        logger.info("Processing metric '%s' (%d points)...", snake_name, len(points))
+        logger.upload("Processing metric '%s' (%d points)...", snake_name, len(points))
         try:
             _dispatch(snake_name, units, points)
             processed += 1
@@ -252,6 +254,11 @@ def handle_health_upload(data: dict[str, Any]):
 # ---------------------------------------------------------------------------
 
 def _get_agg_type(metric: str, sub_metric: str) -> str:
+    """Return the aggregation type ('sum', 'min', 'max', 'mean') for a metric column.
+
+    Falls back to the first rule for the metric if sub_metric isn't found,
+    then falls back to 'mean' if the metric itself isn't in METRIC_AGGREGATION.
+    """
     if metric not in METRIC_AGGREGATION:
         return "mean"
     rules = METRIC_AGGREGATION[metric]
@@ -263,6 +270,7 @@ def _get_agg_type(metric: str, sub_metric: str) -> str:
 
 
 def _aggregate(values: list[float], agg_type: str) -> float:
+    """Reduce a list of floats using the given aggregation type."""
     if agg_type == "sum":
         return sum(values)
     if agg_type == "min":

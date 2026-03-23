@@ -4,29 +4,35 @@ import json
 import logging
 from typing import Any
 import pandas as pd # type: ignore
-from config.general import INTERVAL_MINUTES, METRIC_AGGREGATION, DATA_DIR
+from config.general import INTERVAL_MINUTES, DATA_DIR
+from upload.health.constants import METRIC_AGGREGATION
 
 logger = logging.getLogger(__name__)
 
 def parse_int(value: str | None) -> int | None:
+    """Parse a string to int, returning None for empty/None values."""
     if value in ("", None):
         return None
     return int(value)
 
 def parse_float(value: str | None) -> float | None:
+    """Parse a string to float, returning None for empty/None values."""
     if value in ("", None):
         return None
     return float(value)
 
 def parse_bool_yes_no(value: str) -> bool:
+    """Parse a 'Yes'/'No' string to bool."""
     return value.lower() == "yes"
 
 def parse_string(value: str | None) -> str | None:
+    """Return the string unchanged, or None for empty/None values."""
     if value in ("", None):
         return None
     return value
 
 def parse_cellular_states(states: str | None):
+    """Parse a JSON-encoded list of cellular state dicts into CellularState objects."""
     from telemetry_models import CellularState
 
     if states in ("", None):
@@ -41,9 +47,11 @@ def parse_cellular_states(states: str | None):
         return None
 
 def handle_health_upload(data: dict[str, Any]):
+    """Process a health payload for today's date (legacy entry point)."""
     process_payload(data, datetime.now().strftime("%Y-%m-%d"))
-    
+
 def generate_full_day_index(day: str, interval_minutes: int=INTERVAL_MINUTES) -> pd.DatetimeIndex:
+    """Return a DatetimeIndex covering the full day at interval_minutes resolution."""
     return pd.date_range(
         start=f"{day} 00:00:00",
         end=f"{day} 23:59:59",
@@ -56,6 +64,7 @@ def aggregate_metric_from_csv(
     full_index: pd.DatetimeIndex,
     agg_config: dict
 ):
+    """Resample a point-in-time metric CSV into a full-day interval DataFrame."""
     # Always build empty frame first (guarantees column presence)
     empty_df = pd.DataFrame(index=full_index)
 
@@ -97,6 +106,7 @@ def process_interval_metric(
     csv_string: str,
     full_index: pd.DatetimeIndex
 ):
+    """Expand a Start/End interval metric CSV into a full-day interval DataFrame."""
     if not csv_string.strip():
         # Return empty frame with correct index
         return pd.DataFrame(index=full_index)
@@ -148,6 +158,7 @@ def process_interval_metric(
 
 def process_payload(payload: dict,
                     day: str):
+    """Join all metric DataFrames for a day and write the result to processed.csv."""
     full_index = generate_full_day_index(day, INTERVAL_MINUTES)
 
     final_df = pd.DataFrame(index=full_index)
@@ -171,5 +182,5 @@ def process_payload(payload: dict,
         final_df = final_df.join(df_metric, how="left")
 
     final_df = final_df.reset_index().rename(columns={"index": "Date/Time"})
-    final_df.to_csv(DATA_DIR, f"processed.csv", index=False)
+    final_df.to_csv(DATA_DIR / "processed.csv", index=False)
     return final_df
