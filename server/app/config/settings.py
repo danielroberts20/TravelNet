@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     model_config = {
         "env_file": Path(__file__).parent.parent.parent / ".env",  # → server/.env
         "populate_by_name": True,
+        "extra": "ignore",  # silently drop any .env vars not declared in this model
     }
 
     @property
