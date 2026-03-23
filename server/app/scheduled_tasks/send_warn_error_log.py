@@ -1,3 +1,12 @@
+"""
+scheduled_tasks/send_warn_error_log.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Flush the DailyDigestHandler buffer and send an email containing all WARNING
+and ERROR records accumulated since the last flush.
+
+Scheduled to run once per day.  If the flush fails the error is recorded via
+_record_cron_run so it will still appear in the next digest attempt.
+"""
 from config.editable import load_overrides
 load_overrides()
 

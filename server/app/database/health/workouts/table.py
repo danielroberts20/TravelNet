@@ -1,7 +1,18 @@
+"""
+database/health/workouts/table.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Schema and insert helpers for the workouts and workout_route tables.
+
+workouts stores one row per workout session with aggregated performance metrics.
+workout_route stores individual GPS route points for workouts that include a
+recorded route; each point FK-references its parent workout.
+"""
+
 from database.util import get_conn
 
 
-def init():
+def init() -> None:
+    """Create the workouts and workout_route tables and their indexes if they do not exist."""
     with get_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS workouts (
@@ -181,6 +192,11 @@ def insert_workout_route_point(
     horizontal_accuracy: float | None,
     vertical_accuracy: float | None,
 ):
+    """Insert a single GPS route point for a workout.
+
+    Route points are only stored for newly inserted workouts (checked in
+    handle_workout_upload) to avoid duplicate points on re-upload.
+    """
     with get_conn() as conn:
         conn.execute("""
             INSERT INTO workout_route (

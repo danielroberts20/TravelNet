@@ -1,11 +1,24 @@
+"""
+telemetry_models.py
+~~~~~~~~~~~~~~~~~~~
+Pydantic and dataclass models for all telemetry data ingested by TravelNet.
+
+Two groups:
+  - CellularState / Log   — Shortcuts iOS automation CSV upload (legacy path)
+  - Overland*             — Overland GPS app GeoJSON upload (modern path)
+"""
+
 from dataclasses import dataclass
 from typing import Optional
 
 from parsers import parse_float, parse_bool_yes_no, parse_int, parse_string, parse_cellular_states
 from pydantic import BaseModel, Field, field_validator
 
+
 @dataclass
 class CellularState:
+    """A single cellular network state snapshot attached to a location fix."""
+
     provider_name: str
     radio: str
     code: str
@@ -13,6 +26,7 @@ class CellularState:
 
     @classmethod
     def from_json(self, **kwargs):
+        """Construct a CellularState from a parsed JSON dict."""
         return self(
             provider_name = kwargs["provider_name"],
             radio = kwargs["radio"],
@@ -20,8 +34,15 @@ class CellularState:
             is_roaming = bool(kwargs["is_roaming"])
         )
 
+
 @dataclass
 class Log:
+    """A single row from a Shortcuts location CSV export.
+
+    Includes the device's GPS fix, battery/charging state, Wi-Fi BSSID/RSSI,
+    and a list of concurrent cellular network states.
+    """
+
     timestamp: int
     timezone: str | None
     latitude: float
@@ -39,6 +60,7 @@ class Log:
 
     @classmethod
     def from_strings(self, **kwargs):
+        """Construct a Log from raw CSV string values (all fields are strings)."""
         return self(
             timestamp=parse_int(kwargs["timestamp"]),
             timezone=parse_string(kwargs["timezone"]),
@@ -56,16 +78,21 @@ class Log:
             cellular_states=parse_cellular_states(kwargs["cellular_states"])
         )
 
+
 # ---------------------------------------------------------------------------
 # Pydantic models — mirrors the Overland GeoJSON schema exactly
 # ---------------------------------------------------------------------------
 
 class OverlandGeometry(BaseModel):
+    """GeoJSON geometry object as sent by the Overland iOS app."""
+
     type: str
     coordinates: list[float]          # [lon, lat] — note GeoJSON order
 
 
 class OverlandProperties(BaseModel):
+    """Properties block of an Overland GeoJSON Feature."""
+
     timestamp: str                    # ISO 8601 with TZ offset
     altitude: Optional[float] = None
     speed: Optional[float] = None     # m/s, -1 if unavailable
@@ -93,10 +120,17 @@ class OverlandProperties(BaseModel):
 
 
 class OverlandFeature(BaseModel):
+    """A single GeoJSON Feature as sent inside an Overland payload."""
+
     type: str
     geometry: OverlandGeometry
     properties: OverlandProperties
 
 
 class OverlandPayload(BaseModel):
+    """Top-level object POSTed by the Overland iOS app.
+
+    Contains a list of Feature objects, one per location fix in the batch.
+    """
+
     locations: list[OverlandFeature]

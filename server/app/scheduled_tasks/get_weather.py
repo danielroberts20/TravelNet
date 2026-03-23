@@ -212,7 +212,13 @@ def _insert_daily_rows(data: dict, lat: float, lon: float) -> int:
     return inserted
 
 
-def run():
+def run() -> dict:
+    """Fetch and store retroactive weather data for all distinct location cells.
+
+    Covers the window (today - 47 days) → (today - 7 days).  The 7-day lag
+    gives Open-Meteo time to finalise archive data.  Returns a summary dict
+    with counts of cells processed and rows inserted/failed.
+    """
     today      = date.today()
     end_date   = today - timedelta(days=7)
     start_date = end_date - timedelta(days=40)

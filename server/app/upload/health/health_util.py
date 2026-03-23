@@ -187,7 +187,14 @@ SNAKE_ALIASES: dict[str, str] = {
 }
 
 
-def _dispatch(snake_name: str, units: str, data: list[dict]):
+def _dispatch(snake_name: str, units: str, data: list[dict]) -> None:
+    """Route a single metric to its dedicated handler.
+
+    Applies SNAKE_ALIASES normalisation first, then dispatches to a special
+    handler (heart_rate, sleep_analysis, handwashing) or the generic
+    handle_standard_metric for everything else.  Logs a warning and returns
+    without error for unknown metric names.
+    """
     snake_name = SNAKE_ALIASES.get(snake_name, snake_name)
     display_name = SNAKE_TO_DISPLAY.get(snake_name)
     if display_name is None:
@@ -208,7 +215,14 @@ def _dispatch(snake_name: str, units: str, data: list[dict]):
 # Entry point
 # ---------------------------------------------------------------------------
 
-def handle_health_upload(data: dict[str, Any]):
+def handle_health_upload(data: dict[str, Any]) -> None:
+    """Process a full Health Auto Export payload and insert each metric into the DB.
+
+    Iterates over the 'metrics' list, dispatches each to the appropriate handler
+    (standard, heart-rate, sleep, etc.) and logs a summary on completion.
+    Errors in individual metrics are caught and logged so one bad metric does not
+    abort the rest of the upload.
+    """
     logger.upload("Processing health data in the background...")
 
     metrics = data.get("metrics")

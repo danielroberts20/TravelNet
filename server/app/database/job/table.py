@@ -1,10 +1,20 @@
+"""
+database/job/table.py
+~~~~~~~~~~~~~~~~~~~~~
+Schema and CRUD helpers for the jobs table.
+
+Jobs represent ML/analysis tasks submitted by a worker client.  A job moves
+through the states: QUEUED → RUNNING → COMPLETED | FAILED.
+"""
+
 from datetime import datetime
 
 from jobs.models import DataMode, Job, Status
 from database.util import get_conn
 
 
-def init():
+def init() -> None:
+    """Create the jobs table and its indexes if they do not exist."""
     with get_conn() as conn:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
@@ -28,13 +38,15 @@ def init():
         error_message TEXT
         );
         """)
-        
-        # Index for querying active jobs
+
+        # Index for querying active jobs by status + creation order
         conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_jobs_status_created
         ON jobs (status, created_at);""")
 
-def insert_job(job: Job):
+
+def insert_job(job: Job) -> None:
+    """Persist a new Job to the database."""
     with get_conn() as conn:
         conn.execute("""
             INSERT INTO jobs (
@@ -58,7 +70,9 @@ def insert_job(job: Job):
         ))
         conn.commit()
 
+
 def row_to_job(row) -> Job:
+    """Convert a sqlite3.Row to a Job object."""
     return Job(
         id=row["id"],
         code_path=row["code_path"],
@@ -75,7 +89,9 @@ def row_to_job(row) -> Job:
         worker_id=row["worker_id"]
     )
 
-def get_next_queued_job():
+
+def get_next_queued_job() -> Job | None:
+    """Return the oldest QUEUED job from the DB, or None if the queue is empty."""
     with get_conn() as conn:
         row = conn.execute("""
             SELECT *
@@ -90,7 +106,13 @@ def get_next_queued_job():
 
         return row_to_job(row)
 
-def update_job(job_id: str, job: Job):
+
+def update_job(job_id: str, job: Job) -> None:
+    """Persist all mutable fields of job back to the DB.
+
+    Does nothing if job_id does not match job.id (safety guard against
+    accidentally updating the wrong row).
+    """
     if job_id != job.id:
         return
     with get_conn() as conn:

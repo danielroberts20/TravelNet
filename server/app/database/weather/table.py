@@ -1,10 +1,21 @@
+"""
+database/weather/table.py
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Schema for the weather_hourly and weather_daily tables and the location_weather
+view that joins them with location_unified.
+
+Weather data is fetched retroactively from Open-Meteo's archive API and
+co-located with GPS points so the dashboard can show conditions at each location.
+"""
+
 from database.util import get_conn
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def init():
+def init() -> None:
+    """Create weather tables, indexes, and the location_weather view if they do not exist."""
     with get_conn() as conn:
         try:
             conn.executescript("""

@@ -1,9 +1,18 @@
+"""
+database/location/table.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Schema and insert helpers for the location_history table (Shortcuts CSV path)
+and the location_unified view that merges Shortcuts and Overland data.
+"""
+
 import sqlite3
 from typing import Dict, List, Optional
 
 from database.util import get_conn
 
-def init():
+
+def init() -> None:
+    """Create the location_history table and its indexes if they do not exist."""
     with get_conn() as conn:
         # Locations table
         conn.execute("""
@@ -91,6 +100,12 @@ def init_unified_view():
 def insert_location(conn: sqlite3.Connection, timestamp: int, timezone: str, latitude: float, longitude: float, altitude: Optional[float],
                     activity: Optional[str], device: str, is_locked: Optional[bool], battery: Optional[int],
                     is_charging: Optional[bool], is_connected_charger: Optional[bool], BSSID: Optional[str], RSSI: Optional[int]):
+    """Insert a location_history row and return its id (existing or newly inserted).
+
+    Uses INSERT OR IGNORE on UNIQUE(timestamp, device) so re-processing the
+    same CSV is idempotent.  Returns the row id for use when inserting the
+    associated cellular_state rows.
+    """
     with conn:
         cursor = conn.cursor()
         cursor.execute("""
