@@ -47,12 +47,10 @@ class DailyDigestHandler(logging.Handler):
     """
 
     def __init__(self):
-        """Initialise the handler, create the DB table, and start the worker thread."""
+        """Create the handler instance. Call configure_logging() to activate it."""
         super().__init__(level=logging.WARNING)
         self._lock = threading.Lock()
         self._queue: queue.Queue = queue.Queue()
-        self._init_table()
-        self._start_worker()
 
     def _init_table(self):
         """Create the log_digest table if it does not already exist."""
@@ -186,6 +184,8 @@ def configure_logging():
     ))
 
     # Daily email digest (WARNING+, only if events exist)
+    digest_handler._init_table()
+    digest_handler._start_worker()
     digest_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()

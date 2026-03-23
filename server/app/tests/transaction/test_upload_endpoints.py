@@ -26,7 +26,7 @@ def revolut_client(db, tmp_path):
     app.dependency_overrides[require_upload_token] = lambda: None
     with patch("upload.transaction.endpoints.insert_revolut") as mock_insert, \
          patch("upload.transaction.endpoints.convert_to_gbp", return_value=-8.0), \
-         patch("config.general.REVOLUT_BACKUP_DIR", tmp_path):
+         patch("upload.transaction.endpoints.REVOLUT_BACKUP_DIR", tmp_path):
         mock_insert.return_value = (1, 0, 0)
         with TestClient(app) as c:
             yield c, mock_insert
@@ -76,7 +76,7 @@ def test_revolut_non_csv_rejected(revolut_client):
 def test_revolut_missing_auth_rejected(tmp_path):
     # Do NOT override auth — patch settings so a token is required
     with patch("auth.settings") as mock_settings, \
-         patch("config.general.REVOLUT_BACKUP_DIR", tmp_path):
+         patch("upload.transaction.endpoints.REVOLUT_BACKUP_DIR", tmp_path):
         mock_settings.upload_token = "secret"
         with TestClient(app) as c:
             csv_content = make_revolut_csv([])
@@ -109,7 +109,7 @@ def wise_client(db, tmp_path):
     # Bypass token auth for the duration of the test
     app.dependency_overrides[require_upload_token] = lambda: None
     with patch("upload.transaction.endpoints.insert_wise") as mock_insert, \
-         patch("config.general.WISE_BACKUP_DIR", tmp_path):
+         patch("upload.transaction.endpoints.WISE_BACKUP_DIR", tmp_path):
         mock_insert.return_value = (
             [{"file": "statement_137103719_GBP.csv", "inserted": 2, "parsed": 2}],
             [],
@@ -186,7 +186,7 @@ def test_wise_zip_with_no_csv_rejected(wise_client):
 def test_wise_missing_auth_rejected(tmp_path):
     # Do NOT override auth — patch settings so a token is required
     with patch("auth.settings") as mock_settings, \
-         patch("config.general.WISE_BACKUP_DIR", tmp_path):
+         patch("upload.transaction.endpoints.WISE_BACKUP_DIR", tmp_path):
         mock_settings.upload_token = "secret"
         with TestClient(app) as c:
             resp = c.post(

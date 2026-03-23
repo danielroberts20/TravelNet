@@ -22,13 +22,11 @@ from yarl import URL # type: ignore
 # ---------------------------------------------------------------------------
 
 
-DATA_DIR = Path("../data")
-DATA_DIR.mkdir(exist_ok=True)
+DATA_DIR = Path("/data")
 
 DB_FILE = DATA_DIR / "travel.db"
 
-JOBS_DIR = Path("../data/jobs")
-JOBS_DIR.mkdir(exist_ok=True)
+JOBS_DIR = DATA_DIR / "jobs"
 
 DATA_BACKUP_DIR = DATA_DIR / "backups"
 DATABASE_BACKUP_DIR = DATA_BACKUP_DIR / "db"
@@ -56,8 +54,13 @@ BACKUP_DIRS = [
     WISE_BACKUP_DIR
 ]
 
-for backup_dir in BACKUP_DIRS:
-    backup_dir.mkdir(exist_ok=True)
+# DATA_DIR is a Docker volume mount — only create subdirs when running inside Docker.
+# Outside Docker (e.g. during tests), /data won't exist and we skip the mkdir calls
+# to avoid creating stray directories relative to the process working directory.
+if DATA_DIR.exists():
+    JOBS_DIR.mkdir(exist_ok=True)
+    for backup_dir in BACKUP_DIRS:
+        backup_dir.mkdir(parents=True, exist_ok=True)
 
 LOG_DIR = Path("./logs/")
 LOG_DIR.mkdir(exist_ok=True)
