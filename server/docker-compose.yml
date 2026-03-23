@@ -3,10 +3,13 @@ services:
     build: ./app
     container_name: travelnet
     env_file: .env
+    environment:
+      CRONTAB_FILE: "/var/spool/cron/crontabs/dan"
     volumes:
       - /mnt/linux/docker/services/travelnet/data:/data
       - ./app:/app
       - /home/dan/.config/rclone:/root/.config/rclone:ro 
+      - /var/spool/cron/crontabs/dan:/var/spool/cron/crontabs/dan
     ports:
       - "8000:8000"
     restart: unless-stopped

@@ -7,10 +7,12 @@ from fastapi import APIRouter, Query, HTTPException, Body, Depends  # type: igno
 from fastapi.responses import Response  # type: ignore
 
 from auth import require_upload_token
+from crontab_tz import reset_crontab_timezone, update_crontab_timezone
 from database.exchange.util import get_api_usage
 from database.location.gap_annotations.table import insert_annotation, list_annotations
 from metadata.util import get_db_stats, get_fx_latest_date, get_last_uploads, get_local_backups, get_pending_digest_count, get_remote_backups, get_uptime, read_last_lines_efficient
 from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES, LOG_FILE, OVERRIDES_PATH, STALE_DAYS
+from notifications import send_notification
 from pydantic import BaseModel  # type: ignore
 
 
@@ -219,3 +221,78 @@ async def annotate_gap(body: GapAnnotationRequest):
 async def get_annotations():
     """Return all recorded gap annotations ordered by start time."""
     return {"annotations": list_annotations()}
+
+
+# ---------------------------------------------------------------------------
+# Crontab timezone conversion
+# ---------------------------------------------------------------------------
+
+class CrontabTzRequest(BaseModel):
+    """Request body for re-timing the crontab to a new local timezone."""
+
+    timezone: str
+
+
+@router.post("/crontab_tz", dependencies=[Depends(require_upload_token)])
+async def update_crontab_tz(body: CrontabTzRequest):
+    """Re-time all cron jobs so they fire at the same wall-clock time in the given timezone.
+
+    Takes the current cron schedule (written in Europe/London time) and converts
+    it so every job fires at the equivalent local time for the supplied timezone.
+    For example, a job at 06:00 with timezone='America/New_York' (EST, UTC-5)
+    becomes 11:00 Pi time (11:00 GMT = 06:00 EST).
+
+    Accepts IANA names ('America/New_York'), UTC offsets ('+1000'), or
+    common abbreviations ('EST', 'JST').
+
+    NOTE: requires the Pi's crontab to be accessible from within the Docker
+    container (e.g. via a /var/spool/cron/crontabs volume mount).
+    """
+    try:
+        result = update_crontab_timezone(body.timezone)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    changed_count = sum(1 for c in result['changes'] if c['changed'])
+    send_notification(
+        title="Cron Updated",
+        body=f"Schedule adjusted to {result['timezone_label']} ({changed_count} job(s) re-timed)",
+        time_sensitive=False,
+    )
+    logger.info(
+        "Crontab timezone updated to %s (pi_offset=%+d min, user_offset=%+d min, %d changed)",
+        result['timezone_label'],
+        result['pi_offset_min'],
+        result['user_offset_min'],
+        changed_count,
+    )
+
+    return {
+        "timezone":     result['timezone_label'],
+        "jobs_changed": changed_count,
+        "details":      result['changes'],
+    }
+
+
+@router.delete("/crontab_tz", dependencies=[Depends(require_upload_token)])
+async def reset_crontab_tz():
+    """Restore the crontab to the state it was in before the last timezone conversion.
+
+    The backup is saved automatically each time POST /crontab_tz is called.
+    Only available in Docker mode (requires CRONTAB_FILE to be set).
+    """
+    try:
+        content = reset_crontab_timezone()
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    line_count = sum(1 for l in content.splitlines() if l.strip() and not l.startswith('#'))
+    send_notification(
+        title="Cron Reset",
+        body=f"Crontab restored to pre-conversion backup ({line_count} job(s))",
+        time_sensitive=False,
+    )
+    logger.info("Crontab reset to pre-conversion backup")
+    return {"message": "Crontab restored from backup."}
