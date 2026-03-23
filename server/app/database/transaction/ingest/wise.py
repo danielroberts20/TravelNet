@@ -8,7 +8,8 @@ import re
 from typing import Optional
 from zipfile import ZipFile
 
-from config.general import WISE_SOURCE_MAP
+from notifications import send_notification
+from upload.transaction.constants import WISE_SOURCE_MAP
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn
 
@@ -40,6 +41,7 @@ DETAIL_TYPE_MAP = {
 logger = logging.getLogger(__name__)
 
 def _is_internal(detail_type: str, description: str) -> bool:
+    """Return True if the transaction represents an internal Wise pot-to-pot move."""
     desc_lower = description.lower()
     if detail_type in INTERNAL_DETAIL_TYPES:
         # CONVERSION can also be a real currency exchange — check description
@@ -49,6 +51,7 @@ def _is_internal(detail_type: str, description: str) -> bool:
 
 
 def _is_interest(detail_type: str, description: str) -> bool:
+    """Return True if the transaction represents interest, fees, or investment activity."""
     if detail_type in INTEREST_DETAIL_TYPES:
         return True
     desc_lower = description.lower()
@@ -69,12 +72,19 @@ def _parse_timestamp(date_time_str: str) -> str:
 
 
 def _safe_float(value: str) -> Optional[float]:
+    """Parse a string to float, returning None for blank or unparseable values."""
     try:
         return float(value) if value.strip() != "" else None
     except (ValueError, AttributeError):
         return None
 
 def parse_wise_csv(csv_text: str, source: str) -> list[dict]:
+    """Parse a Wise CSV export into a list of normalised transaction dicts.
+
+    Filters out interest/fee rows (ACCRUAL_CHECKOUT etc.) and maps Wise column
+    names to the shared transactions schema.  FX conversion to GBP is performed
+    inline at the transaction date.
+    """
     reader = csv.DictReader(io.StringIO(csv_text))
     rows = []
     for row in reader:
@@ -122,6 +132,13 @@ def parse_wise_csv(csv_text: str, source: str) -> list[dict]:
     return rows
 
 def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
+    """Parse a single Wise CSV inside a ZipFile and upsert its transactions.
+
+    :param zf: open ZipFile object from the uploaded .zip.
+    :param csv_filename: path within the zip to the target CSV.
+    :param source: account identifier key (e.g. '137103728_USD').
+    :returns: (results, errors) — list of per-file result dicts and error dicts.
+    """
     results = []
     errors = []
     try:
@@ -161,5 +178,16 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
             logger.info(f"Inserting {inserted} transactions from Wise-{source} ({WISE_SOURCE_MAP[source]})...")
     except Exception as e:
         errors.append({"file": csv_filename, "error": str(e)})
-        
+    
+    total_inserted = 0
+    total_skipped = 0
+    for result in results:
+        inserted = result["inserted"]
+        total_inserted += inserted
+        total_skipped += result["parsed"] - inserted
+
+    send_notification(title="Wise", 
+                      body=f"{len(results)} accounts received | {total_inserted} inserted | {total_skipped} skipped",
+                      time_sensitive=False)
+    
     return results, errors
