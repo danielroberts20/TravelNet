@@ -2,7 +2,9 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import logging
+from babel import numbers
 from typing import Optional
+from notifications import send_notification
 from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
 from fastapi import APIRouter, UploadFile, File, Header, HTTPException, BackgroundTasks #type: ignore
 from pydantic import BaseModel, Field, field_validator #type: ignore
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 async def upload_wise(background_tasks: BackgroundTasks,
                       file: UploadFile = File(...),
                       authorization: str = Header(...)):
+    """Accept a Wise .zip export, save a local backup, and queue transaction parsing."""
     check_auth(authorization)
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="File must be a .zip")
@@ -41,6 +44,7 @@ async def upload_wise(background_tasks: BackgroundTasks,
 async def upload_revolut(background_tasks: BackgroundTasks,
                          file: UploadFile = File(...),
                          authorization: str = Header(None)):
+    """Accept a Revolut CSV export, save a local backup, and queue transaction parsing."""
     check_auth(authorization)
 
     if not file.filename.endswith(".csv"):
@@ -148,7 +152,13 @@ async def add_cash_transaction(tx: CashTransactionRequest):
         except Exception as e:
             logger.error(f"Cash insert error: {e}")
             raise HTTPException(status_code=500, detail=f"DB error: {e}")
-
+    
+    currency_symbol = numbers.get_currency_symbol(tx.currency, locale="en_GB")
+    send_notification(
+        title="Cash",
+        body=f"{currency_symbol}{tx.amount} ({tx.currency}) logged",
+        time_sensitive=False
+    )
     return CashTransactionResponse(
         id=tx_id,
         timestamp=timestamp,
