@@ -9,26 +9,71 @@ Provides:
                          completion (✅) or failure (❌) email automatically
   - Updated flush logic for DailyDigestHandler (see refactor note at bottom)
 """
-
+import logging
 import smtplib
 import traceback
 from contextlib import contextmanager
+from config.general import AVAILABLE_NOTIFICATIONS
+from config.settings import settings
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from typing import Any
 
-# ---------------------------------------------------------------------------
-# SMTP config type alias — pass a dict with these keys, sourced from your
-# existing config.general constants
-# ---------------------------------------------------------------------------
-# smtp_cfg = {
-#     "host":      SMTP_HOST,
-#     "port":      SMTP_PORT,
-#     "sender":    EMAIL_SENDER,
-#     "password":  EMAIL_PASSWORD,
-#     "recipient": EMAIL_RECIPIENT,
-# }
+import requests
 
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# PushCut
+# ---------------------------------------------------------------------------
+def trigger_notification(notification_name):
+    """Fire a named Pushcut notification by looking up its URL from AVAILABLE_NOTIFICATIONS."""
+    noti_url = AVAILABLE_NOTIFICATIONS.get(notification_name)
+    if noti_url:
+        resp = requests.post(noti_url)
+        logger.info(resp)
+        return {}
+
+def send_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True):
+    """Send a Pushcut push notification via the custom webhook.
+
+    :param title: notification title (prefixed with 'TravelNet — ' unless use_prefix=False).
+    :param body: notification body text.
+    :param time_sensitive: if True, uses the time-sensitive webhook (breaks through Focus).
+    :param use_prefix: prepend 'TravelNet — ' to the title when True.
+    """
+    payload = {
+        "text": body,
+        "title": f"TravelNet — {title}" if use_prefix else title
+    }
+
+    headers = {
+        "Content-Type": "application/json"
+    }
+    url = settings.custom_notification_time_sensitive if time_sensitive else settings.custom_notification_not_time_sensitive
+    resp = requests.post(url, json=payload, headers=headers)
+    return resp.json()
+
+def warning_notification(body: str = "Warning"):
+    """Send a warning-level notification to the dedicated warning webhook."""
+    _warn_error_notification(body, is_warn=True)
+
+def error_notification(body: str = "Error"):
+    """Send an error-level notification to the dedicated error webhook."""
+    _warn_error_notification(body, is_warn=False)
+
+def _warn_error_notification(body: str, is_warn: bool):
+    """Internal helper: POST body text to the warn or error Pushcut webhook."""
+    payload = {
+        "text": body
+    }
+    headers = {
+        "Content-Type": "application/json"
+    }
+    url = settings.warning_notification if is_warn else settings.error_notification
+    resp = requests.post(url, json=payload, headers=headers)
+    return resp.json()
 
 # ---------------------------------------------------------------------------
 # Primitive
@@ -84,9 +129,10 @@ class CronJobMailer:
                      and the full traceback. The exception is NOT suppressed.
     """
 
-    def __init__(self, job_name: str, smtp_cfg: dict[str, Any]) -> None:
+    def __init__(self, job_name: str, smtp_cfg: dict[str, Any], detail: str = "") -> None:
         self.job_name = job_name
         self.smtp_cfg = smtp_cfg
+        self.detail = detail
         self._metrics: list[tuple[str, Any]] = []
         self._started_at: datetime | None = None
 
@@ -118,6 +164,7 @@ class CronJobMailer:
             subject = f"[TravelNet] ✅ {self.job_name} completed"
             body = _build_body(
                 job_name=self.job_name,
+                detail=self.detail,
                 status="SUCCESS",
                 started=started_str,
                 finished=finished_str,
@@ -129,6 +176,7 @@ class CronJobMailer:
             tb = traceback.format_exc()
             body = _build_body(
                 job_name=self.job_name,
+                detail=self.detail,
                 status="FAILED",
                 started=started_str,
                 finished=finished_str,
@@ -159,6 +207,7 @@ class CronJobMailer:
 
 def _build_body(
     job_name: str,
+    detail: str,
     status: str,
     started: str,
     finished: str,
@@ -166,12 +215,14 @@ def _build_body(
     metrics: list[tuple[str, Any]],
     error: str | None = None,
 ) -> str:
+    """Build the plain-text email body for a cron job completion or failure."""
     lines = [
         f"Job:      {job_name}",
         f"Status:   {status}",
         f"Started:  {started}",
         f"Finished: {finished}",
         f"Duration: {duration}",
+        f"Detail:   {detail}"
     ]
 
     if metrics:
@@ -182,12 +233,13 @@ def _build_body(
             lines.append(f"  {label:<{col}}  {value}")
 
     if error:
-        lines += ["", "=" * 60, "Traceback:", "=" * 60, error]
+        lines += ["", "=" * 58, "Traceback:", "=" * 58, error]
 
     return "\n".join(lines)
 
 
 def _format_duration(seconds: float) -> str:
+    """Format a duration in seconds as a human-readable string (e.g. '2m 5s', '1h 3m 0s')."""
     seconds = int(seconds)
     if seconds < 60:
         return f"{seconds}s"
