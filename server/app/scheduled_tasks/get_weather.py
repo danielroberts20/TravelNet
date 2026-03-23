@@ -278,7 +278,8 @@ def run():
 if __name__ == "__main__":
     configure_logging()
 
-    with CronJobMailer("get_weather", settings.smtp_config) as job:
+    with CronJobMailer("get_weather", settings.smtp_config,
+                       detail="Get weather day for previous 40 days, starting from the 7th") as job:
         result = run()
         job.add_metric("num locations", result["num_locations"])
         job.add_metric("hourly inserted", result["hourly_inserted"])

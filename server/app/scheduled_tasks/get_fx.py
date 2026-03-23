@@ -118,7 +118,8 @@ if __name__ == "__main__":
     prev_month = datetime.now() - relativedelta(months=1)
     logger.info(f"Getting FX rates for previous month ({prev_month.strftime('%B %Y')})...")
 
-    with CronJobMailer("get_fx", settings.smtp_config) as job:
+    with CronJobMailer("get_fx", settings.smtp_config,
+                       detail="Pull FX rates for previous month") as job:
         result = get_fx_for_month()
         job.add_metric("month", result["month_label"])
         job.add_metric("dates inserted", result["dates_inserted"])

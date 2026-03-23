@@ -2,8 +2,7 @@ from config.editable import load_overrides
 load_overrides()
 
 import logging
-from config.editable import load_overrides
-from config.general import WISE_SOURCE_MAP
+from upload.transaction.constants import WISE_SOURCE_MAP
 from config.settings import settings
 from config.logging import configure_logging
 from database.util import get_conn
@@ -13,6 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 def backfill_gbp():
+    """Attempt to fill NULL amount_gbp values using stored FX rates.
+
+    Iterates all transactions where amount_gbp is NULL, looks up the FX rate
+    for the transaction date, and updates the row.  GBP transactions are set
+    to 1:1.  Transactions without an available FX rate are logged as warnings
+    and left NULL.
+    """
     with get_conn() as conn:
         # Fetch all transactions with NULL amount_gbp
         null_rows = conn.execute("""
@@ -92,7 +98,8 @@ def backfill_gbp():
 if __name__ == "__main__":
     configure_logging()
 
-    with CronJobMailer("backfill_gbp", settings.smtp_config) as job:
+    with CronJobMailer("backfill_gbp", settings.smtp_config, 
+                       detail="Backfill NULL amount_gbp from DB FX data") as job:
         result = backfill_gbp()
         job.add_metric("backfilled", result["backfilled"])
         job.add_metric("still null", result["still_null"])

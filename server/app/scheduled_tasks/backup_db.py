@@ -39,6 +39,7 @@ def prune_old_backups(days: int = 28) -> int:
 
 
 def run():
+    """Create a timestamped DB snapshot and prune backups older than 28 days."""
     backup_path = backup_db()
     size_mb     = round(backup_path.stat().st_size / (1024 * 1024), 2)
     deleted     = prune_old_backups(days=28)
@@ -51,7 +52,8 @@ def run():
 
 if __name__ == "__main__":
     configure_logging()
-    with CronJobMailer("backup_db", settings.smtp_config) as job:
+    with CronJobMailer("backup_db", settings.smtp_config,
+                       detail="Backup full DB to local storage, keep only last 4 weeks") as job:
         result = run()
         job.add_metric("backup", result["backup_path"])
         job.add_metric("size_mb", result["size_mb"])
