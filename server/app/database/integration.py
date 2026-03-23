@@ -9,6 +9,7 @@ from database.health.workouts.table import init as init_workouts
 from database.transaction.table import init as init_transactions
 from database.job.table import init as init_jobs
 from database.location.overland.table import init as init_overland
+from database.location.gap_annotations.table import init as init_gap_annotations
 from database.weather.table import init as init_weather
 
 # -----------------------------
@@ -18,9 +19,9 @@ def init_db():
     """Initialise all DB tables and views.
 
     Creates tables for cellular, FX, location, health, workouts, transactions,
-    jobs, Overland GPS, and weather data.  Must be called once at startup before
-    any insert helpers are used.  The unified location view is created last because
-    it depends on both location_history and location_overland.
+    jobs, Overland GPS, gap annotations, and weather data.  Must be called once
+    at startup before any insert helpers are used.  The unified location view is
+    created last because it depends on both location_history and location_overland.
     """
     init_cellular()
     init_fx()
@@ -30,6 +31,7 @@ def init_db():
     init_transactions()
     init_jobs()
     init_overland()
+    init_gap_annotations()
     init_weather()
     log_config_summary()
 

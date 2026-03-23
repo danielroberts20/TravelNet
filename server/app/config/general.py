@@ -1,3 +1,15 @@
+"""
+config/general.py
+~~~~~~~~~~~~~~~~~
+Static paths, constants, and editable runtime configuration for TravelNet.
+
+All values that should be tunable at runtime are registered with the
+@editable() decorator so they appear in the /metadata/config endpoint and can
+be overridden via config_overrides.json without a code change.
+
+Directory constants are created on module import (mkdir exist_ok=True) so
+the application never starts with a missing backup directory.
+"""
 # Storage directory (Docker volume)
 from datetime import datetime
 from pathlib import Path
@@ -124,3 +136,14 @@ SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from")("GBP")
 # ---------------------------------------------------------------------------
 
 INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation")(5)
+
+# ---------------------------------------------------------------------------
+# Gap annotations
+# ---------------------------------------------------------------------------
+
+GAP_ANNOTATION_TOLERANCE_MINUTES = editable(
+    "GAP_ANNOTATION_TOLERANCE_MINUTES",
+    "Tolerance in minutes applied on each side of an annotation when checking\n"
+    "whether it covers a detected data gap.  A value of 10 means an annotation\n"
+    "needs to start at most 10 min before the gap and end at most 10 min after it."
+)(10)
