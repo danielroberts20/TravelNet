@@ -10,11 +10,13 @@ Revolut exports all currencies in a single file. The source label is always 'rev
 import argparse
 import csv
 import hashlib
+import io
 import json
 from datetime import datetime
 import logging
 from typing import Optional
 
+from notifications import send_notification
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn
 
@@ -37,6 +39,7 @@ INTEREST_DESCRIPTION_KEYWORDS = ["interest", "cashback"]
 
 
 def _is_internal(tx_type: str, description: str) -> bool:
+    """Return True if the transaction represents an internal Revolut pot/vault move."""
     if tx_type.upper() in INTERNAL_TYPES:
         return True
     desc_lower = description.lower()
@@ -44,6 +47,7 @@ def _is_internal(tx_type: str, description: str) -> bool:
 
 
 def _is_interest(description: str) -> bool:
+    """Return True if the transaction description indicates interest or cashback."""
     desc_lower = description.lower()
     return any(kw in desc_lower for kw in INTEREST_DESCRIPTION_KEYWORDS)
 
@@ -82,14 +86,20 @@ def _safe_float(value: str) -> Optional[float]:
         return None
 
 
-def insert(csv_path: str, source: str = "revolut"):
+def insert(csv_text: str, source: str = "revolut"):
+    """Parse and upsert all rows from a Revolut CSV export.
+
+    Uses INSERT OR IGNORE so re-uploading the same file is safe.  Sends a
+    Pushcut notification with a row count summary on completion.
+
+    :returns: (inserted, skipped, errors) counts.
+    """
     inserted = 0
     skipped = 0
     errors = 0
 
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
+    reader = csv.DictReader(io.StringIO(csv_text))
+    rows = list(reader)
 
     logger.info(f"Inserting {len(rows)} transactions from {source}...")
 
@@ -151,7 +161,7 @@ def insert(csv_path: str, source: str = "revolut"):
                 if cursor.rowcount == 1:
                     inserted += 1
                 else:
-                    logger.warning(f"Duplicate transaction ID. Skipping... {tx_id} ({currency}) ({description[:40]})")
+                    logger.info(f"Duplicate transaction ID. Skipping... {tx_id} ({currency}) ({description[:40]})")
                     skipped += 1
 
             except Exception as e:
@@ -159,5 +169,9 @@ def insert(csv_path: str, source: str = "revolut"):
                 errors += 1
 
         conn.commit()
-
+        
+    send_notification(title="Revolut", 
+                      body=f"{len(rows)} rows received | {inserted} inserted | {skipped} skipped",
+                      time_sensitive=False)
+    
     return inserted, skipped, errors

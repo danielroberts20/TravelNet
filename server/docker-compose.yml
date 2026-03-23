@@ -1,11 +1,54 @@
 services:
   ingest:
     build: ./app
-    container_name: pi_ingest
+    container_name: travelnet
     env_file: .env
     volumes:
-      - /mnt/linux/docker/services/travelnet/data:/data         # persistent DB
-      - ./app:/app                          # live code mount
+      - /mnt/linux/docker/services/travelnet/data:/data
+      - ./app:/app
+      - /home/dan/.config/rclone:/root/.config/rclone:ro 
     ports:
       - "8000:8000"
     restart: unless-stopped
+    networks:
+      - travelnet
+
+  dashboard:
+    build:
+      context: ../../Dashboard
+    container_name: travelnet-dashboard
+    restart: unless-stopped
+    environment:
+      DASHBOARD_TOKEN:       "${DASHBOARD_TOKEN}"
+      FLASK_SECRET_KEY:      "${FLASK_SECRET_KEY}"
+      DB_PATH:               "/data/travel.db"
+      FASTAPI_URL:           "http://ingest:8000"
+      FASTAPI_API_KEY:       "${UPLOAD_TOKEN}"
+      DOCKER_CONTAINER_NAME: "travelnet"
+    volumes:
+      - /mnt/linux/docker/services/travelnet/data:/data:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /home/dan/services/Dashboard:/app
+    depends_on:
+      - ingest
+    networks:
+      - travelnet
+
+  nginx:
+    image: nginx:alpine
+    container_name: travelnet-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /home/dan/services/Dashboard/certs:/certs:ro
+    depends_on:
+      - dashboard
+    networks:
+      - travelnet
+
+networks:
+  travelnet:
+    name: travelnet

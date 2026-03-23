@@ -1,30 +1,47 @@
 # Storage directory (Docker volume)
-import os
+from datetime import datetime
 from pathlib import Path
+from config.editable import editable
 from yarl import URL # type: ignore
+
+
+# ---------------------------------------------------------------------------
+# Directories
+# ---------------------------------------------------------------------------
 
 
 DATA_DIR = Path("../data")
 DATA_DIR.mkdir(exist_ok=True)
 
+DB_FILE = DATA_DIR / "travel.db"
+
 JOBS_DIR = Path("../data/jobs")
 JOBS_DIR.mkdir(exist_ok=True)
 
-
-DATA_BACKUP_DIR = DATA_DIR / "log_backup"
-HEALTH_BACKUP_DIR = DATA_BACKUP_DIR / "health"
-LOCATION_BACKUP_DIR = DATA_BACKUP_DIR / "location"
-WISE_TRANSACTION_BACKUP_DIR = DATA_BACKUP_DIR / "wise"
-REVOLUT_TRANSACTION_BACKUP_DIR = DATA_BACKUP_DIR / "revolut"
-FX_BACKUP_DIR = DATA_BACKUP_DIR / "fx"
+DATA_BACKUP_DIR = DATA_DIR / "backups"
+DATABASE_BACKUP_DIR = DATA_BACKUP_DIR / "db"
+UPLOADS_BACKUP_DIR = DATA_BACKUP_DIR / "uploads"
+FX_BACKUP_DIR = UPLOADS_BACKUP_DIR / "fx"
+HEALTH_BACKUP_DIR = UPLOADS_BACKUP_DIR / "health"
+WORKOUT_BACKUP_DIR = HEALTH_BACKUP_DIR / "workouts"
+LOCATION_BACKUP_DIR = UPLOADS_BACKUP_DIR / "location"
+LOCATION_SHORTCUTS_BACKUP_DIR = LOCATION_BACKUP_DIR / "shortcuts"
+LOCATION_OVERLAND_BACKUP_DIR = LOCATION_BACKUP_DIR / "overland"
+REVOLUT_BACKUP_DIR = UPLOADS_BACKUP_DIR / "revolut"
+WISE_BACKUP_DIR = UPLOADS_BACKUP_DIR / "wise"
 
 BACKUP_DIRS = [
     DATA_BACKUP_DIR,
+    DATABASE_BACKUP_DIR,
+    UPLOADS_BACKUP_DIR,
+    FX_BACKUP_DIR,
     HEALTH_BACKUP_DIR,
+    WORKOUT_BACKUP_DIR,
     LOCATION_BACKUP_DIR,
-    WISE_TRANSACTION_BACKUP_DIR,
-    REVOLUT_TRANSACTION_BACKUP_DIR,
-    FX_BACKUP_DIR
+    LOCATION_SHORTCUTS_BACKUP_DIR,
+    LOCATION_OVERLAND_BACKUP_DIR,
+    REVOLUT_BACKUP_DIR,
+    WISE_BACKUP_DIR
 ]
 
 for backup_dir in BACKUP_DIRS:
@@ -36,172 +53,74 @@ LOG_FILE = LOG_DIR / "server.log"
 WARN_FILE = LOG_DIR / "server.warn.log"
 ERROR_FILE = LOG_DIR / "server.error.log"
 
-FX_URL = URL("https://api.exchangerate.host/historical")
-CURRENCIES = ["GBP", "USD", "CAN", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"]
-SOURCE_CURRENCY = "GBP"
+OVERRIDES_PATH = DATA_DIR / "config_overrides.json"
 
-WISE_SOURCE_MAP = {
-    "137103728_USD": "🇺🇸 USD",
-    "137103780_AUD": "🇦🇺 AUD",
-    "137103867_CAD": "🇨🇦 CAD",
-    "138167086_AUD": "🇦🇺 Melbourne Fund",
-    "148241577_USD": "🐲 South East Asia",
-    "137103719_GBP": "🇬🇧 GBP",
-    "138167566_NZD": "🇳🇿 NZD",
-    "140828771_USD": "🇺🇸 US Travel",
-    "147924418_EUR": "🇪🇺 EUR",
-    "148241731_NZD": "🇳🇿 New Zealand Travel"
-}
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
 
-UPLOAD_TOKEN = os.getenv("UPLOAD_TOKEN", None)
-FX_API_KEY = os.getenv("FX_API_KEY", None)
-OVERLAND_TOKEN = os.getenv("OVERLAND_TOKEN", None)
+AVAILABLE_NOTIFICATIONS = editable("AVAILABLE_NOTIFICATIONS", "Pushcut notification Webhook URL and internal name")({
+    "travelnet_test": "https://api.pushcut.io/KjvFN6-uKZjR0S3lNehts/notifications/TravelNet%20Test",
+})
 
-# Warning/Error Email Log Settings
-SMTP_HOST = os.getenv("ALERT_SMTP_HOST", None)
-smtp_port = os.getenv("ALERT_SMTP_PORT", None)
-SMTP_PORT = 0 if smtp_port is None else smtp_port
-EMAIL_SENDER = os.getenv("ALERT_EMAIL_SENDER", None)
-EMAIL_PASSWORD = os.getenv("ALERT_EMAIL_PASSWORD", None)
-EMAIL_RECIPIENT = os.getenv("ALERT_EMAIL_RECIPIENT", None)
+# ---------------------------------------------------------------------------
+# Weather
+# ---------------------------------------------------------------------------
+
+STALE_DAYS = editable("STALE_DAYS", "Number of days to consider a backup stale")(7)
 
 
-INTERVAL_MINUTES = 5
-METRIC_AGGREGATION = {
-    "Active Energy": {"Active Energy (kJ)": "sum"},
-    "Apple Exercise Time": {"Apple Exercise Time (min)": "sum"},
-    "Apple Stand Hour": {"Apple Stand Hour (count)": "sum"},
-    "Apple Stand Time": {"Apple Stand Time (min)": "sum"},
-    "Blood Oxygen Saturation": {"Blood Oxygen Saturation (%)": "mean"},
-    "Environmental Audio Exposure": {"Environmental Audio Exposure (dBASPL)": "mean"},
-    "Flights Climbed": {"Flights Climbed (count)": "sum"},
-    "Heart Rate Variability": {"Heart Rate Variability (ms)": "mean"},
-    "Heart Rate": {"Min (count/min)": "min", "Avg (count/min)": "mean", "Max (count/min)": "max"},
-    "Physical Effort": {"Physical Effort (kcal/hr·kg)": "sum"},
-    "Resting Energy": {"Resting Energy (kJ)": "sum"},
-    "Resting Heart Rate": {"Resting Heart Rate (count/min)": "mean"},
-    "Sleep Analysis": {"Sleep Analysis (min)": "sum"},
-    "Stair Speed: Down": {"Stair Speed: Down (m/s)": "mean"},
-    "Stair Speed: Up": {"Stair Speed: Up (m/s)": "mean"},
-    "Step Count": {"Step Count (count)": "sum"},
-    "Walking + Running Distance": {"Walking + Running Distance (km)": "sum"},
-    "Walking Asymmetry Percentage": {"Walking Asymmetry Percentage (%)": "mean"},
-    "Walking Double Support Percentage": {"Walking Double Support Percentage (%)": "mean"},
-    "Walking Heart Rate Average": {"Walking Heart Rate Average (count/min)": "mean"},
-    "Walking Speed": {"Walking Speed (km/hr)": "mean"},
-    "Walking Step Length": {"Walking Step Length (cm)": "mean"},
-}
+OPEN_METEO_URL = (URL("https://archive-api.open-meteo.com/v1/archive"))
 
-METRICS = [
-    "Active Energy",
-    "Alcohol Consumption",
-    "Apple Exercise Time",
-    "Apple Move Time",
-    "Apple Sleeping Wrist Temperature",
-    "Apple Stand Hour",
-    "Apple Stand Time",
-    "Atrial Fibrillation Burden",
-    "Basal Body Temperature",
-    "Biotin",
-    "Blood Alcohol Content",
-    "Blood Glu",
-    "Blood Oxygen Saturation",
-    "Blood Pres",
-    "Body Fat Percentage",
-    "Body Mass Index",
-    "Breathing Disturbances",
-    "Caffeine",
-    "Calcium",
-    "Carbohydrates",
-    "Cardio Recovery",
-    "Chloride",
-    "Cholesterol",
-    "Chromium",
-    "Copper",
-    "Cycling Cadence",
-    "Cycling Distance",
-    "Cycling Functional Threshold Power",
-    "Cycling Power",
-    "Cycling Speed",
-    "Dietary Energy",
-    "Distance Downhill Snow Sports",
-    "Electrodermal Activity",
-    "Environmental Audio Exposure",
-    "Fiber",
-    "Flights Climbed",
-    "Fola",
-    "Forced Expiratory Volume 1",
-    "Forced Vital Capacity",
-    "Handwashing",
-    "Headphone Audio Exposure",
-    "Heart Rate Variability",
-    "Height",
-    "Inhaler Usage",
-    "Insulin Delivery",
-    "Iodine",
-    "Iron",
-    "Lean Body Mas",
-    "Magnesium",
-    "Manganese",
-    "Mindful Minutes",
-    "Molybdenum",
-    "Monounsaturated Fat",
-    "Niacin",
-    "Number of Times Fallen",
-    "Pantothenic Acid",
-    "Peak Expiratory Flow Rate",
-    "Peripheral Perfusion Index",
-    "Phosphorus",
-    "Physical Effort",
-    "Polyunsaturated Fat",
-    "Potassium",
-    "Protein",
-    "Push Count",
-    "Respiratory Rate",
-    "Resting Energy",
-    "Resting Heart Rate",
-    "Riboflavin",
-    "Running Ground Contact Time",
-    "Running Power",
-    "Running Speed",
-    "Running Stride Length",
-    "Running Vertical Oscillation",
-    "Saturated Fat",
-    "Selenium",
-    "Sexual Activity",
-    "Six-Minute Walking Test Distance",
-    "Sleep Analysis",
-    "Sodium",
-    "Stair Speed: Down",
-    "Stair Speed: Up",
-    "Step Count",
-    "Sugar",
-    "Swimming Distance",
-    "Swimming Stroke Count",
-    "Thiamin",
-    "Time in Daylight",
-    "Toothbrushing",
-    "Total Fat",
-    "UV Exposure",
-    "Underwater Depth",
-    "Underwater Temperature",
-    "VO2 Max",
-    "Vitamin A",
-    "Vitamin B12",
-    "Vitamin B6",
-    "Vitamin C",
-    "Vitamin D",
-    "Vitamin E",
-    "Vitamin K",
-    "Waist Circumference",
-    "Walking + Running Distance",
-    "Walking Asymmetry Percentage",
-    "Walking Double Support Percentage",
-    "Walking Heart Rate Average",
-    "Walking Speed",
-    "Walking Step Length",
-    "Water",
-    "Weight",
-    "Wheelchair Distance",
-    "Zinc"
-]
+HOURLY_VARS = editable("HOURLY_VARS", "OpenMeteo API variables that are per hour")([
+    "temperature_2m",
+    "apparent_temperature",
+    "precipitation",
+    "windspeed_10m",
+    "winddirection_10m",
+    "weathercode",
+    "uv_index",
+    "cloudcover",
+    "is_day"
+    ])
+
+DAILY_VARS = editable("DAILY_VARS", "OpenMeteo API variables that are per day")([
+    "sunrise",
+    "sunset",
+    "precipitation_sum",
+    "precipitation_hours",
+    "snowfall_sum",
+    "wind_speed_10m_max",
+    "wind_gusts_10m_max"
+])
+
+
+# Coordinate rounding resolution — matches Open-Meteo's ~10 km grid
+COORD_PRECISION = editable("COORD_PRECISION", "Number of decimal places to round lat/lon coordinates for OpenMeteo requests")(1)
+
+# Seconds between API requests — be a polite free-tier citizen
+REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMeteo request.\nPolite not to spam a free service")(0.5)
+
+
+# ---------------------------------------------------------------------------
+# Directories
+# ---------------------------------------------------------------------------
+
+TRAVEL_START_DATE = editable("TRAVEL_START_DATE")(datetime(year=2026, month=6, day=11))
+TRAVEL_START_DATE_TIMESTAMP = int(TRAVEL_START_DATE.timestamp())
+
+
+# ---------------------------------------------------------------------------
+# Transaction
+# ---------------------------------------------------------------------------
+
+
+FX_URL = URL("https://api.exchangerate.host/timeframe")
+CURRENCIES = editable("CURRENCIES", "Currencies used on travel")(["GBP", "USD", "CAD", "EUR", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"])
+SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from")("GBP")
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation")(5)

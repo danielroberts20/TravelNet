@@ -1,4 +1,5 @@
 import csv
+from notifications import send_notification
 from fastapi import HTTPException  # type: ignore
 import logging
 
@@ -9,6 +10,12 @@ from telemetry_models import Log
 logger = logging.getLogger(__name__)
             
 def input_csv(csv_file):
+    """Parse a Shortcuts location CSV file and insert each row into the DB.
+
+    Skips rows that fail validation (bad data types, missing required fields)
+    and logs a warning for each skipped row.  Sends a Pushcut notification
+    with inserted/skipped counts on completion.
+    """
     reader = csv.DictReader(csv_file)
 
     required_fields = {"latitude", "longitude", "timestamp"}
@@ -35,4 +42,7 @@ def input_csv(csv_file):
             skipped_rows.append(idx+2)
             continue
     logger.info(f"Successfully uploaded {inserted}/{total_rows} entries")
+    send_notification(
+        title="Shortcut Location",
+        body=f"{total_rows} received | {inserted} inserted | {skipped_rows} skipped")
     return inserted, skipped_rows

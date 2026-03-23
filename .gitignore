@@ -14,3 +14,8 @@ server/app/logs/
 /client/.cache.sqlite
 /client/weather_data.csv
 /server/wake-pc.sh
+/logs
+server/restore_db.sh
+server/runcron.sh
+server/build.sh
+.claude

@@ -6,3 +6,5 @@ yarl
 requests
 pytest
 pydantic
+pydantic-settings
+babel

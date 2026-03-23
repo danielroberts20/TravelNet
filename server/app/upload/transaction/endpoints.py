@@ -1,117 +1,64 @@
 from datetime import datetime, timezone
 import hashlib
-import io
 import json
 import logging
+from babel import numbers
 from typing import Optional
-import zipfile
-from fastapi import APIRouter, UploadFile, File, Header, HTTPException #type: ignore
+from notifications import send_notification
+from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
+from fastapi import APIRouter, UploadFile, File, Header, HTTPException, BackgroundTasks #type: ignore
 from pydantic import BaseModel, Field, field_validator #type: ignore
-
-from config.general import REVOLUT_TRANSACTION_BACKUP_DIR, WISE_SOURCE_MAP, WISE_TRANSACTION_BACKUP_DIR
-from auth import check_auth 
-from database.transaction.ingest.wise import insert as insert_wise
 from database.transaction.ingest.revolut import insert as insert_revolut
+
+from auth import check_auth 
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn
+from upload.transaction.util import parse_wise_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.post("/new_wise")
-async def upload_new_wise(file: UploadFile = File(...),
-                          authorization: str = Header(...)):
+@router.post("/wise")
+async def upload_wise(background_tasks: BackgroundTasks,
+                      file: UploadFile = File(...),
+                      authorization: str = Header(...)):
+    """Accept a Wise .zip export, save a local backup, and queue transaction parsing."""
     check_auth(authorization)
-
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="File must be a .zip")
 
-    contents = await file.read()
-    results = []
-    errors = []
-
-    try:
-        with zipfile.ZipFile(io.BytesIO(contents)) as zf:
-            csv_files = [f for f in zf.namelist() if f.endswith(".csv")]
-            if not csv_files:
-                raise HTTPException(status_code=400, detail="No CSV files found in zip")
-            
-            for filename in csv_files:
-                try:
-                    split_filename = filename.split("_")
-                    source = "_".join([split_filename[1], split_filename[2]])
-                    if source not in WISE_SOURCE_MAP.keys():
-                        logger.warning(f"No friendly name found for Wise source: {source}")
-                    
-                    file_results, file_errors = insert_wise(zf, filename, source)
-                    results.extend(file_results)
-                    errors.extend(file_errors)
-                except Exception as e:
-                    logger.error(f"Error while processing Wise transaction ({filename}): {str(e)}")
-
-    except zipfile.BadZipFile as e:
-        raise HTTPException(status_code=400, detail="Invalid or corrupted zip file")
-    
-    return {"processed": results, "errors": errors}
-
-@router.post("/wise")
-async def upload_wise(file: UploadFile = File(...),
-                      authorization: str = Header(None),
-                      source: str = Header(None)):
-    check_auth(authorization)
-
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="File must be a CSV")
-
-    print(source)
-    
+    # Read file contents first before anything else consumes the stream
     contents = await file.read()
 
-    # Decode bytes → string
-    decoded = contents.decode("utf-8")
+    # Write backup immediately (synchronously, before background task)
     now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d"))-1
-    csv_path = WISE_TRANSACTION_BACKUP_DIR / f"{year_month}-{day}.csv"
-    with open(csv_path, "w+") as f:
-        f.write(decoded)
-        f.close()
+    backup_path = WISE_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.zip"
+    with open(backup_path, "wb") as f:
+        f.write(contents)
 
-    inserted, skipped, errors = insert_wise(csv_path, source)
-
-    return {
-        "inserted": inserted,
-        "skipped": skipped,
-        "errors": errors
-    }
+    # Pass contents to background task rather than the UploadFile stream
+    background_tasks.add_task(parse_wise_upload, contents)
+    return {"status": "ok"}
 
 @router.post("/revolut")
-async def upload_revolut(file: UploadFile = File(...),
-                      authorization: str = Header(None)):
+async def upload_revolut(background_tasks: BackgroundTasks,
+                         file: UploadFile = File(...),
+                         authorization: str = Header(None)):
+    """Accept a Revolut CSV export, save a local backup, and queue transaction parsing."""
     check_auth(authorization)
 
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
     
-    contents = await file.read()
-
-    # Decode bytes → string
-    decoded = contents.decode("utf-8")
     now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d"))-1
-    csv_path = REVOLUT_TRANSACTION_BACKUP_DIR / f"{year_month}-{day}.csv"
-    with open(csv_path, "w+") as f:
+    contents = await file.read()
+    decoded = contents.decode("utf-8")
+    backup_path = REVOLUT_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+    with open(backup_path, "w+") as f:
         f.write(decoded)
-        f.close()
 
-    inserted, skipped, errors = insert_revolut(csv_path)
-
-    return {
-        "inserted": inserted,
-        "skipped": skipped,
-        "errors": errors
-    }
+    background_tasks.add_task(insert_revolut, contents.decode("utf-8"))
+    return {"status": "ok"}
 
 class CashTransactionRequest(BaseModel):
     amount: float = Field(..., description="Transaction amount. Negative for spend, positive for received.")
@@ -205,7 +152,13 @@ async def add_cash_transaction(tx: CashTransactionRequest):
         except Exception as e:
             logger.error(f"Cash insert error: {e}")
             raise HTTPException(status_code=500, detail=f"DB error: {e}")
-
+    
+    currency_symbol = numbers.get_currency_symbol(tx.currency, locale="en_GB")
+    send_notification(
+        title="Cash",
+        body=f"{currency_symbol}{tx.amount} ({tx.currency}) logged",
+        time_sensitive=False
+    )
     return CashTransactionResponse(
         id=tx_id,
         timestamp=timestamp,

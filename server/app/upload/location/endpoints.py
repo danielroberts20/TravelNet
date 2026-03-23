@@ -2,20 +2,33 @@ from datetime import datetime
 import io
 import logging
 
-from fastapi import APIRouter, Header, UploadFile, File, HTTPException, status, Depends, BackgroundTasks #type: ignore
-from config.general import LOCATION_BACKUP_DIR
+from fastapi import APIRouter, Header, Query, UploadFile, File, HTTPException, status, Depends, BackgroundTasks #type: ignore
+from config.general import LOCATION_SHORTCUTS_BACKUP_DIR
 from auth import check_auth, verify_token
 from database.location.overland.table import insert_overland
 from telemetry_models import OverlandPayload
-from upload.utils import input_csv  
+from upload.utils import input_csv
+from upload.location.overland.backup import append_to_daily_buffer, log_previous_day_backup
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 @router.post("/shortcut")
-async def upload_csv(file: UploadFile = File(...),
-                     authorization: str = Header(None)):
+async def upload_csv(
+        file: UploadFile = File(...),
+        background_tasks: BackgroundTasks = BackgroundTasks,
+        authorization: str = Header(None),
+):
+    """Accept a Shortcuts CSV location export, save a local backup, and queue processing.
 
+    The file is written synchronously to LOCATION_SHORTCUTS_BACKUP_DIR so the
+    backup is always present even if the background task fails.  Two background
+    tasks are queued:
+      - input_csv: parse and insert each row into the DB.
+      - log_previous_day_backup: log a summary of yesterday's Overland JSONL file
+        (this endpoint fires at ~02:56 UTC, by which point the previous day's
+        Overland buffer is complete).
+    """
     check_auth(authorization)
 
     if not file.filename.endswith(".csv"):
@@ -26,21 +39,18 @@ async def upload_csv(file: UploadFile = File(...),
     # Decode bytes → string
     decoded = contents.decode("utf-8")
     now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-    day = int(now.strftime("%d"))-1
-    with open(LOCATION_BACKUP_DIR / f"{year_month}-{day}.csv", "w+") as f:
+    with open(LOCATION_SHORTCUTS_BACKUP_DIR / f"{now.strftime('%Y-%m-%d')}.csv", "w") as f:
         f.write(decoded)
-        f.close()
 
-    # Convert string → file-like object
+    # Convert string → file-like object and queue DB insert
     csv_file = io.StringIO(decoded)
-    
-    inserted, skipped_rows = input_csv(csv_file)
+    background_tasks.add_task(input_csv, csv_file)
+
+    # Log yesterday's completed Overland buffer now that the day has rolled over
+    background_tasks.add_task(log_previous_day_backup)
 
     return {
-        "status": "success",
-        "rows_inserted": inserted,
-        "skipped_rows": skipped_rows
+        "status": "success"
     }
 
 @router.post(
@@ -51,30 +61,19 @@ async def upload_csv(file: UploadFile = File(...),
 async def upload_overland(
         payload: OverlandPayload,
         background_tasks: BackgroundTasks,
+        device_id: str = Query(default="unknown"),
 ):
-    """for item in payload.locations:
-        insert_location(
-            conn=get_conn(),
-            timestamp=item.properties.timestamp,
-            timezone="",
-            latitude=item.geometry.coordinates[1],
-            longitude=item.geometry.coordinates[0],
-            altitude=item.properties.altitude,
-            activity=str(item.properties.motion),
-            device="overland",
-            is_locked=None,
-            battery=int(item.properties.battery_level * 100),
-            is_charging=None,
-            is_connected_charger=None,
-            BSSID=None,
-            RSSI=None
-        )
-    logger.info(f"Inserted Overland payload with {len(payload.locations)} entries.")"""
+    """Accept an Overland GPS payload, append it to the daily JSONL buffer, and queue DB insert.
 
-    #insert_overland(payload)
-    logger.info(f"Received Overland payload with {len(payload.locations)} entries.")
-    background_tasks.add_task(insert_overland, payload)    
+    Two background tasks are queued:
+      - append_to_daily_buffer: write the raw payload to today's JSONL file.
+      - insert_overland: normalise and upsert each location point into the DB.
+    """
+    logger.upload(f"Received Overland payload with {len(payload.locations)} entries.")
+    background_tasks.add_task(append_to_daily_buffer, payload)
+    background_tasks.add_task(insert_overland, payload, device_id)
     return {"result": "ok"}
+
 
 @router.post(
     "/discard",
@@ -82,4 +81,5 @@ async def upload_overland(
     dependencies=[Depends(verify_token)],
 )
 async def discard_overland():
+    """Accept and silently discard an Overland payload (used for testing/muting)."""
     return {"result": "ok"}

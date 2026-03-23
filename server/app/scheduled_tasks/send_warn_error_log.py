@@ -1,10 +1,15 @@
-from config.general import EMAIL_PASSWORD, EMAIL_RECIPIENT, EMAIL_SENDER, SMTP_HOST, SMTP_PORT
-from config.logging import digest_handler
+from config.editable import load_overrides
+load_overrides()
 
-digest_handler.flush_and_send(
-    smtp_host=SMTP_HOST,
-    smtp_port=SMTP_PORT,
-    sender=EMAIL_SENDER,
-    password=EMAIL_PASSWORD,
-    recipient=EMAIL_RECIPIENT
-)
+from config.logging import digest_handler
+from config.settings import settings
+from notifications import _record_cron_run
+from config.editable import load_overrides
+
+try:
+    digest_handler.flush_and_send(**settings.smtp_config
+    )
+    _record_cron_run("send_warn_error_log", success=True)
+except Exception as e:
+    _record_cron_run("send_warn_error_log", success=False, detail=str(e))
+    raise
