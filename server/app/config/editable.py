@@ -13,7 +13,7 @@ def _infer_type(value) -> str:
     if isinstance(value, str):      return "str"
     if isinstance(value, list):     return _infer_list_type(value)
     if isinstance(value, datetime): return "datetime"
-    if isinstance(value, dict):     return "dict"
+    if isinstance(value, dict):     return _infer_dict_type(value)
     return "str"
 
 def _infer_list_type(value: list) -> str:
@@ -26,6 +26,54 @@ def _infer_list_type(value: list) -> str:
     if isinstance(first, float): return "list[float]"
     if isinstance(first, str):   return "list[str]"
     return "list[str]"
+
+def _infer_dict_type(value: dict) -> str:
+    """Return a typed dict string (e.g. 'dict[str,datetime]') based on the first value."""
+    if not value:
+        return "dict[str,str]"
+    first_val = next(iter(value.values()))
+    if isinstance(first_val, bool):     return "dict[str,bool]"
+    if isinstance(first_val, int):      return "dict[str,int]"
+    if isinstance(first_val, float):    return "dict[str,float]"
+    if isinstance(first_val, datetime): return "dict[str,datetime]"
+    return "dict[str,str]"
+
+def coerce_value(value, type_str: str):
+    """Coerce a value (e.g. from JSON) to the registered Python type.
+
+    Handles simple types, list[X], and dict[str,X].
+    Raises ValueError if coercion fails.
+    """
+    try:
+        if type_str == "bool":
+            if isinstance(value, bool): return value
+            return str(value).lower() in ("true", "1", "yes")
+        if type_str == "int":
+            return int(value)
+        if type_str == "float":
+            return float(value)
+        if type_str == "str":
+            return str(value)
+        if type_str == "datetime":
+            if isinstance(value, datetime): return value
+            return datetime.fromisoformat(str(value))
+        if type_str.startswith("list[") and type_str.endswith("]"):
+            inner = type_str[5:-1]
+            if not isinstance(value, list):
+                raise ValueError(f"expected list, got {type(value).__name__}")
+            return [coerce_value(v, inner) for v in value]
+        if type_str.startswith("dict[str,") and type_str.endswith("]"):
+            inner = type_str[9:-1]
+            if not isinstance(value, dict):
+                raise ValueError(f"expected dict, got {type(value).__name__}")
+            return {k: coerce_value(v, inner) for k, v in value.items()}
+        if type_str == "dict":
+            if not isinstance(value, dict):
+                raise ValueError(f"expected dict, got {type(value).__name__}")
+            return value
+        return value
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Cannot coerce value to {type_str}: {e}")
 
 def editable(key: str, description: str = "", group: str = "general"):
     """Decorator-factory that registers a config constant as runtime-editable.
@@ -80,6 +128,11 @@ def load_overrides() -> None:
         for key, value in overrides.items():
             if key not in _EDITABLE:
                 continue
+            type_str = _EDITABLE[key]["type"]
+            try:
+                value = coerce_value(value, type_str)
+            except Exception:
+                pass  # keep raw value if coercion fails
             _EDITABLE[key]["value"] = value
             # Patch the constant in whatever module registered it
             module_name = _EDITABLE[key]["module"]
@@ -87,6 +140,14 @@ def load_overrides() -> None:
             setattr(module, key, value)
     except Exception as e:
         print(f"[config] Failed to load overrides: {e}")
+        return
+
+    # Let config.general recompute any constants derived from editables
+    try:
+        if hasattr(config.general, "_refresh_derived"):
+            config.general._refresh_derived()
+    except Exception as e:
+        print(f"[config] Failed to refresh derived constants: {e}")
 
 def _format_value(value) -> str:
     """Return a concise repr for a config value, truncating long lists."""

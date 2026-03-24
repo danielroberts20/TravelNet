@@ -44,14 +44,16 @@ def get_conn(read_only=False) -> sqlite3.Connection:
     return conn
 
 
-def backup_db() -> str:
+def backup_db(prefix: str = None, suffix: str = None) -> str:
     """Create a point-in-time copy of travel.db in DATABASE_BACKUP_DIR.
 
     Uses SQLite's built-in online backup API so the copy is consistent even
     while the DB is being written to.  Returns the Path of the new backup file.
     """
     now = datetime.now()
-    backup_path = DATABASE_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.db"
+    prefix = "" if prefix is None else prefix + "_"
+    suffix = "" if suffix is None else "_" + suffix
+    backup_path = DATABASE_BACKUP_DIR / f"{prefix}{now.strftime('%Y-%m-%d_%H-%M-%S')}{suffix}.db"
     source = sqlite3.connect(DB_FILE)
     dest   = sqlite3.connect(backup_path)
     source.backup(dest)

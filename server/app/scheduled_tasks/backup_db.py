@@ -38,9 +38,9 @@ def prune_old_backups(days: int = 28) -> int:
     return deleted
 
 
-def run():
+def run(prefix: str = None, suffix: str = None):
     """Create a timestamped DB snapshot and prune backups older than 28 days."""
-    backup_path = backup_db()
+    backup_path = backup_db(prefix, suffix)
     size_mb     = round(backup_path.stat().st_size / (1024 * 1024), 2)
     deleted     = prune_old_backups(days=28)
     return {

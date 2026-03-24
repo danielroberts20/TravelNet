@@ -33,6 +33,9 @@ app.include_router(metadata_router, prefix="/metadata")
 
 @app.on_event("startup")
 async def on_startup():
+    from config.general import COUNTRY_DEPARTURE_DATES
+    from scheduled_tasks.departure_backup import schedule_departure_backups
+    schedule_departure_backups(COUNTRY_DEPARTURE_DATES)
     send_notification(
         title="TravelNet",
         body="✅ Server online",

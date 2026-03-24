@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import json
 import logging
 from typing import Any
-from config.editable import get_editable, get_value
+from config.editable import get_editable, get_value, coerce_value
 from fastapi import APIRouter, Query, HTTPException, Body, Depends  # type: ignore
 from fastapi.responses import Response  # type: ignore
 
@@ -51,31 +51,6 @@ class ConfigUpdate(BaseModel):
     value: Any
 
 
-def _coerce_value(value: Any, type_str: str) -> Any:
-    """Coerce and validate a config value against its registered type."""
-    try:
-        if type_str == "bool":
-            if isinstance(value, bool):
-                return value
-            return str(value).lower() in ("true", "1", "yes")
-        if type_str == "int":
-            return int(value)
-        if type_str == "float":
-            return float(value)
-        if type_str == "str":
-            return str(value)
-        if type_str == "dict":
-            if not isinstance(value, dict):
-                raise ValueError(f"expected dict, got {type(value).__name__}")
-            return value
-        if type_str.startswith("list"):
-            if not isinstance(value, list):
-                raise ValueError(f"expected list, got {type(value).__name__}")
-            return value
-        # datetime and unknown types — pass through unchanged
-        return value
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Cannot coerce value to {type_str}: {e}")
 
 
 @router.get("/config", dependencies=[Depends(require_upload_token)])
@@ -124,7 +99,7 @@ async def update_config(update: ConfigUpdate):
     default_value = editable[update.key]["default"]
     type_str = editable[update.key]["type"]
     try:
-        coerced = _coerce_value(update.value, type_str)
+        coerced = coerce_value(update.value, type_str)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     overrides[update.key] = coerced

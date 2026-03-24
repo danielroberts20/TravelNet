@@ -116,13 +116,29 @@ COORD_PRECISION = editable("COORD_PRECISION", "Number of decimal places to round
 # Seconds between API requests — be a polite free-tier citizen
 REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMeteo request.\nPolite not to spam a free service")(0.5)
 
+# ---------------------------------------------------------------------------
+# Countries/Travel Legs
+# ---------------------------------------------------------------------------
+COUNTRY_DEPARTURE_DATES = editable("COUNTRY_DEPARTURE_DATES", "Dates")({
+    "UK": (datetime(year=2026, month=6, day=11)),
+    "USA": datetime(year=2026, month=9, day=2)
+})
 
 # ---------------------------------------------------------------------------
 # Directories
 # ---------------------------------------------------------------------------
 
-TRAVEL_START_DATE = editable("TRAVEL_START_DATE")(datetime(year=2026, month=6, day=11))
+TRAVEL_START_DATE = COUNTRY_DEPARTURE_DATES.get("UK")
 TRAVEL_START_DATE_TIMESTAMP = int(TRAVEL_START_DATE.timestamp())
+
+
+def _refresh_derived():
+    """Recompute constants derived from editable values. Called by load_overrides() after patching."""
+    import config.general as _m
+    uk_date = _m.COUNTRY_DEPARTURE_DATES.get("UK")
+    if isinstance(uk_date, datetime):
+        _m.TRAVEL_START_DATE = uk_date
+        _m.TRAVEL_START_DATE_TIMESTAMP = int(uk_date.timestamp())
 
 
 # ---------------------------------------------------------------------------
