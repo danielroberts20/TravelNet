@@ -15,7 +15,7 @@ know the exact second that the gap started or ended.
 
 from typing import Optional
 
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES
 
 
@@ -25,10 +25,10 @@ def init() -> None:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS gap_annotations (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                start_ts    INTEGER NOT NULL,   -- Unix timestamp (seconds), inclusive
-                end_ts      INTEGER NOT NULL,   -- Unix timestamp (seconds), inclusive
+                start_ts    TEXT NOT NULL,
+                end_ts      TEXT NOT NULL, 
                 description TEXT    NOT NULL,
-                created_at  TEXT    DEFAULT (datetime('now'))
+                created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
             );
         """)
         conn.execute("""
@@ -39,13 +39,15 @@ def init() -> None:
 
 def insert_annotation(start_ts: int, end_ts: int, description: str) -> int:
     """Insert a new gap annotation and return its auto-assigned row id."""
+    new_start = to_iso_str(start_ts)
+    new_end = to_iso_str(end_ts)
     with get_conn() as conn:
         cursor = conn.execute(
             """
             INSERT INTO gap_annotations (start_ts, end_ts, description)
             VALUES (?, ?, ?)
             """,
-            (start_ts, end_ts, description),
+            (new_start, new_end, description),
         )
         conn.commit()
         return cursor.lastrowid

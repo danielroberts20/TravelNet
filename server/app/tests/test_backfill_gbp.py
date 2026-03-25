@@ -41,7 +41,7 @@ def db():
             source_currency TEXT NOT NULL,
             target_currency TEXT NOT NULL,
             rate            REAL NOT NULL,
-            timestamp       INTEGER NOT NULL,
+            timestamp       TEXT NOT NULL,
             created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(date, source_currency, target_currency)
         );

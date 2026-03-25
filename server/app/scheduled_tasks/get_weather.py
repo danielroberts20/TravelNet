@@ -23,7 +23,7 @@ import requests
 from config.general import COORD_PRECISION, DAILY_VARS, HOURLY_VARS, OPEN_METEO_URL, REQUEST_DELAY
 from config.logging import configure_logging
 from config.settings import settings
-from database.util import get_conn, increment_api_usage
+from database.util import get_conn, increment_api_usage, to_iso_str
 from notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
@@ -104,11 +104,12 @@ def _insert_hourly_rows(data: dict, lat: float, lon: float) -> int:
     cloudcovers          = hourly.get("cloudcover", [])
     is_days              = hourly.get("is_day", [])
 
-    fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    fetched_at = to_iso_str(datetime.now(timezone.utc))
     inserted = 0
 
     with get_conn() as conn:
         for i, ts in enumerate(times):
+            new_ts = to_iso_str(ts)
             raw = {
                 "temperature_2m":       temperatures[i]          if i < len(temperatures)          else None,
                 "apparent_temperature": apparent_temperatures[i]  if i < len(apparent_temperatures) else None,
@@ -135,7 +136,7 @@ def _insert_hourly_rows(data: dict, lat: float, lon: float) -> int:
                 """,
                 {
                     "fetched_at":    fetched_at,
-                    "timestamp":     ts,
+                    "timestamp":     new_ts,
                     "lat":           lat,
                     "lon":           lon,
                     "temp":          raw["temperature_2m"],
@@ -167,11 +168,12 @@ def _insert_daily_rows(data: dict, lat: float, lon: float) -> int:
     windspeed_maxes    = daily.get("wind_speed_10m_max", [])
     windgust_maxes     = daily.get("wind_gusts_10m_max", [])
 
-    fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    fetched_at = to_iso_str(datetime.now(timezone.utc))
     inserted = 0
 
     with get_conn() as conn:
         for i, d in enumerate(dates):
+            new_date = d
             raw = {
                 "sunrise":             sunrises[i]        if i < len(sunrises)        else None,
                 "sunset":              sunsets[i]         if i < len(sunsets)         else None,
@@ -194,7 +196,7 @@ def _insert_daily_rows(data: dict, lat: float, lon: float) -> int:
                 """,
                 {
                     "fetched_at":     fetched_at,
-                    "date":           d,
+                    "date":           new_date,
                     "lat":            lat,
                     "lon":            lon,
                     "sunrise":        raw["sunrise"],

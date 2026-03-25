@@ -12,7 +12,7 @@ import csv
 import logging
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 
 from config.general import DATABASE_BACKUP_DIR, DB_FILE, FX_BACKUP_DIR, HEALTH_BACKUP_DIR, LOCATION_BACKUP_DIR
 from telemetry_models import Log
@@ -122,3 +122,19 @@ def increment_api_usage(service: str = "exchangerate.host"):
             VALUES (?, 1, ?)
             ON CONFLICT(service) DO UPDATE SET count = count + 1
         """, (service, month))
+
+def to_iso_str(s: str | int | float | datetime) -> str:
+    """Convert any datetime to a ISO 8601 UTC string with Z suffix."""
+    if isinstance(s, (int, float)):
+        dt = datetime.fromtimestamp(s, tz=timezone.utc)
+    elif isinstance(s, str):
+        dt = datetime.fromisoformat(s)
+    else:
+        dt = s
+    
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")

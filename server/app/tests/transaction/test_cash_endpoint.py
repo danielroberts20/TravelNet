@@ -82,7 +82,7 @@ def test_custom_timestamp_used(client, db):
         "timestamp": "2026-09-14T14:30:00",
     })
     row = db.execute("SELECT * FROM transactions").fetchone()
-    assert row["timestamp"] == "2026-09-14T14:30:00"
+    assert row["timestamp"] == "2026-09-14T14:30:00Z"
 
 
 def test_defaults_to_now_when_no_timestamp(client, db):

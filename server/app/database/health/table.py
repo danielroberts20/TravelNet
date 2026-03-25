@@ -9,7 +9,7 @@ a separate child table so a single health entry can reference multiple sources
 without duplicating the metric data.
 """
 
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 
 def init() -> None:
@@ -18,10 +18,10 @@ def init() -> None:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS health_data (
             id INTEGER PRIMARY KEY,
-            timestamp INTEGER NOT NULL,      -- Unix seconds
+            timestamp TEXT NOT NULL,
             metric TEXT NOT NULL,            -- e.g., "Heart Rate"
             value_json TEXT,                 -- JSON of metric sub-values
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
             UNIQUE(timestamp, metric)
         );
         """)
@@ -48,18 +48,19 @@ def insert_health_entry(timestamp: int, metric: str, value_json: str, sources: l
     re-processing the same upload is idempotent.  Source rows are also inserted
     with INSERT OR IGNORE against their composite primary key.
     """
+    new_ts = to_iso_str(timestamp)
     with get_conn() as conn:
         cursor = conn.execute("""
             INSERT OR IGNORE INTO health_data (timestamp, metric, value_json)
             VALUES (?, ?, ?);
-        """, (timestamp, metric, value_json))
+        """, (new_ts, metric, value_json))
 
         health_id = cursor.lastrowid
         if not health_id:
             # Row already existed — fetch its id
             row = conn.execute("""
                 SELECT id FROM health_data WHERE timestamp = ? AND metric = ?
-            """, (timestamp, metric)).fetchone()
+            """, (new_ts, metric)).fetchone()
             if row is None:
                 return
             health_id = row[0]

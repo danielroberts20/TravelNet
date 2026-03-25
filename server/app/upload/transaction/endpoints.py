@@ -15,7 +15,7 @@ from database.transaction.ingest.wise import insert as insert_wise
 
 from auth import require_upload_token
 from database.exchange.util import convert_to_gbp
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 from upload.transaction.constants import WISE_SOURCE_MAP
 
 router = APIRouter()
@@ -155,6 +155,8 @@ async def add_cash_transaction(tx: CashTransactionRequest):
         "note": tx.note,
     })
 
+    new_ts = to_iso_str(timestamp)
+
     with get_conn() as conn:
         cursor = conn.cursor()
         try:
@@ -168,7 +170,7 @@ async def add_cash_transaction(tx: CashTransactionRequest):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    tx_id, "cash", "Cash", timestamp, tx.amount, tx.currency, amount_gbp,
+                    tx_id, "cash", "Cash", new_ts, tx.amount, tx.currency, amount_gbp,
                     tx.description, None, None, None, None,
                     0.0, "DEBIT" if tx.amount < 0 else "CREDIT", "CASH", "COMPLETED",
                     0, 0, None, raw_json,

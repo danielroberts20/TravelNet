@@ -8,7 +8,7 @@ and the location_unified view that merges Shortcuts and Overland data.
 import sqlite3
 from typing import Dict, List, Optional
 
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 
 def init() -> None:
@@ -20,8 +20,7 @@ def init() -> None:
             id INTEGER PRIMARY KEY,
 
             -- Core temporal data
-            timestamp INTEGER NOT NULL CHECK(timestamp > 1500000000),  -- Unix timestamp (seconds)
-            timezone TEXT,                       -- e.g. "+0000, -0300"
+            timestamp TEXT NOT NULL,
 
             -- Geographic identifiers
             latitude REAL NOT NULL CHECK(latitude BETWEEN -90 AND 90),
@@ -40,7 +39,7 @@ def init() -> None:
             BSSID TEXT,
             RSSI INTEGER,
 
-            created_at INTEGER DEFAULT (strftime('%s','now')),
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
                         
             UNIQUE(timestamp, device)
         );""")
@@ -82,7 +81,7 @@ def init_unified_view():
             UNION ALL
 
             SELECT
-                datetime(timestamp, 'unixepoch') AS timestamp,
+                timestamp                        AS timestamp,
                 latitude                         AS lat,
                 longitude                        AS lon,
                 altitude                         AS altitude,
@@ -106,11 +105,12 @@ def insert_location(conn: sqlite3.Connection, timestamp: int, timezone: str, lat
     same CSV is idempotent.  Returns the row id for use when inserting the
     associated cellular_state rows.
     """
+    new_ts = to_iso_str(timestamp)
     with conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR IGNORE INTO location_history (
-                timestamp, timezone, 
+                timestamp, 
                 latitude, longitude, altitude, 
                 activity, device, is_locked, 
                 battery, is_charging, is_connected_charger, 
@@ -118,8 +118,7 @@ def insert_location(conn: sqlite3.Connection, timestamp: int, timezone: str, lat
                 ) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (timestamp,
-                timezone,
+            (new_ts,
                 latitude,
                 longitude,
                 altitude,
@@ -137,7 +136,7 @@ def insert_location(conn: sqlite3.Connection, timestamp: int, timezone: str, lat
         cursor.execute("""
             SELECT id FROM location_history
             WHERE timestamp = ? AND device = ?
-        """, (timestamp, device))
+        """, (new_ts, device))
 
         row = cursor.fetchone()
         return row[0]

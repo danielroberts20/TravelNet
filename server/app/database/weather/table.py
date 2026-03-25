@@ -21,8 +21,8 @@ def init() -> None:
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS weather_hourly (
                     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-                    fetched_at            DATETIME NOT NULL,
-                    timestamp             DATETIME NOT NULL,
+                    fetched_at            TEXT NOT NULL,
+                    timestamp             TEXT NOT NULL,
                     latitude              REAL NOT NULL,
                     longitude             REAL NOT NULL,
                     temperature_c         REAL,
@@ -46,12 +46,12 @@ def init() -> None:
 
                 CREATE TABLE IF NOT EXISTS weather_daily (
                     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-                    fetched_at            DATETIME NOT NULL,
-                    date                  DATE NOT NULL,
+                    fetched_at            TEXT NOT NULL,
+                    date                  TEXT NOT NULL,
                     latitude              REAL NOT NULL,
                     longitude             REAL NOT NULL,
-                    sunrise               DATETIME,
-                    sunset                DATETIME,
+                    sunrise               TEXT,
+                    sunset                TEXT,
                     precipitation_sum_mm  REAL,
                     precipitation_hours   REAL,
                     snowfall_sum_cm       REAL,

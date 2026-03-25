@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 import threading
 
 from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 # Custom level: below INFO, for high-frequency upload acknowledgement messages
 UPLOAD_LEVEL = 15
@@ -90,20 +90,8 @@ class DailyDigestHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord):
         """Enqueue a log record tuple for async DB insertion."""
-        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        ts = to_iso_str(datetime.fromtimestamp(record.created, tz=timezone.utc))
         self._queue.put((ts, record.levelname, record.name, record.module, record.lineno, record.getMessage()))
-
-    """def emit(self, record: logging.LogRecord):
-        with self._lock:
-            try:
-                ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-                with get_conn() as conn:
-                    conn.execute(
-                        "INSERT INTO log_digest (ts, level, logger, module, lineno, message) VALUES (?, ?, ?, ?, ?, ?)",
-                        (ts, record.levelname, record.name, record.module, record.lineno, record.getMessage())
-                    )
-            except Exception:
-                self.handleError(record)"""
     
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient):
        from notifications import send_email

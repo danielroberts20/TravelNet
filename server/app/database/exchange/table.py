@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union
 import logging
 
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +20,12 @@ def init() -> None:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS fx_rates (
             id INTEGER PRIMARY KEY,
-            date TEXT NOT NULL,                -- YYYY-MM-DD
+            date TEXT NOT NULL,
             source_currency TEXT NOT NULL,
             target_currency TEXT NOT NULL,
             rate REAL NOT NULL,
-            timestamp INTEGER NOT NULL,        -- Time when fetched
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            timestamp TEXT NOT NULL,            -- Time when fetched
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
 
             UNIQUE(date, source_currency, target_currency)
         )
@@ -68,12 +68,14 @@ def insert_fx_rate(
     Uses INSERT OR IGNORE so duplicate (date, source, target) rows are silently skipped.
     """
     if ts is None:
-        ts = int(datetime.now().timestamp())
+        ts = datetime.now()
+    new_ts = to_iso_str(ts)
+    new_date = date
     logger.info(f"Inserting FX rate: {date} {source_currency}->{target_currency} = {rate}")
     with get_conn() as conn:
         cursor = conn.execute(
             "INSERT OR IGNORE INTO fx_rates (date, source_currency, target_currency, rate, timestamp) VALUES (?, ?, ?, ?, ?)",
-            (date, source_currency, target_currency, rate, ts)
+            (new_date, source_currency, target_currency, rate, new_ts)
         )
         logger.info(f"Inserted FX rate with ID {cursor.lastrowid}")
         return cursor.lastrowid

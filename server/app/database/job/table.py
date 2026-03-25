@@ -10,7 +10,7 @@ through the states: QUEUED → RUNNING → COMPLETED | FAILED.
 from datetime import datetime
 
 from jobs.models import DataMode, Job, Status
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 
 def init() -> None:
@@ -47,6 +47,7 @@ def init() -> None:
 
 def insert_job(job: Job) -> None:
     """Persist a new Job to the database."""
+    new_created = to_iso_str(job.created_at)
     with get_conn() as conn:
         conn.execute("""
             INSERT INTO jobs (
@@ -59,7 +60,7 @@ def insert_job(job: Job) -> None:
         """, (
             job.id,
             job.status.value,
-            job.created_at.isoformat(),
+            new_created,
             job.code_path,
             job.requirements_path,
             job.data_mode.value,
@@ -115,6 +116,8 @@ def update_job(job_id: str, job: Job) -> None:
     """
     if job_id != job.id:
         return
+    new_start = to_iso_str(job.started_at) if job.started_at else None
+    new_finish = to_iso_str(job.finished_at) if job.finished_at else None
     with get_conn() as conn:
         conn.execute("""
             UPDATE jobs SET
@@ -126,7 +129,7 @@ def update_job(job_id: str, job: Job) -> None:
         """, (
             job.id,
             job.status.value,
-            job.created_at.isoformat(),
+            to_iso_str(job.created_at),
             job.code_path,
             job.requirements_path,
             job.data_mode.value,
@@ -134,8 +137,8 @@ def update_job(job_id: str, job: Job) -> None:
             job.sql_query,
             job.entry_point,
             job.timeout,
-            job.started_at.isoformat() if job.started_at else None,
-            job.finished_at.isoformat() if job.finished_at else None,
+            new_start,
+            new_finish,
             job.worker_id,
             job_id
         ))
