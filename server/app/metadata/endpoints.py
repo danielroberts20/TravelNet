@@ -281,3 +281,12 @@ async def reset_crontab_tz():
     )
     logger.info("Crontab reset to pre-conversion backup")
     return {"message": "Crontab restored from backup."}
+
+@router.get("/widget_status")
+async def widget_status():
+    return {
+        "value": 0.72,
+        "label": "72%",
+        "symbol": "externaldrive.fill",
+        "color": "green"
+    } 
