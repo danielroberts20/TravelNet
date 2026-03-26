@@ -11,7 +11,7 @@ from zipfile import ZipFile
 from notifications import send_notification
 from upload.transaction.constants import WISE_SOURCE_MAP
 from database.exchange.util import convert_to_gbp
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 # Transaction detail types that indicate internal pot-to-pot moves
 INTERNAL_DETAIL_TYPES = {"CONVERSION", "MONEY_ADDED"}
@@ -158,6 +158,7 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
                 cursor = conn.cursor()
 
                 for row in rows:
+                    row["timestamp"] = to_iso_str(row["timestamp"])
                     result = cursor.execute("""
                         INSERT OR IGNORE INTO transactions (
                             id, source, bank, timestamp, amount, currency,

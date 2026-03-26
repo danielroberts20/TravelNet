@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 import threading
 
 from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 # Custom level: below INFO, for high-frequency upload acknowledgement messages
 UPLOAD_LEVEL = 15
@@ -47,12 +47,10 @@ class DailyDigestHandler(logging.Handler):
     """
 
     def __init__(self):
-        """Initialise the handler, create the DB table, and start the worker thread."""
+        """Create the handler instance. Call configure_logging() to activate it."""
         super().__init__(level=logging.WARNING)
         self._lock = threading.Lock()
         self._queue: queue.Queue = queue.Queue()
-        self._init_table()
-        self._start_worker()
 
     def _init_table(self):
         """Create the log_digest table if it does not already exist."""
@@ -92,20 +90,8 @@ class DailyDigestHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord):
         """Enqueue a log record tuple for async DB insertion."""
-        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        ts = to_iso_str(datetime.fromtimestamp(record.created, tz=timezone.utc))
         self._queue.put((ts, record.levelname, record.name, record.module, record.lineno, record.getMessage()))
-
-    """def emit(self, record: logging.LogRecord):
-        with self._lock:
-            try:
-                ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-                with get_conn() as conn:
-                    conn.execute(
-                        "INSERT INTO log_digest (ts, level, logger, module, lineno, message) VALUES (?, ?, ?, ?, ?, ?)",
-                        (ts, record.levelname, record.name, record.module, record.lineno, record.getMessage())
-                    )
-            except Exception:
-                self.handleError(record)"""
     
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient):
        from notifications import send_email
@@ -186,6 +172,8 @@ def configure_logging():
     ))
 
     # Daily email digest (WARNING+, only if events exist)
+    digest_handler._init_table()
+    digest_handler._start_worker()
     digest_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()

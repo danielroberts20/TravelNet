@@ -1,9 +1,18 @@
+"""
+database/location/table.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Schema and insert helpers for the location_history table (Shortcuts CSV path)
+and the location_unified view that merges Shortcuts and Overland data.
+"""
+
 import sqlite3
 from typing import Dict, List, Optional
 
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
-def init():
+
+def init() -> None:
+    """Create the location_history table and its indexes if they do not exist."""
     with get_conn() as conn:
         # Locations table
         conn.execute("""
@@ -11,8 +20,7 @@ def init():
             id INTEGER PRIMARY KEY,
 
             -- Core temporal data
-            timestamp INTEGER NOT NULL CHECK(timestamp > 1500000000),  -- Unix timestamp (seconds)
-            timezone TEXT,                       -- e.g. "+0000, -0300"
+            timestamp TEXT NOT NULL,
 
             -- Geographic identifiers
             latitude REAL NOT NULL CHECK(latitude BETWEEN -90 AND 90),
@@ -31,7 +39,7 @@ def init():
             BSSID TEXT,
             RSSI INTEGER,
 
-            created_at INTEGER DEFAULT (strftime('%s','now')),
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
                         
             UNIQUE(timestamp, device)
         );""")
@@ -73,7 +81,7 @@ def init_unified_view():
             UNION ALL
 
             SELECT
-                datetime(timestamp, 'unixepoch') AS timestamp,
+                timestamp                        AS timestamp,
                 latitude                         AS lat,
                 longitude                        AS lon,
                 altitude                         AS altitude,
@@ -91,20 +99,26 @@ def init_unified_view():
 def insert_location(conn: sqlite3.Connection, timestamp: int, timezone: str, latitude: float, longitude: float, altitude: Optional[float],
                     activity: Optional[str], device: str, is_locked: Optional[bool], battery: Optional[int],
                     is_charging: Optional[bool], is_connected_charger: Optional[bool], BSSID: Optional[str], RSSI: Optional[int]):
+    """Insert a location_history row and return its id (existing or newly inserted).
+
+    Uses INSERT OR IGNORE on UNIQUE(timestamp, device) so re-processing the
+    same CSV is idempotent.  Returns the row id for use when inserting the
+    associated cellular_state rows.
+    """
+    new_ts = to_iso_str(timestamp)
     with conn:
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR IGNORE INTO location_history (
-                timestamp, timezone, 
+                timestamp, 
                 latitude, longitude, altitude, 
                 activity, device, is_locked, 
                 battery, is_charging, is_connected_charger, 
                 BSSID, RSSI
                 ) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (timestamp,
-                timezone,
+            (new_ts,
                 latitude,
                 longitude,
                 altitude,
@@ -122,7 +136,7 @@ def insert_location(conn: sqlite3.Connection, timestamp: int, timezone: str, lat
         cursor.execute("""
             SELECT id FROM location_history
             WHERE timestamp = ? AND device = ?
-        """, (timestamp, device))
+        """, (new_ts, device))
 
         row = cursor.fetchone()
         return row[0]

@@ -1,3 +1,13 @@
+"""
+upload/transaction/constants.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lookup table mapping Wise internal account/pot identifiers (as they appear in
+exported CSV filenames) to human-readable display names.
+
+Keys are derived from the CSV filename pattern: <number>_<CURRENCY>
+e.g. "137103728_USD" → "🇺🇸 USD".
+"""
+
 WISE_SOURCE_MAP = {
     "137103728_USD": "🇺🇸 USD",
     "137103780_AUD": "🇦🇺 AUD",

@@ -110,13 +110,17 @@ def _backup_info(path) -> dict | None:
         return None
 
 
-def _latest_in_dir(directory, pattern="*") -> dict | None:
-    """Return backup info for the most recently modified file matching pattern."""
+def _latest_in_dir(directory, pattern="*", index: int = 0) -> dict | None:
+    """Return backup info for the most recently modified file matching pattern.
+    index: Which file to return. Default is most recent file (``0``). For ``n``-th most recent file, use index ``n-1``"""
     try:
         files = sorted(directory.glob(pattern), key=lambda f: f.stat().st_mtime, reverse=True)
         if not files:
             return None
-        info = _backup_info(files[0])
+        try:
+            info = _backup_info(files[index])
+        except IndexError:
+            info = _backup_info(files[-1]) # If desired file is out of range, use oldest file instead
         if info:
             info["count"] = len(files)
         return info
@@ -133,7 +137,7 @@ def get_local_backups() -> dict:
         "workouts": _latest_in_dir(WORKOUT_BACKUP_DIR, "*.json"),
         "location": {
             "shortcut": _latest_in_dir(LOCATION_SHORTCUTS_BACKUP_DIR, "*.csv"),
-            "overland": _latest_in_dir(LOCATION_OVERLAND_BACKUP_DIR, "*.jsonl")
+            "overland": _latest_in_dir(LOCATION_OVERLAND_BACKUP_DIR, "*.jsonl", index=1)
             },
         "revolut":  _latest_in_dir(REVOLUT_BACKUP_DIR, "*.csv"),
         "wise":     _latest_in_dir(WISE_BACKUP_DIR, "*.zip"),

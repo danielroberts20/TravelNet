@@ -1,3 +1,11 @@
+"""
+scheduled_tasks/reset_fx_api_usage.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reset the monthly API call counters for all external services (exchangerate.host
+and open-meteo) so quota tracking starts fresh at the beginning of each month.
+
+Scheduled to run on the 1st of each month.
+"""
 from config.editable import load_overrides
 load_overrides()
 

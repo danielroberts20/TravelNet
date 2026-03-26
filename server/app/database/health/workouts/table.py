@@ -1,14 +1,25 @@
-from database.util import get_conn
+"""
+database/health/workouts/table.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Schema and insert helpers for the workouts and workout_route tables.
+
+workouts stores one row per workout session with aggregated performance metrics.
+workout_route stores individual GPS route points for workouts that include a
+recorded route; each point FK-references its parent workout.
+"""
+
+from database.util import get_conn, to_iso_str
 
 
-def init():
+def init() -> None:
+    """Create the workouts and workout_route tables and their indexes if they do not exist."""
     with get_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS workouts (
                 id                  TEXT PRIMARY KEY,
                 name                TEXT NOT NULL,
-                start_ts            INTEGER NOT NULL,
-                end_ts              INTEGER NOT NULL,
+                start_ts            TEXT NOT NULL,
+                end_ts              TEXT NOT NULL,
                 duration            INTEGER NOT NULL,
                 location            TEXT,
                 is_indoor           INTEGER,
@@ -38,7 +49,7 @@ def init():
                 salinity            TEXT,
                 swim_stroke_count   REAL,
                 swim_cadence        REAL,
-                created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
             );
         """)
 
@@ -46,7 +57,7 @@ def init():
             CREATE TABLE IF NOT EXISTS workout_route (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 workout_id          TEXT NOT NULL REFERENCES workouts(id),
-                timestamp           INTEGER NOT NULL,
+                timestamp           TEXT NOT NULL,
                 latitude            REAL NOT NULL,
                 longitude           REAL NOT NULL,
                 altitude            REAL,
@@ -116,6 +127,8 @@ def insert_workout(
     swim_cadence: float | None,
 ) -> bool:
     """Insert a workout row. Returns True if inserted, False if already existed."""
+    new_start = to_iso_str(start_ts)
+    new_end = to_iso_str(end_ts)
     with get_conn() as conn:
         cursor = conn.execute("""
             INSERT OR IGNORE INTO workouts (
@@ -150,7 +163,7 @@ def insert_workout(
                 ?, ?
             );
         """, (
-            id, name, start_ts, end_ts, duration,
+            id, name, new_start, new_end, duration,
             location, int(is_indoor) if is_indoor is not None else None,
             active_energy_kcal, total_energy_kcal,
             distance, distance_units,
@@ -181,6 +194,12 @@ def insert_workout_route_point(
     horizontal_accuracy: float | None,
     vertical_accuracy: float | None,
 ):
+    """Insert a single GPS route point for a workout.
+
+    Route points are only stored for newly inserted workouts (checked in
+    handle_workout_upload) to avoid duplicate points on re-upload.
+    """
+    new_ts = to_iso_str(timestamp)
     with get_conn() as conn:
         conn.execute("""
             INSERT INTO workout_route (
@@ -190,7 +209,7 @@ def insert_workout_route_point(
                 horizontal_accuracy, vertical_accuracy
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
-            workout_id, timestamp, latitude, longitude,
+            workout_id, new_ts, latitude, longitude,
             altitude, speed, speed_accuracy,
             course, course_accuracy,
             horizontal_accuracy, vertical_accuracy,

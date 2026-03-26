@@ -1,3 +1,15 @@
+"""
+config/general.py
+~~~~~~~~~~~~~~~~~
+Static paths, constants, and editable runtime configuration for TravelNet.
+
+All values that should be tunable at runtime are registered with the
+@editable() decorator so they appear in the /metadata/config endpoint and can
+be overridden via config_overrides.json without a code change.
+
+Directory constants are created on module import (mkdir exist_ok=True) so
+the application never starts with a missing backup directory.
+"""
 # Storage directory (Docker volume)
 from datetime import datetime
 from pathlib import Path
@@ -10,13 +22,11 @@ from yarl import URL # type: ignore
 # ---------------------------------------------------------------------------
 
 
-DATA_DIR = Path("../data")
-DATA_DIR.mkdir(exist_ok=True)
+DATA_DIR = Path("/data")
 
 DB_FILE = DATA_DIR / "travel.db"
 
-JOBS_DIR = Path("../data/jobs")
-JOBS_DIR.mkdir(exist_ok=True)
+JOBS_DIR = DATA_DIR / "jobs"
 
 DATA_BACKUP_DIR = DATA_DIR / "backups"
 DATABASE_BACKUP_DIR = DATA_BACKUP_DIR / "db"
@@ -44,8 +54,13 @@ BACKUP_DIRS = [
     WISE_BACKUP_DIR
 ]
 
-for backup_dir in BACKUP_DIRS:
-    backup_dir.mkdir(exist_ok=True)
+# DATA_DIR is a Docker volume mount — only create subdirs when running inside Docker.
+# Outside Docker (e.g. during tests), /data won't exist and we skip the mkdir calls
+# to avoid creating stray directories relative to the process working directory.
+if DATA_DIR.exists():
+    JOBS_DIR.mkdir(exist_ok=True)
+    for backup_dir in BACKUP_DIRS:
+        backup_dir.mkdir(parents=True, exist_ok=True)
 
 LOG_DIR = Path("./logs/")
 LOG_DIR.mkdir(exist_ok=True)
@@ -101,13 +116,29 @@ COORD_PRECISION = editable("COORD_PRECISION", "Number of decimal places to round
 # Seconds between API requests — be a polite free-tier citizen
 REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMeteo request.\nPolite not to spam a free service")(0.5)
 
+# ---------------------------------------------------------------------------
+# Countries/Travel Legs
+# ---------------------------------------------------------------------------
+COUNTRY_DEPARTURE_DATES = editable("COUNTRY_DEPARTURE_DATES", "Dates")({
+    "UK": (datetime(year=2026, month=6, day=11)),
+    "USA": datetime(year=2026, month=9, day=2)
+})
 
 # ---------------------------------------------------------------------------
 # Directories
 # ---------------------------------------------------------------------------
 
-TRAVEL_START_DATE = editable("TRAVEL_START_DATE")(datetime(year=2026, month=6, day=11))
+TRAVEL_START_DATE = COUNTRY_DEPARTURE_DATES.get("UK")
 TRAVEL_START_DATE_TIMESTAMP = int(TRAVEL_START_DATE.timestamp())
+
+
+def _refresh_derived():
+    """Recompute constants derived from editable values. Called by load_overrides() after patching."""
+    import config.general as _m
+    uk_date = _m.COUNTRY_DEPARTURE_DATES.get("UK")
+    if isinstance(uk_date, datetime):
+        _m.TRAVEL_START_DATE = uk_date
+        _m.TRAVEL_START_DATE_TIMESTAMP = int(uk_date.timestamp())
 
 
 # ---------------------------------------------------------------------------
@@ -124,3 +155,14 @@ SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from")("GBP")
 # ---------------------------------------------------------------------------
 
 INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation")(5)
+
+# ---------------------------------------------------------------------------
+# Gap annotations
+# ---------------------------------------------------------------------------
+
+GAP_ANNOTATION_TOLERANCE_MINUTES = editable(
+    "GAP_ANNOTATION_TOLERANCE_MINUTES",
+    "Tolerance in minutes applied on each side of an annotation when checking\n"
+    "whether it covers a detected data gap.  A value of 10 means an annotation\n"
+    "needs to start at most 10 min before the gap and end at most 10 min after it."
+)(10)

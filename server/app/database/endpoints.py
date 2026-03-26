@@ -1,19 +1,23 @@
 import logging
 import os
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException  # type: ignore
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends  # type: ignore
 from fastapi.responses import FileResponse  # type: ignore
 
+from auth import require_upload_token
 from database.util import backup_db, get_conn
-from auth import check_auth
 
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.get("/download")
-async def download(background_tasks: BackgroundTasks, authorization: str = Header(None)):
-    check_auth(authorization)
-    
+
+@router.get("/download", dependencies=[Depends(require_upload_token)])
+async def download(background_tasks: BackgroundTasks):
+    """Create a point-in-time DB backup and stream it to the caller.
+
+    The backup file is scheduled for deletion once the response is sent so it
+    does not accumulate on disk.
+    """
     backup_path = backup_db()
     background_tasks.add_task(os.remove, backup_path)
     logger.info(f"Database backup created at {backup_path}, scheduled for deletion after response")
@@ -24,9 +28,14 @@ async def download(background_tasks: BackgroundTasks, authorization: str = Heade
         media_type="application/octet-stream"
     )
 
-@router.get("/reset")
-async def reset_table(table: str, authorization: str = Header(None)):
-    check_auth(authorization)
+
+@router.get("/reset", dependencies=[Depends(require_upload_token)])
+async def reset_table(table: str):
+    """Delete all rows from a resettable table.
+
+    Only tables explicitly listed in RESETTABLE_TABLES are permitted.
+    Returns HTTP 400 for any other table name.
+    """
     RESETTABLE_TABLES = [
         "transactions",
         "fx_rates",

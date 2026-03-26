@@ -1,4 +1,10 @@
-from fastapi import APIRouter  #type: ignore
+"""
+upload/endpoints.py
+~~~~~~~~~~~~~~~~~~~
+Aggregates the three upload sub-routers (location, transaction, health) under
+the /upload prefix.  Each domain manages its own authentication and validation.
+"""
+from fastapi import APIRouter  # type: ignore
 import logging
 
 from upload.location.endpoints import router as location_router

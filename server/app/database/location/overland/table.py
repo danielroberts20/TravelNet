@@ -1,6 +1,6 @@
 import logging
 
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 from database.location.overland.util import _normalise_ts
 from telemetry_models import OverlandPayload
 
@@ -29,7 +29,7 @@ def init():
             desired_accuracy    REAL,
             significant_change  TEXT,
             raw_json            TEXT,                   -- full original feature for safety
-            inserted_at         TEXT DEFAULT (datetime('now')),
+            inserted_at         TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
             UNIQUE(device_id, timestamp)
         );""")
 
@@ -61,6 +61,7 @@ def insert_overland(payload: OverlandPayload, device_id: str):
             props = feature.properties
 
             lon, lat = geo.coordinates[0], geo.coordinates[1]
+            new_ts = to_iso_str(_normalise_ts(props.timestamp))
 
             try:
                 conn.execute("""
@@ -81,7 +82,7 @@ def insert_overland(payload: OverlandPayload, device_id: str):
                     """,
                     {
                         "device_id":           device_id,
-                        "timestamp":           _normalise_ts(props.timestamp),
+                        "timestamp":           new_ts,
                         "lat":                 lat,
                         "lon":                 lon,
                         "altitude":            props.altitude,

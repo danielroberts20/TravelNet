@@ -2,9 +2,9 @@ from datetime import datetime
 import io
 import logging
 
-from fastapi import APIRouter, Header, Query, UploadFile, File, HTTPException, status, Depends, BackgroundTasks #type: ignore
+from fastapi import APIRouter, Query, UploadFile, File, HTTPException, status, Depends, BackgroundTasks  # type: ignore
 from config.general import LOCATION_SHORTCUTS_BACKUP_DIR
-from auth import check_auth, verify_token
+from auth import require_upload_token, verify_overland_token
 from database.location.overland.table import insert_overland
 from telemetry_models import OverlandPayload
 from upload.utils import input_csv
@@ -13,11 +13,11 @@ from upload.location.overland.backup import append_to_daily_buffer, log_previous
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.post("/shortcut")
+
+@router.post("/shortcut", dependencies=[Depends(require_upload_token)])
 async def upload_csv(
         file: UploadFile = File(...),
         background_tasks: BackgroundTasks = BackgroundTasks,
-        authorization: str = Header(None),
 ):
     """Accept a Shortcuts CSV location export, save a local backup, and queue processing.
 
@@ -29,8 +29,6 @@ async def upload_csv(
         (this endpoint fires at ~02:56 UTC, by which point the previous day's
         Overland buffer is complete).
     """
-    check_auth(authorization)
-
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
 
@@ -53,10 +51,11 @@ async def upload_csv(
         "status": "success"
     }
 
+
 @router.post(
     "/overland",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(verify_token)],
+    dependencies=[Depends(verify_overland_token)],
 )
 async def upload_overland(
         payload: OverlandPayload,
@@ -78,7 +77,7 @@ async def upload_overland(
 @router.post(
     "/discard",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(verify_token)],
+    dependencies=[Depends(verify_overland_token)],
 )
 async def discard_overland():
     """Accept and silently discard an Overland payload (used for testing/muting)."""

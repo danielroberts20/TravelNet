@@ -44,5 +44,5 @@ def input_csv(csv_file):
     logger.info(f"Successfully uploaded {inserted}/{total_rows} entries")
     send_notification(
         title="Shortcut Location",
-        body=f"{total_rows} received | {inserted} inserted | {skipped_rows} skipped")
+        body=f"{total_rows} received | {inserted} inserted | {len(skipped_rows)} skipped")
     return inserted, skipped_rows

@@ -1,3 +1,12 @@
+"""
+scheduled_tasks/check_health_gaps.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Scan the health_data table for days that are missing all metrics, or that have
+an incomplete set of expected metrics, since data collection began.
+
+Scheduled: daily.  Logs a WARNING for each problematic day and returns a
+summary dict with gap and partial counts so CronJobMailer can report them.
+"""
 from config.editable import load_overrides
 load_overrides()
 
@@ -36,6 +45,11 @@ EXPECTED_METRICS = {
 
 
 def check_health_gaps() -> dict:
+    """Check for missing or incomplete health data days since collection began.
+
+    Returns a dict with 'gaps' (days with zero data) and 'partial' (days
+    missing at least one of the EXPECTED_METRICS).
+    """
     with get_conn() as conn:
         # Earliest date in the table — use as floor so we don't warn before data collection began
         row = conn.execute(

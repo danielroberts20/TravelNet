@@ -1,10 +1,20 @@
+"""
+database/job/table.py
+~~~~~~~~~~~~~~~~~~~~~
+Schema and CRUD helpers for the jobs table.
+
+Jobs represent ML/analysis tasks submitted by a worker client.  A job moves
+through the states: QUEUED → RUNNING → COMPLETED | FAILED.
+"""
+
 from datetime import datetime
 
 from jobs.models import DataMode, Job, Status
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 
-def init():
+def init() -> None:
+    """Create the jobs table and its indexes if they do not exist."""
     with get_conn() as conn:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS jobs (
@@ -28,13 +38,16 @@ def init():
         error_message TEXT
         );
         """)
-        
-        # Index for querying active jobs
+
+        # Index for querying active jobs by status + creation order
         conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_jobs_status_created
         ON jobs (status, created_at);""")
 
-def insert_job(job: Job):
+
+def insert_job(job: Job) -> None:
+    """Persist a new Job to the database."""
+    new_created = to_iso_str(job.created_at)
     with get_conn() as conn:
         conn.execute("""
             INSERT INTO jobs (
@@ -47,7 +60,7 @@ def insert_job(job: Job):
         """, (
             job.id,
             job.status.value,
-            job.created_at.isoformat(),
+            new_created,
             job.code_path,
             job.requirements_path,
             job.data_mode.value,
@@ -58,7 +71,9 @@ def insert_job(job: Job):
         ))
         conn.commit()
 
+
 def row_to_job(row) -> Job:
+    """Convert a sqlite3.Row to a Job object."""
     return Job(
         id=row["id"],
         code_path=row["code_path"],
@@ -75,7 +90,9 @@ def row_to_job(row) -> Job:
         worker_id=row["worker_id"]
     )
 
-def get_next_queued_job():
+
+def get_next_queued_job() -> Job | None:
+    """Return the oldest QUEUED job from the DB, or None if the queue is empty."""
     with get_conn() as conn:
         row = conn.execute("""
             SELECT *
@@ -90,9 +107,17 @@ def get_next_queued_job():
 
         return row_to_job(row)
 
-def update_job(job_id: str, job: Job):
+
+def update_job(job_id: str, job: Job) -> None:
+    """Persist all mutable fields of job back to the DB.
+
+    Does nothing if job_id does not match job.id (safety guard against
+    accidentally updating the wrong row).
+    """
     if job_id != job.id:
         return
+    new_start = to_iso_str(job.started_at) if job.started_at else None
+    new_finish = to_iso_str(job.finished_at) if job.finished_at else None
     with get_conn() as conn:
         conn.execute("""
             UPDATE jobs SET
@@ -104,7 +129,7 @@ def update_job(job_id: str, job: Job):
         """, (
             job.id,
             job.status.value,
-            job.created_at.isoformat(),
+            to_iso_str(job.created_at),
             job.code_path,
             job.requirements_path,
             job.data_mode.value,
@@ -112,8 +137,8 @@ def update_job(job_id: str, job: Job):
             job.sql_query,
             job.entry_point,
             job.timeout,
-            job.started_at.isoformat() if job.started_at else None,
-            job.finished_at.isoformat() if job.finished_at else None,
+            new_start,
+            new_finish,
             job.worker_id,
             job_id
         ))

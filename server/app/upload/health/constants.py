@@ -1,3 +1,19 @@
+"""
+upload/health/constants.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lookup tables for Health Auto Export metric handling.
+
+METRIC_AGGREGATION: maps display metric name → sub-metric → aggregation type.
+  Used by _get_agg_type() to decide how to combine multiple readings within
+  an INTERVAL_MINUTES bucket (sum, mean, min, max).
+
+METRICS: master list of all HAE metric names (used for gap-checking).
+
+SNAKE_TO_DISPLAY: maps snake_case HAE export name → display metric name.
+  Needed because HAE sends metrics with underscored names but the DB stores
+  the human-readable display name (e.g. "heart_rate" → "Heart Rate").
+"""
+
 METRIC_AGGREGATION = {
     "Active Energy": {"Active Energy (kJ)": "sum"},
     "Apple Exercise Time": {"Apple Exercise Time (min)": "sum"},

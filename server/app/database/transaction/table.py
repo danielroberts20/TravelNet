@@ -1,10 +1,22 @@
+"""
+database/transaction/table.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Schema for the transactions table.
+
+All transaction sources (Revolut, Wise, Cash) share this single table.
+The composite primary key (id, currency, source) allows the same transaction
+ID to appear in multiple currencies without collision.
+"""
+
 import logging
 
 from database.util import get_conn
 
 logger = logging.getLogger(__name__)
 
-def init():
+
+def init() -> None:
+    """Create the transactions table and its indexes if they do not exist."""
     with get_conn() as conn:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS transactions (

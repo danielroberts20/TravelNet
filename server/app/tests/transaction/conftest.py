@@ -10,10 +10,12 @@ import sys
 import pytest
 from unittest.mock import patch, MagicMock
 
-# Prevent main.py from touching the real DB on import
+# Prevent main.py from touching the real DB or attaching the digest log handler on import
 with patch("database.integration.init_db"), \
-     patch("database.util.backup_db", return_value="/tmp/fake.db"):
+     patch("database.util.backup_db", return_value="/tmp/fake.db"), \
+     patch("config.logging.configure_logging"):
     from main import app
+
 
 # Prevent main.py side effects when TestClient imports it
 sys.modules.setdefault("config.runtime", MagicMock())

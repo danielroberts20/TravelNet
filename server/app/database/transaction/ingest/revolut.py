@@ -18,7 +18,7 @@ from typing import Optional
 
 from notifications import send_notification
 from database.exchange.util import convert_to_gbp
-from database.util import get_conn
+from database.util import get_conn, to_iso_str
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,7 @@ def _parse_timestamp(dt_str: str) -> str:
 
 
 def _safe_float(value: str) -> Optional[float]:
+    """Parse a string to float, returning None for blank or unparseable values."""
     try:
         return float(value) if value.strip() != "" else None
     except (ValueError, AttributeError):
@@ -114,7 +115,7 @@ def insert(csv_text: str, source: str = "revolut"):
                     continue
 
                 # Use Started Date as canonical timestamp (when the user initiated the transaction)
-                timestamp = _parse_timestamp(started_str)
+                timestamp = to_iso_str(_parse_timestamp(started_str))
                 tx_date = datetime.fromisoformat(timestamp).date()
 
                 tx_id = _generate_id(row)

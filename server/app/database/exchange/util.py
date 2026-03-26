@@ -45,6 +45,11 @@ def get_gbp_rate(currency: str, on_date: date, tolerance_days: int = 7) -> Optio
         return None
 
 def convert_to_gbp(amount: float, currency: str, on_date: date, tolerance_days: int = 7) -> Optional[float]:
+    """Convert amount in currency to GBP using the stored FX rate for on_date.
+
+    Falls back to the nearest available rate within tolerance_days if an exact
+    date match is unavailable.  Returns None if no rate is found.
+    """
     if currency == "GBP":
         return round(amount, 6)
     rate = get_gbp_rate(currency, on_date, tolerance_days)
@@ -74,7 +79,8 @@ def insert_fx_json(quotes: dict):
                 ts=int(datetime.strptime(date, "%Y-%m-%d").timestamp()),
             )
 
-def insert_fx_file(fx_path: str):
+def insert_fx_file(fx_path: str) -> None:
+    """Load a JSON backup file and insert all FX rates it contains."""
     with open(fx_path) as f:
         fx_data = json.load(f)
     for fx in fx_data:
