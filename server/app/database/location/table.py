@@ -116,7 +116,7 @@ def insert_location(conn: sqlite3.Connection, timestamp: int, timezone: str, lat
                 battery, is_charging, is_connected_charger, 
                 BSSID, RSSI
                 ) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (new_ts,
                 latitude,
