@@ -12,7 +12,7 @@
 - **Multi-source, conflict-aware ingestion** — Revolut, Wise, cash, and local bank accounts reconciled into a single unified ledger
 - **Continuous location tracking** — dual-source GPS (Overland + iOS Shortcuts) with automatic gap-filling and ~99.4% coverage
 - **ML-powered insights** — travel segmentation, spend forecasting, location clustering, and anomaly detection derived from live data
-- **Public demo dataset** — anonymised and coordinate-fuzzed subset available for exploration via the [interactive dashboard](https://danielroberts20.github.io/TravelNet)
+- **Public demo dataset** — anonymised and coordinate-fuzzed subset available for exploration via the [interactive dashboard](https::/travelnet.dev)
 
 ---
 
