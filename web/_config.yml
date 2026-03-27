@@ -2,8 +2,8 @@ title: TravelNet
 tagline: "Three years. Three continents. One dataset."
 description: "A personal data collection and ML analysis platform built for long-term international travel."
 author: Dan Roberts
-baseurl: "/TravelNet"
-url: "https://danielroberts20.github.io"
+baseurl: ""
+url: "https://travelnet.dev"
 github_repo: "https://github.com/danielroberts20/TravelNet"
 
 # Build settings

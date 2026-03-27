@@ -7,7 +7,7 @@
  */
 
 const LIVE_URL      = "https://api.travelnet.dev/public/stats";
-const FALLBACK_URL  = "/TravelNet/public_stats.json";
+const FALLBACK_URL  = "/public_stats.json";
 const TIMEOUT_MS    = 5000;
 
 /* --------------------------------------------------------
