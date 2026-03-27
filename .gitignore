@@ -20,3 +20,4 @@ server/runcron.sh
 server/build.sh
 .claude
 CLAUDE.md
+web/_data
