@@ -769,6 +769,10 @@ section {
   transition: all var(--duration-fast);
 }
 
+.icon, img[src*="/assets/icons/"] {
+  vertical-align: middle;
+}
+
 .stack-item:hover {
   border-color: var(--accent);
   color: var(--text-primary);
