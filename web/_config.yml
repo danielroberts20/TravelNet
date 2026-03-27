@@ -30,23 +30,6 @@ nav:
     icon: info.circle
     status: coming_soon
 
-# Trip metadata (update as you go)
-trip:
-  departure: "2026-06-01"
-  legs:
-    - name: "USA"
-      emoji: "🇺🇸"
-    - name: "Fiji"
-      emoji: "🇫🇯"
-    - name: "Australia"
-      emoji: "🇦🇺"
-    - name: "New Zealand"
-      emoji: "🇳🇿"
-    - name: "SE Asia"
-      emoji: "🌏"
-    - name: "Canada"
-      emoji: "🇨🇦"
-
 exclude:
   - Gemfile
   - Gemfile.lock
