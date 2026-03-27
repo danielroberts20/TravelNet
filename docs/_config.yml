@@ -1,0 +1,54 @@
+title: TravelNet
+tagline: "Two years. Four continents. One dataset."
+description: "A personal data collection and ML analysis platform built for long-term international travel."
+author: Dan Roberts
+baseurl: "/TravelNet"
+url: "https://danielroberts20.github.io"
+github_repo: "https://github.com/danielroberts20/TravelNet"
+
+# Build settings
+markdown: kramdown
+highlighter: rouge
+permalink: pretty
+
+# Navigation
+nav:
+  - title: Journey
+    url: /journey/
+    icon: map
+    status: coming_soon
+  - title: Explorer
+    url: /explorer/
+    icon: chart.bar
+    status: coming_soon
+  - title: ML Insights
+    url: /ml/
+    icon: brain
+    status: coming_soon
+  - title: About
+    url: /about/
+    icon: info.circle
+    status: coming_soon
+
+# Trip metadata (update as you go)
+trip:
+  departure: "2026-06-01"
+  legs:
+    - name: "USA"
+      emoji: "🇺🇸"
+    - name: "Fiji"
+      emoji: "🇫🇯"
+    - name: "Australia"
+      emoji: "🇦🇺"
+    - name: "New Zealand"
+      emoji: "🇳🇿"
+    - name: "SE Asia"
+      emoji: "🌏"
+    - name: "Canada"
+      emoji: "🇨🇦"
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - README.md
