@@ -12,9 +12,8 @@ description: "A personal data collection and ML analysis platform for 2–3 year
 
   <div class="hero-eyebrow">
     <span class="nav-status-dot"></span>
-    Pre-departure &mdash; launching June 2026
+    <span id="hero-status-text">Pre-departure &mdash; launching June 2026</span>
   </div>
-
   <h1 class="hero-title">
     Two years.<br>
     <span class="accent-teal">Four continents.</span><br>
@@ -76,94 +75,46 @@ description: "A personal data collection and ML analysis platform for 2–3 year
   <div class="stats-bar-inner">
     <p class="section-eyebrow reveal">Platform stats</p>
     <div class="stats-grid">
-
+ 
       <div class="stat-card reveal">
         <span class="stat-icon">📍</span>
-        <span class="stat-value accent-teal" id="stat-gps">
-          {% if site.data.stats.gps_points > 0 %}
-            {{ site.data.stats.gps_points | number_with_delimiter }}
-          {% else %}
-            &mdash;
-          {% endif %}
-        </span>
+        <span class="stat-value accent-teal" data-stat="gps_points">—</span>
         <span class="stat-label">GPS points logged</span>
         <span class="stat-sublabel">Overland + Shortcuts</span>
       </div>
-
+ 
       <div class="stat-card reveal">
         <span class="stat-icon">🌍</span>
-        <span class="stat-value accent-blue" id="stat-countries">
-          {% if site.data.stats.countries_visited > 0 %}
-            {{ site.data.stats.countries_visited }}
-          {% else %}
-            &mdash;
-          {% endif %}
-        </span>
+        <span class="stat-value accent-blue" data-stat="total_countries">—</span>
         <span class="stat-label">Countries visited</span>
-        <span class="stat-sublabel">
-          {% if site.data.stats.current_location %}
-            Now: {{ site.data.stats.current_location }}
-          {% else %}
-            Starting June 2026
-          {% endif %}
-        </span>
+        <span class="stat-sublabel" data-stat="current_leg_name">Starting June 2026</span>
       </div>
-
+ 
       <div class="stat-card reveal">
         <span class="stat-icon">❤️</span>
-        <span class="stat-value" id="stat-health">
-          {% if site.data.stats.health_records > 0 %}
-            {{ site.data.stats.health_records | number_with_delimiter }}
-          {% else %}
-            &mdash;
-          {% endif %}
-        </span>
+        <span class="stat-value" data-stat="health_records">—</span>
         <span class="stat-label">Health records</span>
         <span class="stat-sublabel">Apple Health via HAE</span>
       </div>
-
+ 
       <div class="stat-card reveal">
         <span class="stat-icon">💳</span>
-        <span class="stat-value accent-orange" id="stat-tx">
-          {% if site.data.stats.transactions > 0 %}
-            {{ site.data.stats.transactions | number_with_delimiter }}
-          {% else %}
-            &mdash;
-          {% endif %}
-        </span>
+        <span class="stat-value accent-orange" data-stat="transactions">—</span>
         <span class="stat-label">Transactions</span>
         <span class="stat-sublabel">Revolut · Wise · Cash</span>
       </div>
-
+ 
       <div class="stat-card reveal">
         <span class="stat-icon">📅</span>
-        <span class="stat-value" id="stat-days">
-          {% if site.data.stats.days_travelling > 0 %}
-            {{ site.data.stats.days_travelling }}
-          {% else %}
-            &mdash;
-          {% endif %}
-        </span>
+        <span class="stat-value" data-stat="days_travelling">—</span>
         <span class="stat-label">Days travelling</span>
-        <span class="stat-sublabel">
-          {% if site.data.stats.current_leg %}
-            {{ site.data.stats.current_leg }}
-          {% else %}
-            Across all legs
-          {% endif %}
-        </span>
+        <span class="stat-sublabel" id="stat-days-sublabel">Across all legs</span>
       </div>
-
+ 
     </div>
-
-    {% if site.data.stats.last_synced %}
-    <p class="stats-sync-info reveal">
-      Last synced: {{ site.data.stats.last_synced }}
-    </p>
-    {% else %}
-    <p class="stats-sync-info reveal">Stats populate automatically once travelling begins</p>
-    {% endif %}
-
+ 
+    <p class="stats-sync-info reveal" id="stats-sync-info" style="display:none;"></p>
+ 
   </div>
 </section>
 
@@ -242,7 +193,7 @@ description: "A personal data collection and ML analysis platform for 2–3 year
   </div>
   <div class="timeline-track reveal">
     {% for leg in site.trip.legs %}
-    <div class="timeline-leg">
+    <div class="timeline-leg" data-leg-id="{{ leg.id }}">
       <div class="timeline-dot">{{ leg.emoji }}</div>
       <span class="timeline-name">{{ leg.name }}</span>
     </div>
