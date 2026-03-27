@@ -70,6 +70,8 @@ ERROR_FILE = LOG_DIR / "server.error.log"
 
 OVERRIDES_PATH = DATA_DIR / "config_overrides.json"
 
+TRAVEL_YML = Path("/travel.yml")
+
 # ---------------------------------------------------------------------------
 # Notifications
 # ---------------------------------------------------------------------------

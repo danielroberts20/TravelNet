@@ -10,3 +10,5 @@ pydantic-settings
 babel
 numpy
 scikit-learn
+slowapi==0.1.9
+pyyaml

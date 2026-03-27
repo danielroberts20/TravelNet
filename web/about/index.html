@@ -1,0 +1,58 @@
+---
+layout: default
+title: About
+permalink: /about/
+description: How TravelNet works — architecture, data pipeline, and the story behind the project.
+---
+
+<section style="padding: var(--space-10) var(--space-6) var(--space-8);">
+  <div class="section-inner" style="max-width: 760px;">
+
+    <p class="section-eyebrow">About the project</p>
+    <h1 class="section-title">Why I built this</h1>
+
+    <p style="font-size:18px; color:var(--text-secondary); line-height:1.7; margin-bottom: var(--space-6);">
+      I'm Dan — a CS graduate about to spend 2–3 years travelling across four continents on working holiday visas. Before I left, I wanted to answer a question: <em style="color:var(--text-primary);">what does long-term nomadic life actually look like in data?</em>
+    </p>
+
+    <p style="color:var(--text-secondary); line-height:1.7; margin-bottom: var(--space-5);">
+      TravelNet is the answer. A Raspberry Pi 4B runs unattended throughout the trip, ingesting GPS traces, health metrics, financial transactions, and weather data around the clock. By the time I return, I'll have a continuous, multi-year personal dataset unlike anything that typically ends up in a portfolio.
+    </p>
+
+    <p style="color:var(--text-secondary); line-height:1.7; margin-bottom: var(--space-7);">
+      The ML pipeline — clustering, segmentation, anomaly detection — kicks off from Australia, using the US baseline data for comparison. The public demo here is the anonymised output of all of it.
+    </p>
+
+    <hr class="divider">
+
+    <h2 style="font-size:24px; font-weight:600; letter-spacing:-0.02em; margin-bottom:var(--space-5);">Architecture</h2>
+
+    <div class="stack-grid" style="margin-bottom:var(--space-6);">
+      <div class="stack-item"><span class="stack-item-icon">ingest</span> FastAPI on port 8000</div>
+      <div class="stack-item"><span class="stack-item-icon">dash</span> Flask admin UI on port 8080</div>
+      <div class="stack-item"><span class="stack-item-icon">proxy</span> nginx, TLS via Tailscale</div>
+      <div class="stack-item"><span class="stack-item-icon">store</span> SQLite on external HDD</div>
+      <div class="stack-item"><span class="stack-item-icon">sync</span> Tailscale remote access</div>
+      <div class="stack-item"><span class="stack-item-icon">bkp</span> Cloudflare R2, age-encrypted</div>
+    </div>
+
+    <h2 style="font-size:24px; font-weight:600; letter-spacing:-0.02em; margin-bottom:var(--space-5);">Data sources</h2>
+
+    <div class="stack-grid" style="margin-bottom:var(--space-6);">
+      <div class="stack-item"><span class="stack-item-icon">GPS</span> Overland (iOS) — 5s intervals</div>
+      <div class="stack-item"><span class="stack-item-icon">GPS</span> iOS Shortcuts — gap fill</div>
+      <div class="stack-item"><span class="stack-item-icon">♥</span> Apple Watch Ultra + HAE</div>
+      <div class="stack-item"><span class="stack-item-icon">💳</span> Revolut CSV exports</div>
+      <div class="stack-item"><span class="stack-item-icon">💳</span> Wise ZIP exports</div>
+      <div class="stack-item"><span class="stack-item-icon">🌤</span> Open-Meteo weather API</div>
+    </div>
+
+    <hr class="divider">
+
+    <div style="display:flex; gap:var(--space-3); flex-wrap:wrap;">
+      <a href="{{ site.github_repo }}" class="btn btn-primary" target="_blank" rel="noopener">View on GitHub</a>
+      <a href="{{ '/' | relative_url }}" class="btn btn-secondary">← Home</a>
+    </div>
+
+  </div>
+</section>

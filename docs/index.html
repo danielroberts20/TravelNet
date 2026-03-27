@@ -1,554 +1,62 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TravelNet - Personal Data Exploration & ML Insights</title>
-    <link rel="icon" type="image/x-icon" href="/assets/icon.ico">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-            line-height: 1.6;
-            color: #2d3748;
-            background: #f7fafc;
-        }
-
-        header {
-            background: white;
-            color: #2d3748;
-            padding: 1.2rem 0;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        nav a {
-            color: #4a5568;
-            text-decoration: none;
-            margin-left: 2.5rem;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-
-        nav a:hover {
-            color: #667eea;
-        }
-
-        .hero {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 5rem 2rem;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 480px;
-        }
-
-        .hero-content {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            font-size: 3.2rem;
-            margin-bottom: 1rem;
-            font-weight: 700;
-            line-height: 1.2;
-        }
-
-        .subtitle {
-            font-size: 1.2rem;
-            margin-bottom: 1.5rem;
-            opacity: 0.95;
-            font-weight: 300;
-        }
-
-        .hero-description {
-            font-size: 1rem;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-            line-height: 1.8;
-            max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .cta-buttons {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .cta-button {
-            display: inline-block;
-            background: white;
-            color: #667eea;
-            padding: 1rem 2rem;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            border: 2px solid white;
-            cursor: pointer;
-            font-size: 1rem;
-        }
-
-        .cta-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-        }
-
-        .cta-button.secondary {
-            background: transparent;
-            color: white;
-            border-color: white;
-        }
-
-        .cta-button.secondary:hover {
-            background: rgba(255,255,255,0.1);
-        }
-
-        section {
-            padding: 5rem 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        h2 {
-            font-size: 2.5rem;
-            margin-bottom: 3rem;
-            color: #2d3748;
-            text-align: center;
-            font-weight: 700;
-        }
-
-        h3 {
-            font-size: 1.3rem;
-            margin-bottom: 1rem;
-            color: #2d3748;
-            font-weight: 600;
-        }
-
-        .data-collection {
-            background: white;
-        }
-
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-bottom: 3rem;
-        }
-
-        .data-card {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            padding: 2.5rem;
-            border-radius: 8px;
-            border-left: 4px solid #667eea;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-            transition: all 0.3s ease;
-        }
-
-        .data-card:nth-child(2) {
-            border-left-color: #f56565;
-        }
-
-        .data-card:nth-child(3) {
-            border-left-color: #48bb78;
-        }
-
-        .data-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 20px rgba(0,0,0,0.1);
-        }
-
-        .data-icon {
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .data-card p {
-            color: #4a5568;
-            line-height: 1.8;
-        }
-
-        .regions-section {
-            background: white;
-        }
-
-        .regions-text {
-            text-align: center;
-            margin-bottom: 2rem;
-            color: #4a5568;
-            font-size: 1.1rem;
-        }
-
-        .regions-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-
-        .region-badge {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: 600;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        }
-
-        .region-badge:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
-        }
-
-        .insights-section {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        }
-
-        .insights-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-        }
-
-        .insight-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
-            transition: all 0.3s ease;
-            border-top: 3px solid #667eea;
-        }
-
-        .insight-card h4 {
-            color: #667eea;
-            margin-bottom: 1rem;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        .insight-card p {
-            color: #4a5568;
-            line-height: 1.8;
-        }
-
-        .insight-card:hover {
-            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
-            transform: translateY(-3px);
-        }
-
-        .roadmap-section {
-            background: white;
-        }
-
-        .roadmap {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .roadmap-item {
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #667eea;
-            background: #f7fafc;
-            border-radius: 4px;
-            position: relative;
-        }
-
-        .roadmap-item.completed {
-            border-left-color: #48bb78;
-            background: #f0fff4;
-        }
-
-        .roadmap-item h4 {
-            color: #2d3748;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .status-badge.in-progress {
-            background: #bee3f8;
-            color: #2c5aa0;
-        }
-
-        .status-badge.completed {
-            background: #c6f6d5;
-            color: #22543d;
-        }
-
-        .status-badge.planned {
-            background: #fed7d7;
-            color: #742a2a;
-        }
-
-        .roadmap-item p {
-            color: #4a5568;
-            margin: 0;
-        }
-
-        .cta-section {
-            text-align: center;
-            background: white;
-            padding: 4rem 2rem;
-        }
-
-        .cta-section h2 {
-            margin-bottom: 1rem;
-        }
-
-        .cta-section p {
-            font-size: 1.1rem;
-            color: #4a5568;
-            margin-bottom: 2rem;
-        }
-
-        footer {
-            background: #2d3748;
-            color: white;
-            text-align: center;
-            padding: 3rem 2rem;
-            margin-top: 2rem;
-        }
-
-        footer p {
-            margin: 0.5rem 0;
-            opacity: 0.9;
-        }
-
-        footer a {
-            color: #667eea;
-            text-decoration: none;
-        }
-
-        footer a:hover {
-            text-decoration: underline;
-        }
-
-        .divider {
-            height: 1px;
-            background: #e2e8f0;
-            margin: 2rem 0;
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 2.2rem;
-            }
-
-            h2 {
-                font-size: 1.8rem;
-            }
-
-            nav a {
-                margin-left: 1rem;
-                font-size: 0.9rem;
-            }
-
-            .hero {
-                padding: 3rem 1rem;
-                min-height: auto;
-            }
-
-            .cta-buttons {
-                flex-direction: column;
-            }
-
-            .cta-button {
-                width: 100%;
-            }
-
-            section {
-                padding: 3rem 1rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <header>
-        <div class="nav-container">
-            <div class="logo">TravelNet</div>
-            <nav>
-                <a href="#data">Data</a>
-                <a href="#insights">Insights</a>
-                <a href="#roadmap">Roadmap</a>
-                <a href="#demo">Demo</a>
-            </nav>
-        </div>
-    </header>
-
-    <section class="hero">
-        <div class="hero-content">
-            <h1>Exploring 3 Years of Personal Travel Data</h1>
-            <p class="subtitle">Location • Health • Transactions</p>
-            <p class="hero-description">
-                A personal data science project analyzing 3+ years of travel across the USA, Australia, New Zealand, Canada, and Southeast Asia. Discover patterns, insights, and predictions powered by machine learning.
-            </p>
-            <div class="cta-buttons">
-                <a href="#demo" class="cta-button">Explore the Data</a>
-                <a href="#insights" class="cta-button secondary">Learn More</a>
-            </div>
-        </div>
-    </section>
-
-    <section class="data-collection" id="data">
-        <h2>What Data Are We Analyzing?</h2>
-        <div class="data-grid">
-            <div class="data-card">
-                <div class="data-icon">📍</div>
-                <h3>Location Data</h3>
-                <p>Comprehensive GPS tracking and location history across multiple continents. Analyze movement patterns, travel distances, and geographic insights.</p>
-            </div>
-            <div class="data-card">
-                <div class="data-icon">❤️</div>
-                <h3>Health Metrics</h3>
-                <p>Personal health and wellness data including activity levels, sleep patterns, and biometric measurements throughout the journey.</p>
-            </div>
-            <div class="data-card">
-                <div class="data-icon">💰</div>
-                <h3>Transaction History</h3>
-                <p>Complete financial records across multiple currencies. Explore spending patterns, cost of living comparisons, and budget analytics.</p>
-            </div>
-        </div>
-
-        <h2 style="font-size: 1.8rem; margin-top: 3rem;">Travel Regions</h2>
-        <p class="regions-text">Data collected from 5 major regions over 3+ years of continuous travel</p>
-        <div class="regions-grid">
-            <div class="region-badge">🇺🇸 USA</div>
-            <div class="region-badge">🇦🇺 Australia</div>
-            <div class="region-badge">🇳🇿 New Zealand</div>
-            <div class="region-badge">🇨🇦 Canada</div>
-            <div class="region-badge">🌏 SE Asia</div>
-        </div>
-    </section>
-
-    <section class="insights-section" id="insights">
-        <h2>ML-Powered Insights</h2>
-        <p style="text-align: center; color: #4a5568; font-size: 1.1rem; margin-bottom: 2rem;">Advanced machine learning models providing actionable insights from your travel data</p>
-        <div class="insights-grid">
-            <div class="insight-card">
-                <h4>Travel Pattern Analysis</h4>
-                <p>Predictive models identifying movement patterns, optimal travel routes, and travel behavior clustering across regions.</p>
-            </div>
-            <div class="insight-card">
-                <h4>Spending Prediction</h4>
-                <p>Machine learning models forecasting future expenses based on location, region, and historical spending patterns.</p>
-            </div>
-            <div class="insight-card">
-                <h4>Health Correlations</h4>
-                <p>Statistical analysis discovering correlations between location, travel intensity, and health metrics.</p>
-            </div>
-            <div class="insight-card">
-                <h4>Cost of Living Index</h4>
-                <p>Comparative analysis of living costs across regions with time-series trends and category breakdowns.</p>
-            </div>
-            <div class="insight-card">
-                <h4>Anomaly Detection</h4>
-                <p>Identify unusual spending events, location changes, or health metrics using unsupervised learning algorithms.</p>
-            </div>
-            <div class="insight-card">
-                <h4>Interactive Visualizations</h4>
-                <p>Explore data through dynamic dashboards with maps, charts, and real-time filtering capabilities.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="roadmap-section" id="roadmap">
-        <h2>Development Roadmap</h2>
-        <div class="roadmap">
-            <div class="roadmap-item completed">
-                <span class="status-badge completed">Completed</span>
-                <h4>Data Collection Pipeline</h4>
-                <p>Server infrastructure and data models for location, health, and transaction data with multi-region support.</p>
-            </div>
-
-            <div class="roadmap-item completed">
-                <span class="status-badge completed">Completed</span>
-                <h4>Data Cleaning & Enrichment</h4>
-                <p>Client-side processing to clean incoming data, handle missing values, and enrich with derived features.</p>
-            </div>
-
-            <div class="roadmap-item in-progress">
-                <span class="status-badge in-progress">In Progress</span>
-                <h4>Interactive Data Explorer</h4>
-                <p>Web-based dashboard for exploring raw data with filtering, sorting, and custom visualizations.</p>
-            </div>
-
-            <div class="roadmap-item in-progress">
-                <span class="status-badge in-progress">In Progress</span>
-                <h4>ML Model Training</h4>
-                <p>Training and evaluation of predictive models for spending, travel patterns, and health correlations.</p>
-            </div>
-
-            <div class="roadmap-item planned">
-                <span class="status-badge planned">Planned</span>
-                <h4>Demo Dashboard Launch</h4>
-                <p>Public-facing demo with sample data and pre-trained models for interactive exploration.</p>
-            </div>
-
-            <div class="roadmap-item planned">
-                <span class="status-badge planned">Planned</span>
-                <h4>Advanced Analytics</h4>
-                <p>Deep-dive analysis tools, custom report generation, and advanced statistical modeling.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="cta-section" id="demo">
-        <h2>Ready to Explore?</h2>
-        <p>Check out the interactive demo with sample data and machine learning insights</p>
-        <div class="cta-buttons">
-            <a href="/demo" class="cta-button">Launch Demo</a>
-            <a href="https://github.com/danielroberts20/TravelNet" class="cta-button secondary" target="_blank">View on GitHub</a>
-        </div>
-    </section>
-
-    <footer>
-        <p><strong>TravelNet</strong> - Personal Data Exploration & ML Insights Project</p>
-        <p>A 3-year journey collecting and analyzing travel data across 5 continents</p>
-        <div class="divider"></div>
-        <p>Built with Python, Machine Learning, and a passion for data exploration</p>
-        <p style="margin-top: 1rem; font-size: 0.9rem;">© 2026 | <a href="https://github.com/danielroberts20">Daniel Roberts</a></p>
-    </footer>
-</body>
-</html>
+---
+layout: default
+title: TravelNet Docs
+description: "Technical documentation for the TravelNet travel data platform."
+permalink: /
+---
+
+<section style="padding: var(--space-10) var(--space-6) var(--space-8); max-width: 900px; margin: 0 auto;">
+
+  <p style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-3);">Documentation</p>
+  <h1 style="font-size:clamp(36px,6vw,60px);font-weight:700;letter-spacing:-0.03em;line-height:1.05;margin-bottom:var(--space-4);">TravelNet Docs</h1>
+  <p style="font-size:18px;color:var(--text-secondary);max-width:600px;line-height:1.65;margin-bottom:var(--space-8);">
+    Everything about how TravelNet is built, how the data flows, and why decisions were made — written to understand, not just reference.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--space-4);">
+
+    <a href="{{ '/docs/architecture/' | relative_url }}" class="feature-card" data-accent="blue" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="blue">🏗️</div>
+      <h3 class="feature-title">Architecture</h3>
+      <p class="feature-desc">System design, Docker containers, database schema, and configuration layers.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+    <a href="{{ '/docs/api/' | relative_url }}" class="feature-card" data-accent="teal" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="teal">⚡</div>
+      <h3 class="feature-title">API Reference</h3>
+      <p class="feature-desc">Every endpoint — upload, public, database, metadata, and jobs — with schemas and examples.</p>
+      <span class="feature-tag">6 pages</span>
+    </a>
+
+    <a href="{{ '/docs/pipelines/' | relative_url }}" class="feature-card" data-accent="teal" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="teal">🔄</div>
+      <h3 class="feature-title">Data Pipelines</h3>
+      <p class="feature-desc">End-to-end walkthroughs: how GPS, health, transaction, and weather data flows from source to DB.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+    <a href="{{ '/docs/ml/' | relative_url }}" class="feature-card" data-accent="orange" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="orange">🧠</div>
+      <h3 class="feature-title">ML Methodology</h3>
+      <p class="feature-desc">Models, features, evaluation — travel leg segmentation, fitness trends, spending patterns.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+    <a href="{{ '/docs/decisions/' | relative_url }}" class="feature-card" data-accent="purple" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="purple">📋</div>
+      <h3 class="feature-title">Decision Log</h3>
+      <p class="feature-desc">Why SQLite, why Overland + Shortcuts, why ISO 8601 — the reasoning behind every key choice.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+    <a href="{{ '/docs/ops/' | relative_url }}" class="feature-card" data-accent="blue" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="blue">⚙️</div>
+      <h3 class="feature-title">Ops & Setup</h3>
+      <p class="feature-desc">Pi setup, cron schedule, backup and recovery, Cloudflare Tunnel, remote recovery procedure.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+  </div>
+
+</section>

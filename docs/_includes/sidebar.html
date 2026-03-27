@@ -1,0 +1,43 @@
+<!-- _includes/sidebar.html -->
+<aside class="docs-sidebar">
+
+  <!-- Search -->
+  <div class="sidebar-search" style="position:relative;">
+    <input
+      type="search"
+      class="sidebar-search-input"
+      id="docs-search-input"
+      placeholder="Search docs..."
+      autocomplete="off"
+      spellcheck="false"
+    >
+    <div class="search-results" id="search-results"></div>
+  </div>
+
+  <!-- Nav sections -->
+  {% for section in site.data.nav %}
+  {% assign is_open = false %}
+  {% if page.url == section.url %}{% assign is_open = true %}{% endif %}
+  {% for child in section.children %}
+    {% if page.url == child.url %}{% assign is_open = true %}{% endif %}
+  {% endfor %}
+
+  <div class="sidebar-section {% if is_open %}open{% endif %}">
+    <div class="sidebar-section-title" onclick="toggleSection(this)">
+      <a href="{{ section.url | relative_url }}">{{ section.title }}</a>
+      <svg class="sidebar-chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M4 2l4 4-4 4"/>
+      </svg>
+    </div>
+    <div class="sidebar-children">
+      {% for child in section.children %}
+      <a
+        href="{{ child.url | relative_url }}"
+        class="sidebar-link {% if page.url == child.url %}active{% endif %}"
+      >{{ child.title }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+</aside>

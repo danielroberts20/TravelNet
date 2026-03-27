@@ -1,0 +1,153 @@
+# travel.yml
+# Single source of truth for the TravelNet trip itinerary.
+# Consumed by: cron/push_public_stats.py, docs site, portfolio, README.
+#
+# Status inference (in priority order):
+#   1. meta.status_override — set this if auto-inference is wrong
+#   2. Inferred from leg actual/planned dates:
+#        pre_departure  → today is before first leg's arrival
+#        travelling     → at least one leg has started
+#        finished       → all legs have an actual departure date
+#
+# Current leg inference:
+#   The leg where today >= arrival AND (departure is null OR today <= departure).
+#   Actual dates take precedence over planned dates.
+#   Set meta.current_leg_override to force a specific leg id.
+
+meta:
+  status_override: null       # null | pre_departure | travelling | finished
+  current_leg_override: null  # null | leg id e.g. "australia"
+  base_country: "UK"
+  base_city: "London"
+  trip_start: "2026-06-11"    # date of first departure — used for countdown
+
+legs:
+  - id: usa
+    name: "USA"
+    country: "United States"
+    emoji: "🇺🇸"
+    visa: "J-1 (summer camp)"
+    stopover: false
+    planned:
+      arrival: "2026-06-11"
+      departure: "2026-09-06"
+    actual:
+      arrival: null
+      departure: null
+    notes: "Philadelphia/DC pre-camp, summer camp lifeguard/counsellor (~2 months), post-camp labouring, Seattle mini-trip."
+    sub_legs:
+      - id: usa_philly
+        name: "Philadelphia / DC"
+        planned:
+          arrival: "2026-06-11"
+          departure: "2026-06-16"
+        actual:
+          arrival: null
+          departure: null
+      - id: usa_camp
+        name: "Summer Camp"
+        planned:
+          arrival: "2026-06-16"
+          departure: "2026-08-16"
+        actual:
+          arrival: null
+          departure: null
+      - id: usa_post_camp
+        name: "Post Camp Labouring"
+        planned:
+          arrival: "2026-06-16"
+          departure: "2026-09-02"
+        actual:
+          arrival: null
+          departure: null
+      - id: usa_seattle
+        name: "Seattle"
+        planned:
+          arrival: "2026-09-02"
+          departure: "2026-09-06"
+        actual:
+          arrival: null
+          departure: null
+
+  - id: fiji
+    name: "Fiji"
+    country: "Fiji"
+    emoji: "🇫🇯"
+    visa: "Visitor permit (on arrival)"
+    stopover: true
+    planned:
+      arrival: "2026-09-08"
+      departure: "2026-09-11"
+    actual:
+      arrival: null
+      departure: null
+    notes: "3-night stopover en route USA → Australia."
+    sub_legs: []
+
+  - id: australia
+    name: "Australia"
+    country: "Australia"
+    emoji: "🇦🇺"
+    visa: "Working Holiday Visa (WHV)"
+    stopover: false
+    planned:
+      arrival: "2026-09-10"
+      departure: "2027-09-10"
+    actual:
+      arrival: null
+      departure: null
+    notes: "First WHV leg. ML pipeline begins here using US data as baseline."
+    sub_legs:
+      - id: aus_east_coast
+        name: "East Coast"
+        planned:
+          arrival: "2027-02-14"
+          departure: "2027-03-11"
+        actual:
+          arrival: null
+          departure: null
+
+  - id: new_zealand
+    name: "New Zealand"
+    country: "New Zealand"
+    emoji: "🇳🇿"
+    visa: "Working Holiday Visa (WHV)"
+    stopover: false
+    planned:
+      arrival: "2027-07-01"
+      departure: "2028-12-01"
+    actual:
+      arrival: null
+      departure: null
+    notes: ""
+    sub_legs: []
+
+  - id: se_asia
+    name: "SE Asia"
+    country: null           # multiple countries — resolved per-country in DB
+    emoji: "🌏"
+    visa: "Tourist / visa on arrival (varies by country)"
+    stopover: false
+    planned:
+      arrival: "2027-12-01"
+      departure: "2028-04-01"
+    actual:
+      arrival: null
+      departure: null
+    notes: "3–4 months backpacking. Countries TBC."
+    sub_legs: []
+
+  - id: canada
+    name: "Canada"
+    country: "Canada"
+    emoji: "🇨🇦"
+    visa: "Working Holiday Visa (WHV)"
+    stopover: false
+    planned:
+      arrival: "2028-04-01"
+      departure: null         # open-ended
+    actual:
+      arrival: null
+      departure: null
+    notes: "Final WHV leg. Trip end date TBC."
+    sub_legs: []

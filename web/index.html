@@ -1,0 +1,261 @@
+---
+layout: default
+title: ""
+description: "A personal data collection and ML analysis platform for 2–3 years of international travel."
+---
+
+<!-- ============================================================
+     HERO
+     ============================================================ -->
+<section class="hero">
+  <div class="hero-glow"></div>
+
+  <div class="hero-eyebrow">
+    <span class="nav-status-dot"></span>
+    <span id="hero-status-text">Pre-departure &mdash; launching June 2026</span>
+  </div>
+  <h1 class="hero-title">
+    Two years.<br>
+    <span class="accent-teal">Four continents.</span><br>
+    One <span class="accent-blue">dataset.</span>
+  </h1>
+
+  <p class="hero-subtitle">
+    TravelNet is a personal data collection and machine learning platform built to run unattended across 2&ndash;3 years of international travel. GPS traces, health metrics, finances &mdash; all in one place.
+  </p>
+
+  <div class="hero-cta-group">
+    <a href="{{ '/journey/' | relative_url }}" class="btn btn-primary">
+      View the Journey
+    </a>
+    <a href="{{ '/about/' | relative_url }}" class="btn btn-secondary">
+      How it works
+    </a>
+  </div>
+
+  <!-- GPS Map Preview -->
+  <div class="hero-map-container">
+    <div class="hero-map-card">
+      <div class="hero-map-chrome">
+        <span class="chrome-dot chrome-dot-red"></span>
+        <span class="chrome-dot chrome-dot-yellow"></span>
+        <span class="chrome-dot chrome-dot-green"></span>
+        <span class="chrome-label mono">kepler.gl &mdash; GPS trace preview</span>
+      </div>
+      <svg id="gps-map" class="hero-map-canvas" style="width:100%;height:100%;display:block;"></svg>
+      <div class="map-coming-soon" style="position:absolute;bottom:var(--space-4);left:50%;transform:translateX(-50%);top:auto;">
+        <div class="map-coming-soon">
+          <span class="kepler-badge">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--accent-teal);display:inline-block;"></span>
+            Kepler.gl full interactive map &mdash; live from September 2026
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     COUNTDOWN
+     ============================================================ -->
+<section style="padding: var(--space-5) var(--space-6); text-align: center; background: var(--bg-sunken);">
+  <p class="section-eyebrow" style="text-align:center; margin-bottom: var(--space-3);">Departure countdown</p>
+  <div class="countdown" id="countdown" 
+     data-date="{{ site.data.travel.meta.trip_start }}T06:00:00Z">
+    <span class="countdown-value mono">—</span>
+  </div>
+  <p style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-top: var(--space-3); letter-spacing: 0.06em;">
+    Philadelphia, PA &rarr; Global
+  </p>
+</section>
+
+<!-- ============================================================
+     STATS
+     ============================================================ -->
+<section class="stats-bar">
+  <div class="stats-bar-inner">
+    <p class="section-eyebrow reveal">Platform stats</p>
+    <div class="stats-grid">
+ 
+      <div class="stat-card reveal">
+        <span class="stat-icon">📍</span>
+        <span class="stat-value accent-teal" data-stat="gps_points">—</span>
+        <span class="stat-label">GPS points logged</span>
+        <span class="stat-sublabel">Overland + Shortcuts</span>
+      </div>
+ 
+      <div class="stat-card reveal">
+        <span class="stat-icon">🌍</span>
+        <span class="stat-value accent-blue" data-stat="total_countries">—</span>
+        <span class="stat-label">Countries visited</span>
+        <span class="stat-sublabel" data-stat="current_leg_name">Starting June 2026</span>
+      </div>
+ 
+      <div class="stat-card reveal">
+        <span class="stat-icon">❤️</span>
+        <span class="stat-value accent-red" data-stat="health_records">—</span>
+        <span class="stat-label">Health records</span>
+        <span class="stat-sublabel">Apple Health via HAE</span>
+      </div>
+ 
+      <div class="stat-card reveal">
+        <span class="stat-icon">💳</span>
+        <span class="stat-value accent-orange" data-stat="transactions">—</span>
+        <span class="stat-label">Transactions</span>
+        <span class="stat-sublabel">Revolut · Wise · Cash</span>
+      </div>
+ 
+      <div class="stat-card reveal">
+        <span class="stat-icon">📅</span>
+        <span class="stat-value" data-stat="days_travelling">—</span>
+        <span class="stat-label">Days travelling</span>
+        <span class="stat-sublabel" id="stat-days-sublabel">Across all legs</span>
+      </div>
+ 
+    </div>
+ 
+    <p class="stats-sync-info reveal" id="stats-sync-info" style="display:none;"></p>
+ 
+  </div>
+</section>
+
+<!-- ============================================================
+     FEATURE SECTIONS
+     ============================================================ -->
+<section>
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">What's in here</p>
+    <h2 class="section-title reveal">Data. Analysis. Insights.</h2>
+    <p class="section-subtitle reveal">
+      Every module of TravelNet feeds into a unified dataset — built to be explored, visualised, and learned from.
+    </p>
+
+    <div class="feature-grid">
+
+      <div class="feature-card reveal" data-accent="teal">
+        <div class="feature-icon-wrap" data-bg="teal">🗺️</div>
+        <h3 class="feature-title">Journey</h3>
+        <p class="feature-desc">
+          Interactive GPS traces from six countries, rendered in Kepler.gl. Flight arcs, movement density, and time-animated paths across the full trip.
+        </p>
+        <a href="{{ '/journey/' | relative_url }}" class="feature-tag">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--accent-orange);display:inline-block;"></span>
+          Coming September 2026
+        </a>
+      </div>
+
+      <div class="feature-card reveal" data-accent="blue">
+        <div class="feature-icon-wrap" data-bg="blue">📊</div>
+        <h3 class="feature-title">Data Explorer</h3>
+        <p class="feature-desc">
+          Live database statistics, interactive charts, and spending breakdowns by country, currency, and category — updated as I travel.
+        </p>
+        <a href="{{ '/explorer/' | relative_url }}" class="feature-tag">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--accent-orange);display:inline-block;"></span>
+          Coming 2026
+        </a>
+      </div>
+
+      <div class="feature-card reveal" data-accent="orange">
+        <div class="feature-icon-wrap" data-bg="orange">🧠</div>
+        <h3 class="feature-title">ML Insights</h3>
+        <p class="feature-desc">
+          Travel leg segmentation, fitness trend decomposition, spending pattern detection — machine learning models trained on two years of personal data.
+        </p>
+        <a href="{{ '/ml/' | relative_url }}" class="feature-tag">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--accent-orange);display:inline-block;"></span>
+          Coming late 2026
+        </a>
+      </div>
+
+      <div class="feature-card reveal" data-accent="purple">
+        <div class="feature-icon-wrap" data-bg="purple">🔬</div>
+        <h3 class="feature-title">Open Dataset</h3>
+        <p class="feature-desc">
+          An anonymised, privacy-fuzzed subset of the full dataset. GPS coordinates offset by ~1&thinsp;km Gaussian noise. Free to explore and build on.
+        </p>
+        <a href="{{ site.github_repo }}" class="feature-tag" target="_blank">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--accent-orange);display:inline-block;"></span>
+          GitHub &rarr;
+        </a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     TRIP TIMELINE
+     ============================================================ -->
+<section class="timeline">
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">The route</p>
+    <h2 class="section-title reveal">Six legs. 3 years.</h2>
+  </div>
+  <div class="timeline-track reveal">
+    {% for leg in site.data.travel.legs %}
+    <div class="timeline-leg" data-leg-id="{{ leg.id }}">
+      <div class="timeline-dot">{{ leg.emoji }}</div>
+      <span class="timeline-name">{{ leg.name }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<!-- ============================================================
+     TECH STACK
+     ============================================================ -->
+<section>
+  <div class="section-inner">
+    <p class="section-eyebrow reveal">Built with</p>
+    <h2 class="section-title reveal">The stack</h2>
+    <p class="section-subtitle reveal">
+      A Raspberry Pi 4B runs unattended, collecting data 24/7. Everything streams into a single SQLite database.
+    </p>
+
+    <div class="stack-grid">
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/server.rack.svg' | relative_url }}" width="16" height="16"></span>
+        Raspberry Pi 4B — always-on server
+      </div>
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/bolt.fill.svg' | relative_url }}" width="16" height="16"></span>
+        FastAPI — data ingest endpoints
+      </div>
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/cylinder.fill.svg' | relative_url }}" width="16" height="16"></span>
+        SQLite — unified travel database
+      </div>
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/location.fill.svg' | relative_url }}" width="16" height="16"></span>
+        Overland + iOS Shortcuts
+      </div>
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/heart.fill.svg' | relative_url }}" width="16" height="16"></span>
+        Apple Watch Ultra + Health Auto Export
+      </div>
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/creditcard.svg' | relative_url }}" width="16" height="16"></span>
+        Revolut · Wise · exchangerate.host
+      </div>
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/function.svg' | relative_url }}" width="16" height="16"></span>
+        scikit-learn · HDBSCAN · pandas
+      </div>
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/chart.xyaxis.line.svg' | relative_url }}" width="16" height="16"></span>
+        Kepler.gl · Plotly · Dash
+      </div>
+      <div class="stack-item reveal">
+        <span class="stack-item-icon"><img src="{{ '/assets/icons/24/lock.shield.fill.svg' | relative_url }}" width="16" height="16"></span>
+        Tailscale · Cloudflare R2
+      </div>
+    </div>
+
+    <div style="margin-top: var(--space-6); text-align: center;">
+      <a href="{{ '/about/' | relative_url }}" class="btn btn-secondary reveal">
+        Full architecture overview →
+      </a>
+    </div>
+  </div>
+</section>
