@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # --- External APIs ---
     fx_api_key: str = Field(alias="FX_API_KEY")
 
+    # --- GitHub ---
+    github_public_stats_token: str = Field(alias="GITHUB_PUBLIC_STATS_TOKEN")
+    github_repo: str = Field(alias="GITHUB_REPO")
+
     # --- SMTP / email alerts ---
     smtp_host: str = Field(alias="ALERT_SMTP_HOST")
     smtp_port: int = Field(alias="ALERT_SMTP_PORT")          # coerced to int automatically

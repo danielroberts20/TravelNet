@@ -10,6 +10,7 @@ services:
       - ./app:/app
       - /home/dan/.config/rclone:/root/.config/rclone:ro 
       - /var/spool/cron/crontabs/dan:/var/spool/cron/crontabs/dan
+      - /home/dan/services/TravelNet/travel.yml:/travel.yml:ro
     ports:
       - "8000:8000"
     restart: unless-stopped
