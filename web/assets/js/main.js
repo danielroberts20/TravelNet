@@ -84,7 +84,9 @@ function initReveal() {
    ============================================================ */
 
 function initGPSCanvas() {
+    console.log('[map] initGPSCanvas called');
   const container = document.getElementById('gps-map');
+  console.log('[map] container:', container);
   if (!container) return;
 
   // Load D3 and TopoJSON from CDN then initialise
@@ -92,9 +94,13 @@ function initGPSCanvas() {
     loadScript('https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js'),
     loadScript('https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js'),
   ]).then(() => {
+      console.log('[map] D3 and TopoJSON loaded');
     fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
       .then(r => r.json())
-      .then(world => initMap(world));
+      .then(world => {
+          console.log('[map] world data loaded');
+          initMap(world)
+      });
   });
 
   function loadScript(src) {
