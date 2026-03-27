@@ -48,6 +48,7 @@
   --accent-teal:   #30D158;  /* data/GPS green */
   --accent-orange: #FF9F0A;  /* ML/insights */
   --accent-purple: #BF5AF2;  /* ML secondary */
+  --accent-red:    #FF6961; /* data/Health red */
 }
 
 /* --- Light mode ------------------------------------------- */
@@ -522,6 +523,7 @@ body::before {
 }
 
 .stat-value.accent-blue   { color: var(--accent); }
+.stat-value.accent-red   { color: var(--accent-red); }
 .stat-value.accent-teal   { color: var(--accent-teal); }
 .stat-value.accent-orange { color: var(--accent-orange); }
 
