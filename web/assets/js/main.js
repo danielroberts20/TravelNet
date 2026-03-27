@@ -228,6 +228,7 @@ function initGPSCanvas() {
     // Draw landmasses
     // ----------------------------------------------------------
     function drawLandmasses() {
+      console.log('drawing landmasses, w:', w, 'h:', h, 'isDark:', isDark);
       isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       const fillColour   = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)';
       const strokeColour = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.12)';
