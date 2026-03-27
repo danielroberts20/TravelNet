@@ -1,0 +1,24 @@
+<!-- _includes/prev-next.html -->
+{% if page.prev_page or page.next_page %}
+<nav class="docs-prev-next">
+
+  {% if page.prev_page %}
+  <a href="{{ page.prev_page.url | relative_url }}" class="prev-next-link prev">
+    <span class="prev-next-label">← Previous</span>
+    <span class="prev-next-title">{{ page.prev_page.title }}</span>
+    {% if page.prev_page.section %}<span class="prev-next-section">{{ page.prev_page.section }}</span>{% endif %}
+  </a>
+  {% else %}
+  <div></div>
+  {% endif %}
+
+  {% if page.next_page %}
+  <a href="{{ page.next_page.url | relative_url }}" class="prev-next-link next">
+    <span class="prev-next-label">Next →</span>
+    <span class="prev-next-title">{{ page.next_page.title }}</span>
+    {% if page.next_page.section %}<span class="prev-next-section">{{ page.next_page.section }}</span>{% endif %}
+  </a>
+  {% endif %}
+
+</nav>
+{% endif %}

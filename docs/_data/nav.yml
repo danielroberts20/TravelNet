@@ -1,0 +1,108 @@
+# docs-site/_data/nav.yml
+# The entire sidebar is driven from this file.
+# Adding a page = one entry here + a markdown file. No template changes needed.
+#
+# Fields:
+#   title:    display name in sidebar
+#   url:      relative URL (must match permalink in front matter)
+#   children: optional nested pages (one level deep)
+
+- title: Getting Started
+  url: /docs/
+  children:
+    - title: Overview
+      url: /docs/
+    - title: Project Goals
+      url: /docs/goals/
+
+- title: Architecture
+  url: /docs/architecture/
+  children:
+    - title: System Overview
+      url: /docs/architecture/
+    - title: Docker & Containers
+      url: /docs/architecture/docker/
+    - title: Database Schema
+      url: /docs/architecture/database/
+    - title: Configuration Layers
+      url: /docs/architecture/configuration/
+    - title: Auth & Security
+      url: /docs/architecture/auth/
+
+- title: API Reference
+  url: /docs/api/
+  children:
+    - title: Overview
+      url: /docs/api/
+    - title: Upload Endpoints
+      url: /docs/api/upload/
+    - title: Public Endpoints
+      url: /docs/api/public/
+    - title: Database Endpoints
+      url: /docs/api/database/
+    - title: Metadata Endpoints
+      url: /docs/api/metadata/
+    - title: Jobs Endpoints
+      url: /docs/api/jobs/
+
+- title: Data Pipelines
+  url: /docs/pipelines/
+  children:
+    - title: Overview
+      url: /docs/pipelines/
+    - title: Location (GPS)
+      url: /docs/pipelines/location/
+    - title: Health & Workouts
+      url: /docs/pipelines/health/
+    - title: Transactions & FX
+      url: /docs/pipelines/transactions/
+    - title: Weather Enrichment
+      url: /docs/pipelines/weather/
+    - title: Public Stats
+      url: /docs/pipelines/public-stats/
+
+- title: ML Methodology
+  url: /docs/ml/
+  children:
+    - title: Overview
+      url: /docs/ml/
+    - title: Travel Leg Segmentation
+      url: /docs/ml/segmentation/
+    - title: Fitness Trend Decomposition
+      url: /docs/ml/fitness/
+    - title: Spending Pattern Detection
+      url: /docs/ml/spending/
+    - title: Recovery Score Modelling
+      url: /docs/ml/recovery/
+    - title: Demo Dataset
+      url: /docs/ml/demo-dataset/
+
+- title: Decision Log
+  url: /docs/decisions/
+  children:
+    - title: All Decisions
+      url: /docs/decisions/
+    - title: Why SQLite
+      url: /docs/decisions/sqlite/
+    - title: Why Overland + Shortcuts
+      url: /docs/decisions/location-sources/
+    - title: Timestamp Standard
+      url: /docs/decisions/timestamps/
+    - title: Process Isolation & Logging
+      url: /docs/decisions/logging/
+
+- title: Ops & Setup
+  url: /docs/ops/
+  children:
+    - title: Overview
+      url: /docs/ops/
+    - title: Initial Pi Setup
+      url: /docs/ops/pi-setup/
+    - title: Cron Schedule
+      url: /docs/ops/crons/
+    - title: Backup & Recovery
+      url: /docs/ops/backup/
+    - title: Cloudflare Tunnel
+      url: /docs/ops/cloudflare-tunnel/
+    - title: Remote Recovery
+      url: /docs/ops/remote-recovery/

@@ -1,0 +1,28 @@
+title: TravelNet Docs
+description: "Technical documentation for the TravelNet travel data platform."
+author: Dan Roberts
+baseurl: ""
+url: "https://docs.travelnet.dev"
+main_site: "https://travelnet.dev"
+github_repo: "https://github.com/danielroberts20/TravelNet"
+
+markdown: kramdown
+highlighter: rouge
+permalink: pretty
+
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    block:
+      line_numbers: true
+
+plugins:
+  - jekyll-seo-tag
+
+# Exclude from build
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - README.md

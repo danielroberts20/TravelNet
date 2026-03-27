@@ -1,0 +1,62 @@
+---
+layout: default
+title: TravelNet Docs
+description: "Technical documentation for the TravelNet travel data platform."
+permalink: /
+---
+
+<section style="padding: var(--space-10) var(--space-6) var(--space-8); max-width: 900px; margin: 0 auto;">
+
+  <p style="font-family:var(--font-mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:var(--space-3);">Documentation</p>
+  <h1 style="font-size:clamp(36px,6vw,60px);font-weight:700;letter-spacing:-0.03em;line-height:1.05;margin-bottom:var(--space-4);">TravelNet Docs</h1>
+  <p style="font-size:18px;color:var(--text-secondary);max-width:600px;line-height:1.65;margin-bottom:var(--space-8);">
+    Everything about how TravelNet is built, how the data flows, and why decisions were made — written to understand, not just reference.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--space-4);">
+
+    <a href="{{ '/docs/architecture/' | relative_url }}" class="feature-card" data-accent="blue" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="blue">🏗️</div>
+      <h3 class="feature-title">Architecture</h3>
+      <p class="feature-desc">System design, Docker containers, database schema, and configuration layers.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+    <a href="{{ '/docs/api/' | relative_url }}" class="feature-card" data-accent="teal" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="teal">⚡</div>
+      <h3 class="feature-title">API Reference</h3>
+      <p class="feature-desc">Every endpoint — upload, public, database, metadata, and jobs — with schemas and examples.</p>
+      <span class="feature-tag">6 pages</span>
+    </a>
+
+    <a href="{{ '/docs/pipelines/' | relative_url }}" class="feature-card" data-accent="teal" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="teal">🔄</div>
+      <h3 class="feature-title">Data Pipelines</h3>
+      <p class="feature-desc">End-to-end walkthroughs: how GPS, health, transaction, and weather data flows from source to DB.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+    <a href="{{ '/docs/ml/' | relative_url }}" class="feature-card" data-accent="orange" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="orange">🧠</div>
+      <h3 class="feature-title">ML Methodology</h3>
+      <p class="feature-desc">Models, features, evaluation — travel leg segmentation, fitness trends, spending patterns.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+    <a href="{{ '/docs/decisions/' | relative_url }}" class="feature-card" data-accent="purple" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="purple">📋</div>
+      <h3 class="feature-title">Decision Log</h3>
+      <p class="feature-desc">Why SQLite, why Overland + Shortcuts, why ISO 8601 — the reasoning behind every key choice.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+    <a href="{{ '/docs/ops/' | relative_url }}" class="feature-card" data-accent="blue" style="text-decoration:none;">
+      <div class="feature-icon-wrap" data-bg="blue">⚙️</div>
+      <h3 class="feature-title">Ops & Setup</h3>
+      <p class="feature-desc">Pi setup, cron schedule, backup and recovery, Cloudflare Tunnel, remote recovery procedure.</p>
+      <span class="feature-tag">5 pages</span>
+    </a>
+
+  </div>
+
+</section>
