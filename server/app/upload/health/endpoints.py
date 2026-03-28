@@ -38,7 +38,7 @@ async def upload_health(
 
     background_tasks.add_task(handle_health_upload, health_data)
 
-    logger.info(f"Successfully received health upload with {metric_count} metrics.")
+    logger.upload(f"Successfully received health upload with {metric_count} metrics.")
     return {
         "status": "success",
         "metrics_received": metric_count,
@@ -70,7 +70,7 @@ async def upload_workout(
 
     background_tasks.add_task(handle_workout_upload, workout_data)
 
-    logger.info("Successfully received workout upload with %d workouts.", workout_count)
+    logger.upload(f"Successfully received workout upload with {workout_count} workouts.")
     return {
         "status": "success",
         "workouts_received": workout_count,
