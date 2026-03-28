@@ -21,7 +21,7 @@ def init_db():
     Creates tables for cellular, FX, location, health, workouts, transactions,
     jobs, Overland GPS, gap annotations, and weather data.  Must be called once
     at startup before any insert helpers are used.  The unified location view is
-    created last because it depends on both location_history and location_overland.
+    created last because it depends on both location_shortcuts and location_overland.
     """
     init_cellular()
     init_fx()
@@ -35,7 +35,7 @@ def init_db():
     init_weather()
     log_config_summary()
 
-    # Must be last — depends on location_history and location_overland tables
+    # Must be last — depends on location_shortcuts and location_overland tables
     init_unified_view()
 
 # -----------------------------
@@ -46,7 +46,7 @@ def insert_log(log: Log):
     if not validate_log(log):
         return
     with get_conn() as conn:
-        location_id = insert_location(conn, log.timestamp, log.timezone, log.latitude, log.longitude, log.altitude,
+        location_id = insert_location(conn, log.timestamp, log.latitude, log.longitude, log.altitude,
                                       log.activity, log.device, log.is_locked, log.battery,
                                       log.is_charging, log.is_connected_charger, log.BSSID, log.RSSI)
 

@@ -44,7 +44,6 @@ class Log:
     """
 
     timestamp: int
-    timezone: str | None
     latitude: float
     longitude: float
     altitude: float | None
@@ -63,7 +62,6 @@ class Log:
         """Construct a Log from raw CSV string values (all fields are strings)."""
         return self(
             timestamp=parse_int(kwargs["timestamp"]),
-            timezone=parse_string(kwargs["timezone"]),
             latitude=parse_float(kwargs["latitude"]),
             longitude=parse_float(kwargs["longitude"]),
             altitude=parse_float(kwargs["altitude"]),

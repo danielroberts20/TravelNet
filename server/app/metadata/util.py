@@ -64,7 +64,7 @@ def get_last_uploads() -> dict:
 
         return {
             "location_shortcuts": latest(
-                "SELECT MAX(timestamp) FROM location_history"
+                "SELECT MAX(timestamp) FROM location_shortcuts"
             ),
             "location_overland": latest(
                 "SELECT MAX(timestamp) FROM location_overland"
