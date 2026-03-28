@@ -1,0 +1,13 @@
+{
+  "status": "pre_departure",
+  "days_travelling": 0,
+  "countries_visited": 0,
+  "stopover_countries": 0,
+  "total_countries": 0,
+  "current_leg": null,
+  "gps_points": 39141,
+  "health_records": 14896,
+  "transactions": 123,
+  "last_synced": "2026-03-28T06:56:25Z",
+  "generated_at": "2026-03-28T07:00:08Z"
+}
