@@ -256,10 +256,8 @@ def handle_health_upload(data: dict[str, Any]) -> None:
             logger.error("Error processing metric '%s': %s", snake_name, e, exc_info=True)
             skipped += 1
 
-    logger.info(
-        "Finished processing health data: %d metrics processed, %d skipped.",
-        processed,
-        skipped,
+    logger.upload(
+        f"Finished processing health data: {processed} metrics processed, {skipped} skipped."
     )
 
 

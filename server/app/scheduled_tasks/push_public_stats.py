@@ -77,16 +77,6 @@ def push_stats_to_github(payload: dict) -> None:
 
 
 if __name__ == "__main__":
-    with CronJobMailer("push_public_stats", settings.smtp_config, 
-                       detail="Update GitHub repo with publicly available stats as " \
-                       "a fallback if https://api.travelnet.dev/public/stats fails to GET") as job:
-        logger.info("Building public stats payload...")
         payload = build_public_stats()
-
-        job.add_metric("status", payload["status"])
-        job.add_metric("gps points", payload["gps_points"])
-        job.add_metric("health points", payload["health_records"])
-        job.add_metric("transactions", payload["transactions"])
-
         push_stats_to_github(payload)
         logger.info("public_stats.json pushed to GitHub successfully.")
