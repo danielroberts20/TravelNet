@@ -186,9 +186,5 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
         inserted = result["inserted"]
         total_inserted += inserted
         total_skipped += result["parsed"] - inserted
-
-    send_notification(title="Wise", 
-                      body=f"{len(results)} accounts received | {total_inserted} inserted | {total_skipped} skipped",
-                      time_sensitive=False)
     
-    return results, errors
+    return len(results), total_inserted, total_skipped, errors
