@@ -13,6 +13,7 @@
 #   The leg where today >= arrival AND (departure is null OR today <= departure).
 #   Actual dates take precedence over planned dates.
 #   Set meta.current_leg_override to force a specific leg id.
+# This is a test comment to verify if webhook is working.
 
 meta:
   status_override: null       # null | pre_departure | travelling | finished
