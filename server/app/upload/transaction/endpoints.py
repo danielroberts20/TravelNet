@@ -6,14 +6,14 @@ import logging
 import zipfile
 from babel import numbers
 from typing import Optional
-from notifications import send_notification
+from config.notifications import send_notification
 from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends  # type: ignore
 from pydantic import BaseModel, Field, field_validator  # type: ignore
 from database.transaction.ingest.revolut import insert as insert_revolut
 from database.transaction.ingest.wise import insert as insert_wise
 
-from auth import require_upload_token
+from config.auth import require_upload_token
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn, to_iso_str
 from upload.transaction.constants import WISE_SOURCE_MAP

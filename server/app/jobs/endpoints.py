@@ -4,7 +4,7 @@ from typing import Any, Optional
 import uuid
 from fastapi import Header, UploadFile, File, Form, HTTPException, APIRouter, BackgroundTasks, Depends  # type: ignore
 
-from auth import require_upload_token
+from config.auth import require_upload_token
 from jobs.models import DataMode, Status
 from database.job.table import get_next_queued_job, insert_job, update_job
 from jobs.utils import store_job
