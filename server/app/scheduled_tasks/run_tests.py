@@ -28,7 +28,7 @@ from config.editable import load_overrides
 load_overrides()
 
 from config.settings import settings
-from notifications import CronJobMailer
+from config.notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
 

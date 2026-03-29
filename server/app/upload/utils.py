@@ -1,10 +1,10 @@
 import csv
-from notifications import send_notification
+from config.notifications import send_notification
 from fastapi import HTTPException  # type: ignore
 import logging
 
 from database.integration import insert_log
-from telemetry_models import Log
+from models.telemetry import Log
 
 
 logger = logging.getLogger(__name__)

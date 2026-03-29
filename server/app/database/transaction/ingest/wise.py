@@ -8,7 +8,7 @@ import re
 from typing import Optional
 from zipfile import ZipFile
 
-from notifications import send_notification
+from config.notifications import send_notification
 from upload.transaction.constants import WISE_SOURCE_MAP
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn, to_iso_str

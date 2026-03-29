@@ -24,7 +24,7 @@ from config.general import COORD_PRECISION, DAILY_VARS, HOURLY_VARS, OPEN_METEO_
 from config.logging import configure_logging
 from config.settings import settings
 from database.util import get_conn, increment_api_usage, to_iso_str
-from notifications import CronJobMailer
+from config.notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
 
