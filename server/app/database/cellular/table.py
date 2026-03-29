@@ -12,7 +12,7 @@ from logging import log
 import sqlite3
 from typing import Optional
 
-from telemetry_models import CellularState
+from models.telemetry import CellularState
 from database.util import get_conn
 
 

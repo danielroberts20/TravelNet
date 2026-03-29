@@ -1,6 +1,6 @@
 from config.editable import log_config_summary
 from database.util import get_conn
-from telemetry_models import Log
+from models.telemetry import Log
 from database.cellular.table import init as init_cellular, insert_cellular_state
 from database.exchange.table import init as init_fx
 from database.location.table import init as init_location, init_unified_view, insert_location

@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from config.general import LOCATION_OVERLAND_BACKUP_DIR
-from telemetry_models import OverlandPayload
+from models.telemetry import OverlandPayload
 
 logger = logging.getLogger(__name__)
 
