@@ -11,7 +11,7 @@ Two groups:
 from dataclasses import dataclass
 from typing import Optional
 
-from parsers import parse_float, parse_bool_yes_no, parse_int, parse_string, parse_cellular_states
+from models.parsers import parse_float, parse_bool_yes_no, parse_int, parse_string, parse_cellular_states
 from pydantic import BaseModel, Field, field_validator
 
 

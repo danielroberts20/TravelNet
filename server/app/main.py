@@ -19,7 +19,7 @@ from upload.endpoints import router as uploads_router
 from database.endpoints import router as db_router
 from metadata.endpoints import router as metadata_router
 from public.endpoints import router as public_router
-from notifications import send_notification
+from config.notifications import send_notification
 import config.runtime # Records timestamp that docker container started
 
 

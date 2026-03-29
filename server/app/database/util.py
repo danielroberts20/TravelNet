@@ -15,7 +15,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from config.general import DATABASE_BACKUP_DIR, DB_FILE, FX_BACKUP_DIR, HEALTH_BACKUP_DIR, LOCATION_BACKUP_DIR
-from telemetry_models import Log
+from models.telemetry import Log
 
 logger = logging.getLogger(__name__)
 

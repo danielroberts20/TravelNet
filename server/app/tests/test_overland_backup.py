@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from telemetry_models import OverlandFeature, OverlandGeometry, OverlandPayload, OverlandProperties
+from models.telemetry import OverlandFeature, OverlandGeometry, OverlandPayload, OverlandProperties
 from upload.location.overland.backup import append_to_daily_buffer, log_previous_day_backup
 
 

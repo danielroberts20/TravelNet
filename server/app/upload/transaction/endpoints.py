@@ -6,38 +6,19 @@ import logging
 import zipfile
 from babel import numbers
 from typing import Optional
-from notifications import send_notification
+from config.notifications import send_notification
 from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends  # type: ignore
 from pydantic import BaseModel, Field, field_validator  # type: ignore
 from database.transaction.ingest.revolut import insert as insert_revolut
-from database.transaction.ingest.wise import insert as insert_wise
 
-from auth import require_upload_token
+from config.auth import require_upload_token
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn, to_iso_str
-from upload.transaction.constants import WISE_SOURCE_MAP
+from upload.transaction.util import parse_wise_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-def _process_wise(contents: bytes) -> None:
-    """Parse and ingest all CSVs from a Wise zip export (runs in background)."""
-    try:
-        zf = zipfile.ZipFile(io.BytesIO(contents))
-    except zipfile.BadZipFile:
-        logger.error("Wise background task: invalid or corrupted zip")
-        return
-
-    for filename in [f for f in zf.namelist() if f.endswith(".csv")]:
-        try:
-            parts = filename.split("_")
-            source = "_".join([parts[1], parts[2]])
-            insert_wise(zf, filename, source)
-        except Exception as e:
-            logger.error("Wise background task: error processing %s: %s", filename, e)
-
 
 @router.post("/wise", dependencies=[Depends(require_upload_token)])
 async def upload_wise(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -61,7 +42,7 @@ async def upload_wise(background_tasks: BackgroundTasks, file: UploadFile = File
     with open(backup_path, "wb") as f:
         f.write(contents)
 
-    background_tasks.add_task(_process_wise, contents)
+    background_tasks.add_task(parse_wise_upload, contents)
     return {"status": "queued", "files": csv_files}
 
 

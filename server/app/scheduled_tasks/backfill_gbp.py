@@ -6,7 +6,7 @@ from upload.transaction.constants import WISE_SOURCE_MAP
 from config.settings import settings
 from config.logging import configure_logging
 from database.util import get_conn
-from notifications import CronJobMailer
+from config.notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
 

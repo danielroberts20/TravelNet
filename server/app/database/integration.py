@@ -1,6 +1,6 @@
 from config.editable import log_config_summary
 from database.util import get_conn
-from telemetry_models import Log
+from models.telemetry import Log
 from database.cellular.table import init as init_cellular, insert_cellular_state
 from database.exchange.table import init as init_fx
 from database.location.table import init as init_location, init_unified_view, insert_location
@@ -43,8 +43,6 @@ def init_db():
 # -----------------------------
 def insert_log(log: Log):
     """Insert a single Shortcuts telemetry log row (location + cellular state)."""
-    if not validate_log(log):
-        return
     with get_conn() as conn:
         location_id = insert_location(conn, log.timestamp, log.timezone, log.latitude, log.longitude, log.altitude,
                                       log.activity, log.device, log.is_locked, log.battery,
@@ -53,6 +51,3 @@ def insert_log(log: Log):
         insert_cellular_state(conn, log.cellular_states, location_id)
         conn.commit()
 
-def validate_log(log: Log):
-    """Return True if the log entry should be inserted, False to skip it."""
-    return True

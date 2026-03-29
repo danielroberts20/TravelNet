@@ -33,7 +33,7 @@ def parse_string(value: str | None) -> str | None:
 
 def parse_cellular_states(states: str | None):
     """Parse a JSON-encoded list of cellular state dicts into CellularState objects."""
-    from telemetry_models import CellularState
+    from models.telemetry import CellularState
 
     if states in ("", None):
         return None

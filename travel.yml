@@ -20,6 +20,60 @@ meta:
   base_country: "UK"
   base_city: "London"
   trip_start: "2026-06-11"    # date of first departure — used for countdown
+  display:
+    pill: "Pre-departure · Building TravelNet"
+    label: "London, UK"
+    description: "Hardening TravelNet infrastructure before departure in June 2026."
+    location: "London, UK"
+  map:
+    lon: -0.1
+    lat: 51.5
+    label: "UK"
+    above: true
+
+# Ordered list of map stops for the route visualisation.
+# Includes top-level legs and any notable sub-legs (e.g. Seattle).
+map_route:
+  - leg_id: home
+    lon: -0.1
+    lat: 51.5
+    label: "UK"
+    above: true
+  - leg_id: usa
+    lon: -80.0
+    lat: 37.0
+    label: "USA"
+    above: true
+  - leg_id: usa_seattle
+    lon: -122.3
+    lat: 47.6
+    label: "SEA"
+    above: true
+  - leg_id: fiji
+    lon: 178.0
+    lat: -18.0
+    label: "FJI"
+    above: true
+  - leg_id: australia
+    lon: 134.0
+    lat: -25.0
+    label: "AUS"
+    above: false
+  - leg_id: new_zealand
+    lon: 172.0
+    lat: -41.0
+    label: "NZ"
+    above: false
+  - leg_id: se_asia
+    lon: 102.0
+    lat: 15.0
+    label: "SE Asia"
+    above: true
+  - leg_id: canada
+    lon: -95.0
+    lat: 56.0
+    label: "CAN"
+    above: true
 
 legs:
   - id: usa
@@ -35,6 +89,18 @@ legs:
       arrival: null
       departure: null
     notes: "Philadelphia/DC pre-camp, summer camp lifeguard/counsellor (~2 months), post-camp labouring, Seattle mini-trip."
+    display:
+      pill: "J-1 · Summer Camp · USA"
+      label: "USA — Summer Camp"
+      description: "Philadelphia/DC intro, summer camp lifeguarding and counselling, post-camp labouring, and a Seattle send-off."
+      location: "United States"
+      km_cumulative: 5500
+      countries_cumulative: 1
+    map:
+      lon: -80.0
+      lat: 37.0
+      label: "USA"
+      above: true
     sub_legs:
       - id: usa_philly
         name: "Philadelphia / DC"
@@ -82,6 +148,18 @@ legs:
       arrival: null
       departure: null
     notes: "3-night stopover en route USA → Australia."
+    display:
+      pill: "Stopover · Fiji"
+      label: "Fiji — Stopover"
+      description: "3-night stopover en route from the USA to Australia."
+      location: "Fiji"
+      km_cumulative: 11000
+      countries_cumulative: 2
+    map:
+      lon: 178.0
+      lat: -18.0
+      label: "FJI"
+      above: true
     sub_legs: []
 
   - id: australia
@@ -97,6 +175,18 @@ legs:
       arrival: null
       departure: null
     notes: "First WHV leg. ML pipeline begins here using US data as baseline."
+    display:
+      pill: "WHV · Australia · ML begins"
+      label: "Australia — Working Holiday"
+      description: "First Working Holiday Visa leg. ML pipeline begins using US data as baseline."
+      location: "Australia"
+      km_cumulative: 17000
+      countries_cumulative: 3
+    map:
+      lon: 134.0
+      lat: -25.0
+      label: "AUS"
+      above: false
     sub_legs:
       - id: aus_east_coast
         name: "East Coast"
@@ -120,6 +210,18 @@ legs:
       arrival: null
       departure: null
     notes: ""
+    display:
+      pill: "WHV · New Zealand"
+      label: "New Zealand — Working Holiday"
+      description: "Second Working Holiday Visa leg."
+      location: "New Zealand"
+      km_cumulative: 21000
+      countries_cumulative: 4
+    map:
+      lon: 172.0
+      lat: -41.0
+      label: "NZ"
+      above: false
     sub_legs: []
 
   - id: se_asia
@@ -135,6 +237,18 @@ legs:
       arrival: null
       departure: null
     notes: "3–4 months backpacking. Countries TBC."
+    display:
+      pill: "SE Asia · Banana Pancake Trail"
+      label: "SE Asia — Backpacking"
+      description: "3–4 months on the Banana Pancake Trail. Countries TBC."
+      location: "SE Asia"
+      km_cumulative: 32000
+      countries_cumulative: 8
+    map:
+      lon: 102.0
+      lat: 15.0
+      label: "SE Asia"
+      above: true
     sub_legs: []
 
   - id: canada
@@ -150,4 +264,16 @@ legs:
       arrival: null
       departure: null
     notes: "Final WHV leg. Trip end date TBC."
+    display:
+      pill: "WHV · Canada · Final leg"
+      label: "Canada — Working Holiday"
+      description: "Final Working Holiday Visa leg. End date TBC."
+      location: "Canada"
+      km_cumulative: 48000
+      countries_cumulative: 9
+    map:
+      lon: -95.0
+      lat: 56.0
+      label: "CAN"
+      above: true
     sub_legs: []

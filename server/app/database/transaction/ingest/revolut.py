@@ -16,7 +16,7 @@ from datetime import datetime
 import logging
 from typing import Optional
 
-from notifications import send_notification
+from config.notifications import send_notification
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn, to_iso_str
 

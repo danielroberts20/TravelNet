@@ -8,7 +8,7 @@ import re
 from typing import Optional
 from zipfile import ZipFile
 
-from notifications import send_notification
+from config.notifications import send_notification
 from upload.transaction.constants import WISE_SOURCE_MAP
 from database.exchange.util import convert_to_gbp
 from database.util import get_conn, to_iso_str
@@ -186,9 +186,5 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
         inserted = result["inserted"]
         total_inserted += inserted
         total_skipped += result["parsed"] - inserted
-
-    send_notification(title="Wise", 
-                      body=f"{len(results)} accounts received | {total_inserted} inserted | {total_skipped} skipped",
-                      time_sensitive=False)
     
-    return results, errors
+    return len(results), total_inserted, total_skipped, errors

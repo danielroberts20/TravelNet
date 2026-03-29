@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from upload.health.workout_util import handle_workout_upload
-from auth import require_upload_token
+from config.auth import require_upload_token
 from config.general import HEALTH_BACKUP_DIR, WORKOUT_BACKUP_DIR
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends  # type: ignore
 from upload.health.health_util import handle_health_upload
