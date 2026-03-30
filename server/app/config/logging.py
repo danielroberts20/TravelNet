@@ -94,7 +94,7 @@ class DailyDigestHandler(logging.Handler):
         self._queue.put((ts, record.levelname, record.name, record.module, record.lineno, record.getMessage()))
     
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient):
-       from notifications import send_email
+       from config.notifications import send_email
        with self._lock:
            with get_conn() as conn:
                rows = conn.execute(

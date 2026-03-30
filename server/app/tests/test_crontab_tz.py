@@ -12,8 +12,8 @@ Three layers:
 import pytest
 from unittest.mock import patch
 
-import crontab_tz
-from crontab_tz import (
+import metadata.crontab_tz as crontab_tz
+from metadata.crontab_tz import (
     _convert_time_fields,
     convert_crontab,
     read_crontab,

@@ -13,7 +13,7 @@ from config.settings import settings
 from config.logging import configure_logging
 from database.exchange.util import get_api_usage, insert_fx_json
 from database.util import get_conn, increment_api_usage
-from notifications import CronJobMailer
+from config.notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
 

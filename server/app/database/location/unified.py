@@ -14,8 +14,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-TIME_WINDOW     = 60    # seconds — match window between sources
-DIST_THRESHOLD  = 0.01  # degrees — ~1km, below this = same location
+from config.general import LOCATION_TIME_WINDOW as TIME_WINDOW, LOCATION_DIST_THRESHOLD as DIST_THRESHOLD
 
 
 def get_unified_location(

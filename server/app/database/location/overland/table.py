@@ -2,7 +2,7 @@ import logging
 
 from database.util import get_conn, to_iso_str
 from database.location.overland.util import _normalise_ts
-from telemetry_models import OverlandPayload
+from models.telemetry import OverlandPayload
 
 logger = logging.getLogger(__name__)
 

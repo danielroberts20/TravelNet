@@ -18,7 +18,7 @@ from config.general import DATABASE_BACKUP_DIR
 from datetime import datetime, timedelta
 from config.logging import configure_logging
 from config.settings import settings
-from notifications import CronJobMailer
+from config.notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
 

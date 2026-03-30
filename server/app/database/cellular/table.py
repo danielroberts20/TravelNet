@@ -8,11 +8,9 @@ roaming status) at a specific location fix.  A location fix may have multiple
 cellular states if the device was connected to more than one carrier.
 """
 
-from logging import log
 import sqlite3
-from typing import Optional
 
-from telemetry_models import CellularState
+from models.telemetry import CellularState
 from database.util import get_conn
 
 
@@ -41,27 +39,29 @@ def init() -> None:
 
 def insert_cellular_state(
     conn: sqlite3.Connection,
-    cellular_states: list[CellularState],
+    cellular_states: list[CellularState] | None,
     location_id: int,
 ) -> None:
     """Insert one cellular state row per carrier for the given location fix.
 
     Uses INSERT OR IGNORE against UNIQUE(location_id, provider_name, radio) so
-    re-processing the same CSV row is idempotent.
+    re-processing the same CSV row is idempotent.  Uses the supplied connection
+    so the insert runs inside the same transaction as the parent location row.
     """
-    with get_conn() as conn:
-        for cs in cellular_states:
-            conn.execute(
-                """
-                INSERT OR IGNORE INTO cellular_state
-                    (location_id, provider_name, radio, code, is_roaming)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    location_id,
-                    cs.provider_name,
-                    cs.radio,
-                    cs.code,
-                    cs.is_roaming,
-                ),
-            )
+    if not cellular_states:
+        return
+    for cs in cellular_states:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO cellular_state
+                (location_id, provider_name, radio, code, is_roaming)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                location_id,
+                cs.provider_name,
+                cs.radio,
+                cs.code,
+                cs.is_roaming,
+            ),
+        )

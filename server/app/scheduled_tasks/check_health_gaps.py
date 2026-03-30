@@ -15,7 +15,7 @@ from datetime import date, timedelta
 from config.editable import load_overrides
 from config.logging import configure_logging
 from database.util import get_conn
-from notifications import CronJobMailer
+from config.notifications import CronJobMailer
 from config.settings import settings
 
 logger = logging.getLogger(__name__)

@@ -3,8 +3,9 @@ import json
 import logging
 from typing import Any
 
+from database.health.mood.table import insert_state_of_mind
 from upload.health.workout_util import handle_workout_upload
-from auth import require_upload_token
+from config.auth import require_upload_token
 from config.general import HEALTH_BACKUP_DIR, WORKOUT_BACKUP_DIR
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends  # type: ignore
 from upload.health.health_util import handle_health_upload
@@ -75,3 +76,16 @@ async def upload_workout(
         "status": "success",
         "workouts_received": workout_count,
     }
+
+@router.post("/mood", dependencies=[Depends(require_upload_token)])
+async def upload_mood(
+    data: dict[str, Any],
+    background_tasks: BackgroundTasks,
+):
+    entries = data.get("data", {}).get("stateOfMind", [])
+    if not entries:
+        raise HTTPException(status_code=422, detail="No stateOfMind entries found")
+
+    background_tasks.add_task(insert_state_of_mind, entries)
+    return {"status": "success", "queued": len(entries)}
+

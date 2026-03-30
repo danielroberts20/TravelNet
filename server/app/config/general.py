@@ -159,6 +159,20 @@ SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from")("GBP")
 INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation")(5)
 
 # ---------------------------------------------------------------------------
+# Location deduplication
+# ---------------------------------------------------------------------------
+
+LOCATION_TIME_WINDOW = editable(
+    "LOCATION_TIME_WINDOW",
+    "Seconds — match window between Overland and Shortcuts points when deduplicating"
+)(60)
+
+LOCATION_DIST_THRESHOLD = editable(
+    "LOCATION_DIST_THRESHOLD",
+    "Degrees — distance below which two points are considered the same location (~1 km)"
+)(0.01)
+
+# ---------------------------------------------------------------------------
 # Gap annotations
 # ---------------------------------------------------------------------------
 
