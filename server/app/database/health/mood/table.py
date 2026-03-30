@@ -4,7 +4,7 @@ from database.util import get_conn, to_iso_str
 
 
 def init() -> None:
-    with get_conn as conn:
+    with get_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS state_of_mind (
                 id              TEXT PRIMARY KEY,
