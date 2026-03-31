@@ -80,6 +80,13 @@ AVAILABLE_NOTIFICATIONS = editable("AVAILABLE_NOTIFICATIONS", "Pushcut notificat
     "travelnet_test": "https://api.pushcut.io/KjvFN6-uKZjR0S3lNehts/notifications/TravelNet%20Test",
 })
 
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+PUBLIC_ALLOWED_PREFIXES = ["/public/"]
+
 # ---------------------------------------------------------------------------
 # Location
 # ---------------------------------------------------------------------------
