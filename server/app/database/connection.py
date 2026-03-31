@@ -1,6 +1,6 @@
 """
-database/util.py
-~~~~~~~~~~~~~~~~
+database/connection.py
+~~~~~~~~~~~~~~~~~~~~~~
 Low-level SQLite connection and maintenance helpers.
 
 get_conn() is the single point through which all DB access flows — it enables
@@ -70,10 +70,9 @@ def rebuild_db(*table_names):
     only health_data/health_sources, location_history/location_overland, and
     fx_rates are currently supported for replay.
     """
-    from database.integration import init_db
-    from upload.utils import input_csv
+    from database.setup import init_db, insert_log
+    from upload.location.shortcuts import input_csv
     from database.exchange.util import insert_fx_file
-    from database.integration import insert_log
 
     logger.info("Rebuilding database from CSV logs...")
     with get_conn() as conn:
@@ -99,7 +98,6 @@ def rebuild_db(*table_names):
                     try:
                         log = Log.from_strings(**row)
                         insert_log(log)
-                        inserted += 1
                     except Exception as e:
                         # Skip bad rows
                         logger.warning(f"Bad row on line {idx+2}.\t CSV entry: {row}\tException: {e}")
@@ -131,10 +129,10 @@ def to_iso_str(s: str | int | float | datetime) -> str:
         dt = datetime.fromisoformat(s)
     else:
         dt = s
-    
+
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     else:
         dt = dt.astimezone(timezone.utc)
-    
+
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")

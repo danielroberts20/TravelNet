@@ -1,5 +1,5 @@
 from config.editable import log_config_summary
-from database.util import get_conn
+from database.connection import get_conn
 from models.telemetry import Log
 from database.cellular.table import init as init_cellular, insert_cellular_state
 from database.exchange.table import init as init_fx
@@ -13,6 +13,7 @@ from database.job.table import init as init_jobs
 from database.location.overland.table import init as init_overland
 from database.location.gap_annotations.table import init as init_gap_annotations
 from database.weather.table import init as init_weather
+from database.logging.table import init as init_log_digest
 from triggers.location_change import init as init_location_change
 
 # -----------------------------
@@ -38,9 +39,10 @@ def init_db():
     init_overland()
     init_gap_annotations()
     init_weather()
+    init_log_digest()
     init_location_change()
     log_config_summary()
-    
+
 
     # Must be last — depends on location_history and location_overland tables
     init_unified_view()
@@ -57,4 +59,3 @@ def insert_log(log: Log):
 
         insert_cellular_state(conn, log.cellular_states, location_id)
         conn.commit()
-

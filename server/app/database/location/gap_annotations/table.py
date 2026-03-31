@@ -15,7 +15,7 @@ know the exact second that the gap started or ended.
 
 from typing import Optional
 
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES
 
 

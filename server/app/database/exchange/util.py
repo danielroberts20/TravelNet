@@ -5,7 +5,7 @@ from typing import Optional
 
 from database.exchange.table import insert_fx_rate
 from config.general import SOURCE_CURRENCY
-from database.util import get_conn
+from database.connection import get_conn
 
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,7 @@ workout_route stores individual GPS route points for workouts that include a
 recorded route; each point FK-references its parent workout.
 """
 
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 
 
 def init() -> None:

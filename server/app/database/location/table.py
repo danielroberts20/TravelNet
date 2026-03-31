@@ -8,7 +8,7 @@ and the location_unified view that merges Shortcuts and Overland data.
 import sqlite3
 from typing import Dict, List, Optional
 
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 
 
 def init() -> None:
