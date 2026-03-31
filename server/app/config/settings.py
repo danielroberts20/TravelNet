@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     custom_notification_not_time_sensitive: str = Field(alias="CUSTOM_NOTIFICATION_NOT_TIME_SENSITIVE")
     warning_notification: str = Field(alias="WARNING_NOTIFICATION")
     error_notification: str = Field(alias="ERROR_NOTIFICATION")
+    journal_notification: str = Field(alias="JOURNAL_NOTIFICATION")
 
     # --- External APIs ---
     fx_api_key: str = Field(alias="FX_API_KEY")
