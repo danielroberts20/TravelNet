@@ -8,10 +8,12 @@ from database.health.table import init as init_health
 from database.health.workouts.table import init as init_workouts
 from database.health.mood.table import init as init_mood
 from database.transaction.table import init as init_transactions
+from database.triggers.table import init as init_triggers
 from database.job.table import init as init_jobs
 from database.location.overland.table import init as init_overland
 from database.location.gap_annotations.table import init as init_gap_annotations
 from database.weather.table import init as init_weather
+from triggers.location_change import init as init_location_change
 
 # -----------------------------
 # Initialization
@@ -31,11 +33,14 @@ def init_db():
     init_workouts()
     init_mood()
     init_transactions()
+    init_triggers()
     init_jobs()
     init_overland()
     init_gap_annotations()
     init_weather()
+    init_location_change()
     log_config_summary()
+    
 
     # Must be last — depends on location_history and location_overland tables
     init_unified_view()

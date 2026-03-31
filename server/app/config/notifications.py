@@ -35,7 +35,7 @@ def trigger_notification(notification_name):
         logger.info(resp)
         return {}
 
-def send_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True):
+def send_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True, prefix: str = None):
     """Send a Pushcut push notification via the custom webhook.
 
     :param title: notification title (prefixed with 'TravelNet — ' unless use_prefix=False).
@@ -43,15 +43,24 @@ def send_notification(title: str = "Title", body: str = "Body", time_sensitive: 
     :param time_sensitive: if True, uses the time-sensitive webhook (breaks through Focus).
     :param use_prefix: prepend 'TravelNet — ' to the title when True.
     """
+    url = settings.custom_notification_time_sensitive if time_sensitive else settings.custom_notification_not_time_sensitive
+    return _trigger_notification(url, title, body, use_prefix, prefix)
+
+def journal_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True, prefix: str = None):
+    url = settings.journal_notification
+    return _trigger_notification(url, title, body, use_prefix, prefix)
+
+def _trigger_notification(url, title: str = "Title", body: str = "Body", use_prefix: bool = True, prefix: str = None):
+    if use_prefix:
+        title = f"TravelNet — {title}" if prefix is None else f"{prefix} — {title}"
     payload = {
         "text": body,
-        "title": f"TravelNet — {title}" if use_prefix else title
+        "title": title
     }
 
     headers = {
         "Content-Type": "application/json"
     }
-    url = settings.custom_notification_time_sensitive if time_sensitive else settings.custom_notification_not_time_sensitive
     resp = requests.post(url, json=payload, headers=headers)
     return resp.json()
 
