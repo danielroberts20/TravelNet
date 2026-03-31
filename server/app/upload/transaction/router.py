@@ -6,16 +6,16 @@ import logging
 import zipfile
 from babel import numbers
 from typing import Optional
-from config.notifications import send_notification
+from notifications import send_notification
 from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends  # type: ignore
 from pydantic import BaseModel, Field, field_validator  # type: ignore
 from database.transaction.ingest.revolut import insert as insert_revolut
 
-from config.auth import require_upload_token
+from auth import require_upload_token
 from database.exchange.util import convert_to_gbp
-from database.util import get_conn, to_iso_str
-from upload.transaction.util import parse_wise_upload
+from database.connection import get_conn, to_iso_str
+from upload.transaction.wise_upload import parse_wise_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -113,7 +113,6 @@ async def add_cash_transaction(tx: CashTransactionRequest):
     Manually log a cash transaction in any currency.
     Used for cash spend/received that won't appear in any bank export.
     """
-    # Resolve timestamp
     if tx.timestamp:
         timestamp = datetime.fromisoformat(tx.timestamp).isoformat()
     else:
@@ -121,11 +120,9 @@ async def add_cash_transaction(tx: CashTransactionRequest):
 
     tx_date = datetime.fromisoformat(timestamp).date()
 
-    # Generate stable ID
     key = f"cash-{timestamp}-{tx.amount}-{tx.currency}-{tx.description}"
     tx_id = "CASH-" + hashlib.sha256(key.encode()).hexdigest()[:16]
 
-    # FX conversion
     amount_gbp = convert_to_gbp(tx.amount, tx.currency, tx_date)
 
     raw_json = json.dumps({
@@ -157,8 +154,6 @@ async def add_cash_transaction(tx: CashTransactionRequest):
                     0, 0, None, raw_json,
                 ),
             )
-            # if cursor.rowcount == 0:
-            #     raise HTTPException(status_code=409, detail=f"Duplicate transaction ID: {tx_id}")
             logger.info(f"Cash insert rowcount: {cursor.rowcount}")
             conn.commit()
         except Exception as e:
