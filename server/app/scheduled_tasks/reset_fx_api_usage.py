@@ -14,7 +14,7 @@ import logging
 from config.logging import configure_logging
 from config.settings import settings
 from database.exchange.util import reset_api_usage
-from config.notifications import CronJobMailer
+from notifications import CronJobMailer
 from config.editable import load_overrides
 
 

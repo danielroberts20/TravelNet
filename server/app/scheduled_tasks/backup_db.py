@@ -13,12 +13,12 @@ from config.editable import load_overrides
 load_overrides()
 
 import logging
-from database.util import backup_db
+from database.connection import backup_db
 from config.general import DATABASE_BACKUP_DIR
 from datetime import datetime, timedelta
 from config.logging import configure_logging
 from config.settings import settings
-from config.notifications import CronJobMailer
+from notifications import CronJobMailer
 
 logger = logging.getLogger(__name__)
 
