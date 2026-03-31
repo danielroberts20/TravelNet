@@ -11,7 +11,7 @@ cellular states if the device was connected to more than one carrier.
 import sqlite3
 
 from models.telemetry import CellularState
-from database.util import get_conn
+from database.connection import get_conn
 
 
 def init() -> None:

@@ -9,7 +9,7 @@ a separate child table so a single health entry can reference multiple sources
 without duplicating the metric data.
 """
 
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 
 
 def init() -> None:

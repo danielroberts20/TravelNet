@@ -1,6 +1,6 @@
 import logging
 
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 from database.location.overland.util import _normalise_ts
 from models.telemetry import OverlandPayload
 from triggers import location_change

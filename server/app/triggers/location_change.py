@@ -1,8 +1,8 @@
 import logging
 
 from config.general import LOCATION_CHANGE_RADIUS_M, LOCATION_MINIMUM_POINTS, LOCATION_STATIONARITY_RADIUS_M, LOCATION_STAY_DURATION_MINS
-from triggers.util import dispatch, haversine_m
-from database.util import get_conn, to_iso_str
+from triggers.dispatch import dispatch, haversine_m
+from database.connection import get_conn, to_iso_str
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,15 @@ def init() -> None:
                 first_seen  TEXT NOT NULL,   -- ISO 8601 UTC
                 label       TEXT             -- optional manual label, e.g. "Hostel, Chiang Mai"
             );""")
+
+def label_place(place_id: int, label: str):
+    with get_conn() as conn:
+        cursor = conn.execute("""
+        UPDATE known_places
+        SET label = ?
+        WHERE id = ?
+        """, (label, place_id))
+        return cursor.rowcount > 0
 
 def get_most_recent_points():    
     now = datetime.now(timezone.utc)

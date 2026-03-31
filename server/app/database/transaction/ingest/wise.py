@@ -5,13 +5,12 @@ import json
 import logging
 from datetime import datetime
 import re
-from typing import Optional
 from zipfile import ZipFile
 
-from config.notifications import send_notification
+from notifications import send_notification
 from upload.transaction.constants import WISE_SOURCE_MAP
 from database.exchange.util import convert_to_gbp
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 
 # Transaction detail types that indicate internal pot-to-pot moves
 INTERNAL_DETAIL_TYPES = {"CONVERSION", "MONEY_ADDED"}
@@ -70,13 +69,6 @@ def _parse_timestamp(date_time_str: str) -> str:
     dt = datetime.strptime(date_time_str.strip(), "%d-%m-%Y %H:%M:%S.%f")
     return dt.isoformat()
 
-
-def _safe_float(value: str) -> Optional[float]:
-    """Parse a string to float, returning None for blank or unparseable values."""
-    try:
-        return float(value) if value.strip() != "" else None
-    except (ValueError, AttributeError):
-        return None
 
 def parse_wise_csv(csv_text: str, source: str) -> list[dict]:
     """Parse a Wise CSV export into a list of normalised transaction dicts.

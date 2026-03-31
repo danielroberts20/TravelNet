@@ -12,7 +12,7 @@ load_overrides()
 
 from config.logging import digest_handler
 from config.settings import settings
-from config.notifications import _record_cron_run
+from notifications import _record_cron_run
 from config.editable import load_overrides
 
 try:

@@ -1,11 +1,14 @@
 from collections import defaultdict
 from datetime import datetime
+import io
 import json
 import logging
 import statistics
 from typing import Any
 
-from config.general import INTERVAL_MINUTES
+import pandas as pd  # type: ignore
+
+from config.general import DATA_DIR, INTERVAL_MINUTES
 from upload.health.constants import METRIC_AGGREGATION, SNAKE_TO_DISPLAY
 from database.health.table import insert_health_entry
 
@@ -39,7 +42,7 @@ def bucket_timestamp(unix_ts: int, interval_minutes: int) -> int:
 
 def _parse_sources(point: dict) -> list[str]:
     """Extract sources from a data point's 'source' field.
- 
+
     Sources are pipe-delimited when multiple devices contributed.
     Returns an empty list if the field is absent or blank.
     """
@@ -173,7 +176,6 @@ def handle_special_qty(display_name: str, units: str, data: list[dict], extra_fi
 # ---------------------------------------------------------------------------
 
 # Metrics that need a dedicated handler rather than handle_standard_metric.
-# Maps snake_case name -> handler identifier.
 SPECIAL_HANDLERS = {
     "heart_rate",
     "sleep_analysis",
@@ -181,20 +183,13 @@ SPECIAL_HANDLERS = {
 }
 
 # Normalise known HAE aliases to canonical snake_case names before dispatch.
-# Add entries here if HAE sends a name that differs from the expected snake_case.
 SNAKE_ALIASES: dict[str, str] = {
     "basal_energy_burned": "resting_energy",
 }
 
 
 def _dispatch(snake_name: str, units: str, data: list[dict]) -> None:
-    """Route a single metric to its dedicated handler.
-
-    Applies SNAKE_ALIASES normalisation first, then dispatches to a special
-    handler (heart_rate, sleep_analysis, handwashing) or the generic
-    handle_standard_metric for everything else.  Logs a warning and returns
-    without error for unknown metric names.
-    """
+    """Route a single metric to its dedicated handler."""
     snake_name = SNAKE_ALIASES.get(snake_name, snake_name)
     display_name = SNAKE_TO_DISPLAY.get(snake_name)
     if display_name is None:
@@ -212,17 +207,11 @@ def _dispatch(snake_name: str, units: str, data: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Entry points
 # ---------------------------------------------------------------------------
 
 def handle_health_upload(data: dict[str, Any]) -> None:
-    """Process a full Health Auto Export payload and insert each metric into the DB.
-
-    Iterates over the 'metrics' list, dispatches each to the appropriate handler
-    (standard, heart-rate, sleep, etc.) and logs a summary on completion.
-    Errors in individual metrics are caught and logged so one bad metric does not
-    abort the rest of the upload.
-    """
+    """Process a full Health Auto Export payload and insert each metric into the DB."""
     logger.upload("Processing health data in the background...")
 
     metrics = data.get("metrics")
@@ -262,15 +251,141 @@ def handle_health_upload(data: dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# CSV/DataFrame processing (moved from models/parsers.py)
+# ---------------------------------------------------------------------------
+
+def generate_full_day_index(day: str, interval_minutes: int = INTERVAL_MINUTES) -> pd.DatetimeIndex:
+    """Return a DatetimeIndex covering the full day at interval_minutes resolution."""
+    return pd.date_range(
+        start=f"{day} 00:00:00",
+        end=f"{day} 23:59:59",
+        freq=f"{interval_minutes}min"
+    )
+
+def aggregate_metric_from_csv(
+    metric_name: str,
+    csv_string: str,
+    full_index: pd.DatetimeIndex,
+    agg_config: dict
+):
+    """Resample a point-in-time metric CSV into a full-day interval DataFrame."""
+    empty_df = pd.DataFrame(index=full_index)
+
+    if not csv_string.strip():
+        return empty_df
+
+    df = pd.read_csv(io.StringIO(csv_string), parse_dates=[0])
+    df = df.convert_dtypes()
+
+    if df.empty:
+        return empty_df
+
+    ts_col = df.columns[0]
+    df[ts_col] = pd.to_datetime(df[ts_col])
+    df = df.set_index(ts_col)
+
+    metric_rules = agg_config.get(metric_name, {})
+
+    col_aggs = {}
+    for col in df.columns:
+        col_aggs[col] = metric_rules.get(col, "mean")
+
+    resampled = df.resample(
+        full_index.freq,
+        origin="start_day"
+    ).agg(col_aggs)
+
+    resampled = resampled.reindex(full_index)
+    resampled = resampled.add_prefix(f"{metric_name}_")
+
+    return resampled
+
+def process_interval_metric(
+    metric_name: str,
+    csv_string: str,
+    full_index: pd.DatetimeIndex
+):
+    """Expand a Start/End interval metric CSV into a full-day interval DataFrame."""
+    if not csv_string.strip():
+        return pd.DataFrame(index=full_index)
+
+    df = pd.read_csv(io.StringIO(csv_string), parse_dates=["Start", "End"])
+    df = df.convert_dtypes()
+
+    if df.empty:
+        return pd.DataFrame(index=full_index)
+
+    df["Start"] = pd.to_datetime(df["Start"])
+    df["End"] = pd.to_datetime(df["End"])
+
+    output = pd.DataFrame(index=full_index)
+
+    interval_minutes = int(full_index.freq.delta.total_seconds() / 60)
+
+    for _, row in df.iterrows():
+        start = row["Start"]
+        end = row["End"]
+
+        day_start = full_index[0]
+        day_end = full_index[-1] + full_index.freq
+
+        start = max(start, day_start)
+        end = min(end, day_end)
+
+        if start >= end:
+            continue
+
+        mask = (full_index < end) & (full_index + full_index.freq > start)
+        overlapping_intervals = full_index[mask]
+
+        for col in df.columns:
+            if col in ["Start", "End"]:
+                continue
+
+            prefixed_col = f"{metric_name}_{col}"
+
+            if prefixed_col not in output.columns:
+                output[prefixed_col] = pd.NA
+
+            output.loc[overlapping_intervals, prefixed_col] = row[col]
+
+    return output
+
+def process_payload(payload: dict, day: str):
+    """Join all metric DataFrames for a day and write the result to processed.csv."""
+    full_index = generate_full_day_index(day, INTERVAL_MINUTES)
+
+    final_df = pd.DataFrame(index=full_index)
+
+    for metric_name, csv_string in payload.items():
+        logger.info(f"Processing metric: {metric_name}")
+        if "Start" in csv_string and "End" in csv_string:
+            df_metric = process_interval_metric(
+                metric_name,
+                csv_string,
+                full_index
+            )
+        else:
+            df_metric = aggregate_metric_from_csv(
+                metric_name,
+                csv_string,
+                full_index,
+                METRIC_AGGREGATION
+            )
+
+        final_df = final_df.join(df_metric, how="left")
+
+    final_df = final_df.reset_index().rename(columns={"index": "Date/Time"})
+    final_df.to_csv(DATA_DIR / "processed.csv", index=False)
+    return final_df
+
+
+# ---------------------------------------------------------------------------
 # Aggregation helpers
 # ---------------------------------------------------------------------------
 
 def _get_agg_type(metric: str, sub_metric: str) -> str:
-    """Return the aggregation type ('sum', 'min', 'max', 'mean') for a metric column.
-
-    Falls back to the first rule for the metric if sub_metric isn't found,
-    then falls back to 'mean' if the metric itself isn't in METRIC_AGGREGATION.
-    """
+    """Return the aggregation type ('sum', 'min', 'max', 'mean') for a metric column."""
     if metric not in METRIC_AGGREGATION:
         return "mean"
     rules = METRIC_AGGREGATION[metric]

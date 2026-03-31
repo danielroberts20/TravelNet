@@ -1,4 +1,4 @@
-from database.util import get_conn
+from database.connection import get_conn
 
 
 def init() -> None:

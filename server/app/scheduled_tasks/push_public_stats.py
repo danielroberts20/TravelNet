@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 import requests
 
 from config.settings import settings
-from config.notifications import CronJobMailer
+from notifications import CronJobMailer
 from public.util import build_public_stats
 
 logger = logging.getLogger(__name__)

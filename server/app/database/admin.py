@@ -3,8 +3,8 @@ import os
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends  # type: ignore
 from fastapi.responses import FileResponse  # type: ignore
 
-from config.auth import require_upload_token
-from database.util import backup_db, get_conn
+from auth import require_upload_token
+from database.connection import backup_db, get_conn
 
 
 router = APIRouter()
