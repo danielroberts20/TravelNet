@@ -16,7 +16,7 @@ from typing import Optional
 import sqlite3
 import yaml
 
-from database.util import get_conn
+from database.connection import get_conn
 
 logger = logging.getLogger(__name__)
 

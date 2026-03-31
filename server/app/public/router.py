@@ -1,6 +1,6 @@
 """
-public/endpoints.py
-~~~~~~~~~~~~~~~~~~~
+public/router.py
+~~~~~~~~~~~~~~~~
 Public-facing read-only stats endpoint.
 
 - No auth required (data is non-sensitive counts only)

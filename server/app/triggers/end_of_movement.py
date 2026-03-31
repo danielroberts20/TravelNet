@@ -1,6 +1,6 @@
 import logging
 
-from database.health.util import get_metric_entries, get_unique_metrics
+from database.health.queries import get_metric_entries, get_unique_metrics
 
 logger = logging.getLogger(__name__)
 

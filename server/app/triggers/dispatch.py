@@ -2,8 +2,8 @@ from datetime import datetime, timedelta, timezone
 import json
 import math
 
-from config.notifications import journal_notification, send_notification
-from database.util import get_conn, to_iso_str
+from notifications import journal_notification, send_notification
+from database.connection import get_conn, to_iso_str
 
 def haversine_m(lat1, lon1, lat2, lon2) -> float:
     """Returns distance in metres between two lat/lon points."""
