@@ -7,6 +7,7 @@ from datetime import datetime
 import re
 from zipfile import ZipFile
 
+from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp
 from notifications import send_notification
 from upload.transaction.constants import WISE_SOURCE_MAP
 from database.exchange.util import convert_to_gbp
@@ -141,8 +142,8 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
 
             if not rows:
                 results.append({"file": csv_filename, "inserted": 0, "skipped": "empty or all filtered"})
-                logger.info(f"No transactions found for Wise-{source} ({WISE_SOURCE_MAP[source]})")
-                return results, errors
+                logger.info(f"No transactions found for Wise-{source} ({WISE_SOURCE_MAP.get(source, "Unknown Source")})")
+                return len(results), 0, 0, errors
 
             inserted = 0
 
@@ -150,7 +151,10 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
                 cursor = conn.cursor()
 
                 for row in rows:
+                    logger.info("Row")
                     row["timestamp"] = to_iso_str(row["timestamp"])
+                    lat, lon = get_closest_lat_lon_by_timestamp(cursor, row["timestamp"])
+                    logger.info(f"Closest lat/lon to transaction {row["id"]} is {lat}, {lon}")
                     result = cursor.execute("""
                         INSERT OR IGNORE INTO transactions (
                             id, source, bank, timestamp, amount, currency,
