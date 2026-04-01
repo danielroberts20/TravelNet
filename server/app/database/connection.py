@@ -67,7 +67,7 @@ def rebuild_db(*table_names):
     """Drop and recreate the named tables, then replay backup files to repopulate them.
 
     This is a maintenance/recovery function.  Pass table names to rebuild;
-    only health_data/health_sources, location_history/location_overland, and
+    only health_data/health_sources, location_shortcuts/location_overland, and
     fx_rates are currently supported for replay.
     """
     from database.setup import init_db, insert_log
@@ -90,7 +90,7 @@ def rebuild_db(*table_names):
             if f.endswith(".csv"):
                 input_csv(open(HEALTH_BACKUP_DIR / f, "r"))
 
-    if "location_history" in table_names and "location_overland" in table_names:
+    if "location_shortcuts" in table_names and "location_overland" in table_names:
         for f in sorted(os.listdir(LOCATION_BACKUP_DIR)):
             if f.endswith(".csv"):
                 reader = csv.DictReader(LOCATION_BACKUP_DIR / f)
