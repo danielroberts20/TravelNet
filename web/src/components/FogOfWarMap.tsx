@@ -1,24 +1,25 @@
 /**
  * FogOfWarMap — interactive GPS fog-of-war built on deck.gl + maplibre-gl.
  *
- * This is the Kepler.gl tech stack (deck.gl layers + maplibre basemap) used
- * directly for precise rendering control. The project uses Kepler.gl as its
- * canonical mapping foundation; future pages will add the KeplerGl component
- * for exploratory data viz (Explorer, ML pages).
+ * Basemap: Carto Positron (light, clean, Apple Maps-style).
  *
- * Zoom ≤ 5 (world view):
- *   Visited countries are lit amber/gold. Rest of world is dark.
- *   Country detection: point-in-polygon via d3-geo geoContains against
- *   world-atlas 110m TopoJSON, subsampled to ≤500 GPS points.
+ * Zoom ≤ 5 (country view):
+ *   Every country gets a fog overlay. Visited ones receive a subtle warm
+ *   tint; unvisited stay dark. Country detection uses d3-geo geoContains
+ *   against world-atlas 50m TopoJSON, subsampled to ≤500 GPS points.
  *
  * Zoom > 5 (track view):
- *   Dark SolidPolygonLayer covering the whole world with holes cut around
- *   GPS track clusters. Only areas physically visited are revealed.
+ *   Full-world SolidPolygonLayer fog with holes cut at GPS cluster centres
+ *   (~9 km radius per cluster). A ScatterplotLayer rendered above the fog
+ *   with additive blending adds a soft glow/halo at each hole edge.
+ *
+ * Transitions: both layer groups are always present; opacity crossfades
+ * over 400 ms when crossing the zoom threshold so there is no hard swap.
  */
 
 import { useState, useEffect, useMemo } from 'react';
 import DeckGL from '@deck.gl/react';
-import { SolidPolygonLayer } from '@deck.gl/layers';
+import { SolidPolygonLayer, ScatterplotLayer } from '@deck.gl/layers';
 import type { MapViewState } from '@deck.gl/core';
 import Map from 'react-map-gl';
 import maplibregl from 'maplibre-gl';
@@ -27,8 +28,9 @@ import type { Topology, Objects } from 'topojson-specification';
 import { geoContains } from 'd3-geo';
 
 const FOG_OF_WAR_URL = 'https://api.travelnet.dev/public/fog-of-war';
-const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
-const DARK_MATTER_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
+const POSITRON_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+const ZOOM_THRESHOLD = 5;
 
 const INITIAL_VIEW_STATE: MapViewState = {
   longitude: 175,
@@ -38,26 +40,28 @@ const INITIAL_VIEW_STATE: MapViewState = {
   bearing: 0,
 };
 
-// Visited country fill: warm amber/gold
-const AMBER: [number, number, number, number] = [255, 159, 10, 185];
-// Unvisited country fill: very dark, slightly blue
-const DARK_COUNTRY: [number, number, number, number] = [12, 12, 18, 235];
-// Fog fill: almost-black with slight opacity to let basemap labels through at edges
-const FOG_FILL: [number, number, number, number] = [8, 8, 14, 218];
+// Zoom-in fog: dark semi-transparent overlay covering the entire world
+const FOG_FILL: [number, number, number, number] = [0, 0, 0, 165];
+// Zoom-out visited country: subtle warm tint on the light basemap
+const VISITED_TINT: [number, number, number, number] = [255, 210, 80, 60];
+// Zoom-out unvisited country: dark fog tile on the light basemap
+const UNVISITED_FOG: [number, number, number, number] = [0, 0, 0, 150];
+// Glow halo colour: warm, very low opacity — rendered additively to soften hole edges
+const GLOW: [number, number, number, number] = [255, 210, 120, 35];
 
 type Position2 = [number, number];
 
-// World bounding box as CCW outer ring (GeoJSON convention: CCW = exterior)
+// World bounding box as CCW outer ring (GeoJSON exterior convention)
 const WORLD_OUTER: Position2[] = [
   [-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90],
 ];
 
-// Circle polygon — CW winding (GeoJSON convention: CW = hole / interior ring)
-function circleHole(lon: number, lat: number, r: number, n = 24): Position2[] {
+// CW-wound circle — used as a hole ring inside the world polygon
+function circleHole(lon: number, lat: number, r: number, n = 32): Position2[] {
   const coords: Position2[] = [];
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * Math.PI * 2;
-    // CW: cos(a), -sin(a) — right → south → left → north
+    // CW: east → south → west → north
     coords.push([lon + r * Math.cos(a), lat - r * Math.sin(a)]);
   }
   return coords;
@@ -129,11 +133,8 @@ export default function FogOfWarMap() {
   // Determine visited country indices (expensive — memoized, only recomputes on new data)
   const visitedSet = useMemo(() => {
     if (!gpsPoints.length || !worldFeatures.length) return new Set<number>();
-
-    // Subsample to ≤500 points for country detection performance
     const step = Math.max(1, Math.floor(gpsPoints.length / 500));
     const sample = gpsPoints.filter((_, i) => i % step === 0);
-
     const visited = new Set<number>();
     worldFeatures.forEach((feature, idx) => {
       if (visited.has(idx)) return;
@@ -147,38 +148,39 @@ export default function FogOfWarMap() {
     return visited;
   }, [gpsPoints, worldFeatures]);
 
-  // Pre-flatten country features for SolidPolygonLayer (memoized)
   const flatCountries = useMemo(() => flattenCountries(worldFeatures), [worldFeatures]);
-
-  // GPS clusters for track-level fog holes (memoized)
   const fogClusters = useMemo(() => gridCluster(gpsPoints, 0.1), [gpsPoints]);
 
   const zoom = viewState.zoom;
-  const isZoomedIn = zoom > 5;
+  const isZoomedIn = zoom > ZOOM_THRESHOLD;
 
   const layers = useMemo(() => {
     if (loading) return [];
 
-    if (!isZoomedIn) {
-      // Country-level: single SolidPolygonLayer, amber for visited, dark for rest
-      return [
-        new SolidPolygonLayer<FlatPoly>({
-          id: 'countries',
-          data: flatCountries,
-          getPolygon: d => d.polygon,
-          getFillColor: d => visitedSet.has(d.featureIdx) ? AMBER : DARK_COUNTRY,
-          filled: true,
-          pickable: false,
-          updateTriggers: { getFillColor: [visitedSet] },
-        }),
-      ];
-    }
-
-    // Track-level: dark world polygon with GPS cluster holes
-    const HOLE_RADIUS = 0.08; // degrees (~9 km) — reveals a corridor around each track cluster
+    // Holes for the fog polygon: CW circles at each GPS cluster centre
+    const HOLE_RADIUS = 0.08; // ~9 km per cluster
     const holes = fogClusters.map(([lon, lat]) => circleHole(lon, lat, HOLE_RADIUS));
 
+    // Both layer groups live in the array at all times; opacity crossfades when
+    // isZoomedIn changes so there is no hard visual swap at the threshold.
+    const countryOpacity = isZoomedIn ? 0 : 1;
+    const fogOpacity = isZoomedIn ? 1 : 0;
+
     return [
+      // --- Country view (zoom-out) ---
+      new SolidPolygonLayer<FlatPoly>({
+        id: 'countries',
+        data: flatCountries,
+        getPolygon: d => d.polygon,
+        getFillColor: d => visitedSet.has(d.featureIdx) ? VISITED_TINT : UNVISITED_FOG,
+        filled: true,
+        pickable: false,
+        opacity: countryOpacity,
+        transitions: { opacity: 400 },
+        updateTriggers: { getFillColor: [visitedSet] },
+      }),
+
+      // --- Track view (zoom-in): fog mask with holes ---
       new SolidPolygonLayer({
         id: 'fog',
         data: [{ polygon: [WORLD_OUTER, ...holes] }],
@@ -186,6 +188,30 @@ export default function FogOfWarMap() {
         getFillColor: FOG_FILL,
         filled: true,
         pickable: false,
+        opacity: fogOpacity,
+        transitions: { opacity: 400 },
+      }),
+
+      // --- Soft glow halos (zoom-in) ---
+      // Additive blending (SRC_ALPHA + ONE) lightens the dark fog at each hole
+      // edge, creating a smooth vignette-style transition instead of a hard cutout.
+      new ScatterplotLayer<Position2>({
+        id: 'fog-glow',
+        data: fogClusters,
+        getPosition: d => d,
+        getRadius: 12000,      // 12 km geographic radius
+        radiusUnits: 'meters',
+        radiusMinPixels: 60,   // always at least 60 px wide in screen space
+        radiusMaxPixels: 180,
+        getFillColor: GLOW,
+        pickable: false,
+        opacity: fogOpacity,
+        transitions: { opacity: 400 },
+        parameters: {
+          blend: true,
+          // GL.SRC_ALPHA (770) + GL.ONE (1): additive blend brightens fog at edges
+          blendFunc: [770, 1],
+        },
       }),
     ];
   }, [loading, isZoomedIn, flatCountries, visitedSet, fogClusters]);
@@ -195,13 +221,17 @@ export default function FogOfWarMap() {
       <DeckGL
         viewState={viewState}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        onViewStateChange={(p: any) => setViewState(p.viewState as MapViewState)}
+        onViewStateChange={(p: any) => {
+          const next = p.viewState as MapViewState;
+          console.log('[FogOfWarMap] zoom:', next.zoom.toFixed(2), '| track view:', next.zoom > ZOOM_THRESHOLD);
+          setViewState(next);
+        }}
         controller={true}
         layers={layers}
       >
         <Map
           mapLib={maplibregl as unknown as Parameters<typeof Map>[0]['mapLib']}
-          mapStyle={DARK_MATTER_STYLE}
+          mapStyle={POSITRON_STYLE}
           reuseMaps
         />
       </DeckGL>
@@ -210,8 +240,8 @@ export default function FogOfWarMap() {
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(8,8,14,0.75)',
-          color: 'rgba(255,255,255,0.45)',
+          background: 'rgba(255,255,255,0.7)',
+          color: 'rgba(0,0,0,0.4)',
           fontFamily: 'var(--font-mono)',
           fontSize: 12,
           letterSpacing: '0.08em',
@@ -224,8 +254,8 @@ export default function FogOfWarMap() {
       {!loading && error && (
         <div style={{
           position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(8,8,14,0.85)',
-          color: 'rgba(255,255,255,0.4)',
+          background: 'rgba(255,255,255,0.85)',
+          color: 'rgba(0,0,0,0.35)',
           fontFamily: 'var(--font-mono)',
           fontSize: 11,
           padding: '6px 12px',
@@ -238,8 +268,8 @@ export default function FogOfWarMap() {
 
       <div style={{
         position: 'absolute', bottom: 16, right: 16,
-        background: 'rgba(8,8,14,0.75)',
-        color: 'rgba(255,255,255,0.35)',
+        background: 'rgba(255,255,255,0.75)',
+        color: 'rgba(0,0,0,0.4)',
         fontFamily: 'var(--font-mono)',
         fontSize: 10,
         padding: '4px 10px',
