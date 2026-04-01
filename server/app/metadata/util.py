@@ -6,7 +6,7 @@ import time
 import os
 from config.general import DATABASE_BACKUP_DIR, DB_FILE, FX_BACKUP_DIR, HEALTH_BACKUP_DIR, LOCATION_OVERLAND_BACKUP_DIR, LOCATION_SHORTCUTS_BACKUP_DIR, REVOLUT_BACKUP_DIR, STALE_DAYS, UPLOADS_BACKUP_DIR, WISE_BACKUP_DIR, WORKOUT_BACKUP_DIR
 from config.runtime import app_start_time
-from database.util import get_conn
+from database.connection import get_conn
 
 def read_last_lines_efficient(filename: str, n: int = 200) -> str:
     """Return the last n lines of a file as a single string, using a bounded deque."""
@@ -64,7 +64,7 @@ def get_last_uploads() -> dict:
 
         return {
             "location_shortcuts": latest(
-                "SELECT MAX(timestamp) FROM location_history"
+                "SELECT MAX(timestamp) FROM location_shortcuts"
             ),
             "location_overland": latest(
                 "SELECT MAX(timestamp) FROM location_overland"

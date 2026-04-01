@@ -3,8 +3,8 @@ import os
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends  # type: ignore
 from fastapi.responses import FileResponse  # type: ignore
 
-from config.auth import require_upload_token
-from database.util import backup_db, get_conn
+from auth import require_upload_token
+from database.connection import backup_db, get_conn
 
 
 router = APIRouter()
@@ -23,6 +23,10 @@ RESETTABLE_TABLES = [
     "cellular_state",
     "weather_hourly",
     "weather_daily",
+    "known_places",
+    "gap_annotations",
+    "state_of_mind",
+    "trigger_log",
 ]
 
 

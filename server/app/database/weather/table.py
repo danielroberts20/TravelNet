@@ -8,7 +8,7 @@ Weather data is fetched retroactively from Open-Meteo's archive API and
 co-located with GPS points so the dashboard can show conditions at each location.
 """
 
-from database.util import get_conn
+from database.connection import get_conn
 import logging
 
 logger = logging.getLogger(__name__)

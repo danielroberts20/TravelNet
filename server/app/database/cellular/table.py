@@ -11,7 +11,7 @@ cellular states if the device was connected to more than one carrier.
 import sqlite3
 
 from models.telemetry import CellularState
-from database.util import get_conn
+from database.connection import get_conn
 
 
 def init() -> None:
@@ -21,30 +21,30 @@ def init() -> None:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS cellular_state (
             id INTEGER PRIMARY KEY,
-            location_id INTEGER NOT NULL,
+            shortcut_id INTEGER NOT NULL,
             provider_name TEXT,
             radio TEXT,
             code TEXT,
             is_roaming BOOLEAN,
-            FOREIGN KEY(location_id) REFERENCES location_history(id) ON DELETE CASCADE,
+            FOREIGN KEY(shortcut_id) REFERENCES location_shortcuts(id) ON DELETE CASCADE,
 
-            UNIQUE(location_id, provider_name, radio)
+            UNIQUE(shortcut_id, provider_name, radio)
         );""")
 
         conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_cellular_location
-            ON cellular_state(location_id);
+            ON cellular_state(shortcut_id);
         """)
 
 
 def insert_cellular_state(
     conn: sqlite3.Connection,
     cellular_states: list[CellularState] | None,
-    location_id: int,
+    shortcut_id: int,
 ) -> None:
     """Insert one cellular state row per carrier for the given location fix.
 
-    Uses INSERT OR IGNORE against UNIQUE(location_id, provider_name, radio) so
+    Uses INSERT OR IGNORE against UNIQUE(shortcut_id, provider_name, radio) so
     re-processing the same CSV row is idempotent.  Uses the supplied connection
     so the insert runs inside the same transaction as the parent location row.
     """
@@ -54,11 +54,11 @@ def insert_cellular_state(
         conn.execute(
             """
             INSERT OR IGNORE INTO cellular_state
-                (location_id, provider_name, radio, code, is_roaming)
+                (shortcut_id, provider_name, radio, code, is_roaming)
             VALUES (?, ?, ?, ?, ?)
             """,
             (
-                location_id,
+                shortcut_id,
                 cs.provider_name,
                 cs.radio,
                 cs.code,

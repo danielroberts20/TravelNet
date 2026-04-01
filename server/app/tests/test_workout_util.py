@@ -9,7 +9,8 @@ Covers:
 
 import pytest
 
-from upload.health.workout_util import _qty, _units, parse_unix
+from upload.health.workouts import _qty, _units
+from upload.health.processing import parse_unix
 
 
 # ---------------------------------------------------------------------------

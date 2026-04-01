@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union
 import logging
 
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 
 logger = logging.getLogger(__name__)
 

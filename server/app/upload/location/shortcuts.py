@@ -1,14 +1,14 @@
 import csv
-from config.notifications import send_notification
-from fastapi import HTTPException  # type: ignore
 import logging
 
-from database.integration import insert_log
+from fastapi import HTTPException  # type: ignore
+from notifications import send_notification
+from database.setup import insert_log
 from models.telemetry import Log
 
-
 logger = logging.getLogger(__name__)
-            
+
+
 def input_csv(csv_file):
     """Parse a Shortcuts location CSV file and insert each row into the DB.
 
@@ -37,7 +37,6 @@ def input_csv(csv_file):
             insert_log(log)
             inserted += 1
         except Exception as e:
-            # Skip bad rows
             logger.warning(f"Bad row on line {idx+2}.\t CSV entry: {row}\tException: {e}")
             skipped_rows.append(idx+2)
             continue

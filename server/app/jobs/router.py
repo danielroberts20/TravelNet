@@ -3,10 +3,10 @@ import logging
 from typing import Any, Optional
 from fastapi import Header, UploadFile, File, Form, HTTPException, APIRouter, BackgroundTasks, Depends  # type: ignore
 
-from config.auth import require_upload_token
+from auth import require_upload_token
 from jobs.models import DataMode, Status
 from database.job.table import get_next_queued_job, insert_job, update_job
-from jobs.utils import store_job
+from jobs.storage import store_job
 
 
 router = APIRouter()
@@ -24,13 +24,7 @@ async def submit_job(
     entry_point: Optional[str] = Form("main"),
     timeout: int = Form(3600),
 ):
-    """Accept a user-submitted ML job (code, requirements, optional data), queue it for execution.
-
-    Returns the assigned job_id on success.  Validates that:
-      - SQL mode has a sql_query
-      - INLINE mode has a data_file
-      - timeout does not exceed 4 hours (14400 s)
-    """
+    """Accept a user-submitted ML job (code, requirements, optional data), queue it for execution."""
     if data_mode == DataMode.SQL and not sql_query:
         raise HTTPException(status_code=400, detail="SQL mode requires sql_query")
 

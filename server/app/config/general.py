@@ -80,6 +80,21 @@ AVAILABLE_NOTIFICATIONS = editable("AVAILABLE_NOTIFICATIONS", "Pushcut notificat
     "travelnet_test": "https://api.pushcut.io/KjvFN6-uKZjR0S3lNehts/notifications/TravelNet%20Test",
 })
 
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+PUBLIC_ALLOWED_PREFIXES = ["/public/"]
+
+# ---------------------------------------------------------------------------
+# Location
+# ---------------------------------------------------------------------------
+LOCATION_CHANGE_RADIUS_M = editable("LOCATION_CHANGE_RADIUS_M", "Distance in meters to consider a location change")(500)
+LOCATION_STAY_DURATION_MINS = editable("LOCATION_STAY_DURATION_MINS", "Duration in minutes to consider a stay at a location")(30)
+LOCATION_MINIMUM_POINTS = editable("LOCATION_MINIMUM_POINTS", "Minimum number of location points within the stay duration to consider it a valid stay")(5)
+LOCATION_STATIONARITY_RADIUS_M = editable("LOCATION_STATIONARITY_RADIUS_M", "Distance in meters that location points must be within to be considered stationary rather than in transit")(150)
+
 # ---------------------------------------------------------------------------
 # Weather
 # ---------------------------------------------------------------------------

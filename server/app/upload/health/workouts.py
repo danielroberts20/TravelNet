@@ -1,15 +1,10 @@
-from datetime import datetime
 import logging
 from typing import Any
 
 from database.health.workouts.table import insert_workout, insert_workout_route_point
+from upload.health.processing import parse_unix
 
 logger = logging.getLogger(__name__)
-
-
-def parse_unix(date_str: str) -> int:
-    """Parse a HAE workout datetime string ('2024-02-06 14:30:00 -0800') to Unix timestamp."""
-    return int(datetime.strptime(date_str.strip(), "%Y-%m-%d %H:%M:%S %z").timestamp())
 
 
 def _qty(obj: dict | None) -> float | None:
@@ -81,8 +76,7 @@ def handle_workout_upload(data: dict[str, Any]):
         elevation_down = _qty(elev_down_obj)
         elevation_units = _units(elev_up_obj) or _units(elev_down_obj)
 
-        # Heart rate -- HAE sends flat minHeartRate/avgHeartRate/maxHeartRate fields,
-        # falling back to nested heartRate.min/avg/max if present
+        # Heart rate
         hr = w.get("heartRate") or {}
         hr_min = _qty(w.get("minHeartRate")) or _qty(hr.get("min"))
         hr_avg = _qty(w.get("avgHeartRate")) or _qty(hr.get("avg"))

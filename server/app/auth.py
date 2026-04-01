@@ -11,7 +11,7 @@ Both are sourced from config/settings.py (i.e. the .env file).
 
 Usage:
     from fastapi import Depends
-    from config.auth import require_upload_token, verify_overland_token
+    from auth import require_upload_token, verify_overland_token
 
     # Via decorator (no extra parameter in handler):
     @router.get("/endpoint", dependencies=[Depends(require_upload_token)])

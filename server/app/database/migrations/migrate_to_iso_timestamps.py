@@ -60,7 +60,7 @@ def x(conn: sqlite3.Connection, sql: str) -> None:
 # Individual table migrations
 # ---------------------------------------------------------------------------
 
-def migrate_location_history(conn: sqlite3.Connection) -> None:
+def migrate_location_shortcuts(conn: sqlite3.Connection) -> None:
     """
     timestamp:  INTEGER (Unix epoch)   → TEXT NOT NULL (ISO 8601 UTC, e.g. 2026-03-25T12:34:56Z)
     created_at: INTEGER (Unix epoch)   → TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
@@ -71,14 +71,14 @@ def migrate_location_history(conn: sqlite3.Connection) -> None:
     preserved — the current insert code ignores them but dropping them would
     be destructive.
     """
-    t = col_type(conn, "location_history", "timestamp")
+    t = col_type(conn, "location_shortcuts", "timestamp")
     if t == "TEXT":
-        print("  location_history: already TEXT — skipping")
+        print("  location_shortcuts: already TEXT — skipping")
         return
 
-    print("  location_history: INTEGER → TEXT  (Unix epoch → ISO 8601)")
+    print("  location_shortcuts: INTEGER → TEXT  (Unix epoch → ISO 8601)")
     x(conn, """
-        CREATE TABLE location_history_new (
+        CREATE TABLE location_shortcuts_new (
             id                   INTEGER PRIMARY KEY,
             timestamp            TEXT    NOT NULL,
             timezone             TEXT,
@@ -99,7 +99,7 @@ def migrate_location_history(conn: sqlite3.Connection) -> None:
         )
     """)
     x(conn, """
-        INSERT INTO location_history_new
+        INSERT INTO location_shortcuts_new
             SELECT
                 id,
                 strftime('%Y-%m-%dT%H:%M:%SZ', timestamp, 'unixepoch'),
@@ -109,13 +109,13 @@ def migrate_location_history(conn: sqlite3.Connection) -> None:
                 BSSID, RSSI,
                 strftime('%Y-%m-%dT%H:%M:%SZ', created_at, 'unixepoch'),
                 is_noise
-            FROM location_history
+            FROM location_shortcuts
     """)
-    x(conn, "DROP TABLE location_history")
-    x(conn, "ALTER TABLE location_history_new RENAME TO location_history")
-    x(conn, "CREATE INDEX idx_location_timestamp ON location_history(timestamp)")
-    x(conn, "CREATE INDEX idx_location_device    ON location_history(device)")
-    x(conn, "CREATE INDEX idx_location_lat_lon   ON location_history(latitude, longitude)")
+    x(conn, "DROP TABLE location_shortcuts")
+    x(conn, "ALTER TABLE location_shortcuts_new RENAME TO location_shortcuts")
+    x(conn, "CREATE INDEX idx_location_timestamp ON location_shortcuts(timestamp)")
+    x(conn, "CREATE INDEX idx_location_device    ON location_shortcuts(device)")
+    x(conn, "CREATE INDEX idx_location_lat_lon   ON location_shortcuts(latitude, longitude)")
 
 
 def migrate_health_data(conn: sqlite3.Connection) -> None:
@@ -527,7 +527,7 @@ def migrate_location_overland(conn: sqlite3.Connection) -> None:
 
 def recreate_location_unified(conn: sqlite3.Connection) -> None:
     """
-    The backup view uses datetime(timestamp, 'unixepoch') for the location_history
+    The backup view uses datetime(timestamp, 'unixepoch') for the location_shortcuts
     branch.  After migration, timestamp is TEXT so that conversion is removed.
     """
     print("  location_unified view: recreating")
@@ -561,7 +561,7 @@ def recreate_location_unified(conn: sqlite3.Connection) -> None:
             NULL                             AS accuracy,
             'shortcuts'                      AS source
 
-        FROM location_history
+        FROM location_shortcuts
         ORDER BY timestamp ASC
     """)
 
@@ -640,7 +640,7 @@ def run(db_path: str, dry_run: bool) -> None:
         x(conn, "DROP VIEW IF EXISTS location_unified")
 
         # --- Table migrations (parents before children) ---
-        migrate_location_history(conn)   # parent of cellular_state
+        migrate_location_shortcuts(conn)   # parent of cellular_state
         migrate_health_data(conn)        # parent of health_sources
         migrate_workouts(conn)           # parent of workout_route
         migrate_workout_route(conn)

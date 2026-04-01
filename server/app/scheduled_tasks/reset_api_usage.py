@@ -1,5 +1,5 @@
 """
-scheduled_tasks/reset_fx_api_usage.py
+scheduled_tasks/reset_api_usage.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Reset the monthly API call counters for all external services (exchangerate.host
 and open-meteo) so quota tracking starts fresh at the beginning of each month.
@@ -14,7 +14,7 @@ import logging
 from config.logging import configure_logging
 from config.settings import settings
 from database.exchange.util import reset_api_usage
-from config.notifications import CronJobMailer
+from notifications import CronJobMailer
 from config.editable import load_overrides
 
 
@@ -26,10 +26,10 @@ if __name__ == "__main__":
     logger.info("Resetting FX API usage counter...")
     services = ["exchangerate.host", "open-meteo"]
 
-    with CronJobMailer("reset_fx_api_usage", settings.smtp_config,
+    with CronJobMailer("reset_api_usage", settings.smtp_config,
                        detail="Reset monthly API call counters") as job:
-        for service in services:
-            result = reset_api_usage(services)
+        for name in services:
+            result = reset_api_usage(name)
             job.add_metric("service", result["service"])
-            job.add_metric(f"{service} old count", result["old_count"])
-            job.add_metric(f"{service} old month", result["old_month"])
+            job.add_metric(f"{name} old count", result["old_count"])
+            job.add_metric(f"{name} old month", result["old_month"])

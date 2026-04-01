@@ -1,6 +1,6 @@
 """
-jobs/utils.py
-~~~~~~~~~~~~~
+jobs/storage.py
+~~~~~~~~~~~~~~~
 Helpers for persisting job artefacts (code, requirements, data) to disk.
 """
 

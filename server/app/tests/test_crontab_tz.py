@@ -34,7 +34,7 @@ MAILTO=""
 0 2 2 * * /usr/bin/docker exec travelnet sh -c "cd /app && python3 -u -m scheduled_tasks.get_fx"
 0 6 * * * /usr/bin/docker exec travelnet sh -c "cd /app && python3 -u -m scheduled_tasks.send_warn_error_log"
 30 2 2 * * /usr/bin/docker exec travelnet sh -c "cd /app && python3 -u -m scheduled_tasks.backfill_gbp"
-0 0 1 * * /usr/bin/docker exec travelnet sh -c "cd /app && python3 -u -m scheduled_tasks.reset_fx_api_usage"
+0 0 1 * * /usr/bin/docker exec travelnet sh -c "cd /app && python3 -u -m scheduled_tasks.reset_api_usage"
 50 5 * * 1 /usr/bin/docker exec travelnet sh -c "cd /app && python3 -u -m scheduled_tasks.check_health_gaps"
 @reboot /home/dan/start.sh
 """

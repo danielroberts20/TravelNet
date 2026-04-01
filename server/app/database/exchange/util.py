@@ -5,7 +5,7 @@ from typing import Optional
 
 from database.exchange.table import insert_fx_rate
 from config.general import SOURCE_CURRENCY
-from database.util import get_conn
+from database.connection import get_conn
 
 
 logger = logging.getLogger(__name__)
@@ -95,23 +95,24 @@ def get_api_usage(service: str = "exchangerate.host") -> dict:
     return {"service": service, "count": row["count"], "month": row["month"]} if row else {"service": service, "count": 0, "month": None}
 
 
-def reset_api_usage(service: str = "exchangerate.host"):
+def reset_api_usage(name: str = "exchangerate.host"):
     """Reset the API usage count to 0 for a service."""
     month = datetime.now().strftime("%Y-%m")
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM api_usage WHERE service = ?", (service))
-        old_service, old_count, old_month = row.fetchone()
-
+        row = conn.execute(
+            "SELECT service, count, month FROM api_usage WHERE service = ?", (name,)
+        ).fetchone()
+        old_service, old_count, old_month = row
         conn.execute("""
             INSERT INTO api_usage (service, count, month)
             VALUES (?, 0, ?)
             ON CONFLICT(service) DO UPDATE SET count = 0, month = ?
-        """, (service, month, month))
-    logger.info(f"Reset API usage for {service} (month: {month})")
+        """, (name, month, month))
+    logger.info(f"Reset API usage for {name} (month: {month})")
     return {
-        "service": service if service == old_service else old_service,
+        "service": name if name == old_service else old_service,
         "old_count": old_count,
-        "old_month": old_month
+        "old_month": old_month,
     }
 
 

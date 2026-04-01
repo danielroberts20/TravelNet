@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from config.notifications import CronJobMailer, _build_body, _format_duration, send_email
+from notifications import CronJobMailer, _build_body, _format_duration, send_email
 
 # ---------------------------------------------------------------------------
 # Shared fixtures

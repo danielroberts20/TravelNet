@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 import threading
 
 from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 
 # Custom level: below INFO, for high-frequency upload acknowledgement messages
 UPLOAD_LEVEL = 15
@@ -54,18 +54,8 @@ class DailyDigestHandler(logging.Handler):
 
     def _init_table(self):
         """Create the log_digest table if it does not already exist."""
-        with get_conn() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS log_digest (
-                    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                    ts        TEXT NOT NULL,
-                    level     TEXT NOT NULL,
-                    logger    TEXT NOT NULL,
-                    module    TEXT NOT NULL,
-                    lineno    INTEGER NOT NULL,
-                    message   TEXT NOT NULL
-                )
-            """)
+        from database.logging.table import init as init_log_digest
+        init_log_digest()
 
     def _start_worker(self):
         """Spawn the daemon thread that drains the queue into the DB."""
@@ -74,17 +64,13 @@ class DailyDigestHandler(logging.Handler):
 
     def _worker(self):
         """Continuously consume records from the queue and INSERT them into the DB."""
+        from database.logging.table import insert_log_digest
         while True:
             record = self._queue.get()
             if record is None:
                 break
             try:
-                with get_conn() as conn:
-                    conn.execute(
-                        "INSERT INTO log_digest (ts, level, logger, module, lineno, message) VALUES (?, ?, ?, ?, ?, ?)",
-                        record
-                    )
-                    conn.commit()
+                insert_log_digest(record)
             except Exception:
                 pass  # Never let the digest handler crash the server
 
@@ -94,16 +80,12 @@ class DailyDigestHandler(logging.Handler):
         self._queue.put((ts, record.levelname, record.name, record.module, record.lineno, record.getMessage()))
     
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient):
-       from config.notifications import send_email
+       from notifications import send_email
+       from database.logging.table import fetch_and_clear, restore_log_digest
        with self._lock:
-           with get_conn() as conn:
-               rows = conn.execute(
-                   "SELECT ts, level, logger, module, lineno, message FROM log_digest ORDER BY id"
-               ).fetchall()
+           rows = fetch_and_clear()
            if not rows:
                return
-           with get_conn() as conn:
-               conn.execute("DELETE FROM log_digest")
 
        try:
            now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
@@ -125,12 +107,8 @@ class DailyDigestHandler(logging.Handler):
                password=password,
                recipient=recipient,
            )
-       except Exception as e:
-           with get_conn() as conn:                          # restore on failure
-               conn.executemany(
-                   "INSERT INTO log_digest (ts, level, logger, module, lineno, message) VALUES (?, ?, ?, ?, ?, ?)",
-                   rows,
-               )
+       except Exception:
+           restore_log_digest(rows)
            raise
 
 

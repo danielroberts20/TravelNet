@@ -4,22 +4,25 @@ from fastapi import FastAPI  # type: ignore
 
 from config.logging import configure_logging
 from config.editable import load_overrides
-from database.integration import init_db
-from database.util import rebuild_db
+from database.setup import init_db
+from database.connection import rebuild_db
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 configure_logging()
 load_overrides()
 
-from jobs.endpoints import router as jobs_router
-from upload.endpoints import router as uploads_router
-from database.endpoints import router as db_router
-from metadata.endpoints import router as metadata_router
-from public.endpoints import router as public_router
-from config.notifications import send_notification
+from jobs.router import router as jobs_router
+from upload.router import router as uploads_router
+from database.admin import router as db_router
+from metadata.router import router as metadata_router
+from public.router import router as public_router
+from notifications import send_notification
+from config.general import PUBLIC_ALLOWED_PREFIXES
 import config.runtime # Records timestamp that docker container started
 
 
@@ -43,6 +46,16 @@ app.add_middleware(
     allow_methods=["GET"],
     allow_headers=[],
 )
+
+class PublicPathFilterMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        host = request.headers.get("host", "")
+        if "api.travelnet.dev" in host:
+            if not any(request.url.path.startswith(p) for p in PUBLIC_ALLOWED_PREFIXES):
+                return JSONResponse({"detail": "Forbidden"}, status_code=403)
+        return await call_next(request)
+
+app.add_middleware(PublicPathFilterMiddleware)
 
 app.include_router(jobs_router, prefix="/jobs")
 app.include_router(uploads_router, prefix="/upload")

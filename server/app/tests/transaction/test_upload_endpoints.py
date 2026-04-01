@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from config.auth import require_upload_token
+from auth import require_upload_token
 from conftest import db, make_revolut_csv, make_wise_csv, make_wise_zip, app
 
 

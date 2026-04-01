@@ -1,6 +1,6 @@
 import json
 
-from database.util import get_conn
+from database.connection import get_conn
 
 
 def get_unique_metrics() -> list[str]:

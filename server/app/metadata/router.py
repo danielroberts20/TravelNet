@@ -6,14 +6,16 @@ from config.editable import get_editable, get_value, coerce_value
 from fastapi import APIRouter, Query, HTTPException, Body, Depends  # type: ignore
 from fastapi.responses import Response  # type: ignore
 
-from config.auth import require_upload_token
+from auth import require_upload_token
 from metadata.crontab_tz import reset_crontab_timezone, update_crontab_timezone
 from database.exchange.util import get_api_usage
 from database.location.gap_annotations.table import insert_annotation, list_annotations
 from metadata.util import get_db_stats, get_fx_latest_date, get_last_uploads, get_local_backups, get_pending_digest_count, get_remote_backups, get_uptime, read_last_lines_efficient
 from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES, LOG_FILE, OVERRIDES_PATH, STALE_DAYS
-from config.notifications import send_notification
+from notifications import send_notification
 from pydantic import BaseModel  # type: ignore
+
+from triggers.location_change import label_place  # type: ignore
 
 
 router = APIRouter()
@@ -22,10 +24,7 @@ logger = logging.getLogger(__name__)
 
 @router.get("/logs", dependencies=[Depends(require_upload_token)])
 async def get_logs(lines: int = Query(200, ge=1, le=1000)):
-    """Return the last `lines` lines of the main server log file.
-
-    - `lines`: number of lines to return (default 200, min 1, max 1000)
-    """
+    """Return the last `lines` lines of the main server log file."""
     logs = read_last_lines_efficient(LOG_FILE, n=lines)
     return Response(content=logs, media_type="text/plain")
 
@@ -57,7 +56,6 @@ class ConfigUpdate(BaseModel):
 async def get_config():
     """Return all registered editable config values, including override status."""
     editable = get_editable()
-    # Load current overrides to show what's been overridden
     overrides = {}
     if OVERRIDES_PATH.exists():
         try:
@@ -86,7 +84,6 @@ async def update_config(update: ConfigUpdate):
     if update.key not in editable:
         raise HTTPException(status_code=400, detail=f"Key '{update.key}' is not editable")
 
-    # Load existing overrides
     overrides = {}
     if OVERRIDES_PATH.exists():
         try:
@@ -104,7 +101,6 @@ async def update_config(update: ConfigUpdate):
         raise HTTPException(status_code=422, detail=str(e))
     overrides[update.key] = coerced
 
-    # Write atomically
     tmp = OVERRIDES_PATH.with_suffix(".tmp")
     with open(tmp, "w") as f:
         json.dump(overrides, f, indent=2, default=str)
@@ -156,15 +152,7 @@ class GapAnnotationRequest(BaseModel):
 
 @router.post("/annotate_gap", dependencies=[Depends(require_upload_token)])
 async def annotate_gap(body: GapAnnotationRequest):
-    """Record a known gap in location/health data with a human-readable description.
-
-    Gaps are stored as Unix timestamp ranges.  When gap-detection logic later
-    encounters a gap it can call is_gap_covered() to check whether a matching
-    annotation exists within the configured tolerance window
-    (GAP_ANNOTATION_TOLERANCE_MINUTES).
-
-    Example use case: phone was in for battery replacement from ~10:00 to ~10:45.
-    """
+    """Record a known gap in location/health data with a human-readable description."""
     start_ts = int(body.start_time.timestamp())
     end_ts = int(body.end_time.timestamp())
 
@@ -210,19 +198,7 @@ class CrontabTzRequest(BaseModel):
 
 @router.post("/crontab_tz", dependencies=[Depends(require_upload_token)])
 async def update_crontab_tz(body: CrontabTzRequest):
-    """Re-time all cron jobs so they fire at the same wall-clock time in the given timezone.
-
-    Takes the current cron schedule (written in Europe/London time) and converts
-    it so every job fires at the equivalent local time for the supplied timezone.
-    For example, a job at 06:00 with timezone='America/New_York' (EST, UTC-5)
-    becomes 11:00 Pi time (11:00 GMT = 06:00 EST).
-
-    Accepts IANA names ('America/New_York'), UTC offsets ('+1000'), or
-    common abbreviations ('EST', 'JST').
-
-    NOTE: requires the Pi's crontab to be accessible from within the Docker
-    container (e.g. via a /var/spool/cron/crontabs volume mount).
-    """
+    """Re-time all cron jobs so they fire at the same wall-clock time in the given timezone."""
     try:
         result = update_crontab_timezone(body.timezone)
     except ValueError as e:
@@ -263,11 +239,7 @@ async def update_crontab_tz(body: CrontabTzRequest):
 
 @router.delete("/crontab_tz", dependencies=[Depends(require_upload_token)])
 async def reset_crontab_tz():
-    """Restore the crontab to the state it was in before the last timezone conversion.
-
-    The backup is saved automatically each time POST /crontab_tz is called.
-    Only available in Docker mode (requires CRONTAB_FILE to be set).
-    """
+    """Restore the crontab to the state it was in before the last timezone conversion."""
     try:
         content = reset_crontab_timezone()
     except RuntimeError as e:
@@ -289,4 +261,20 @@ async def widget_status():
         "label": "72%",
         "symbol": "externaldrive.fill",
         "color": "green"
-    } 
+    }
+
+@router.post("/label-place")
+async def label_location(body):
+    label = body.get("label", {})
+    place_id = body.get("id", {})
+
+    if place_id:
+        logger.info(f"Received label '{label}' for location ID {place_id}")
+        if label_place(place_id, label):
+            return {"status": "success"}
+        else:
+            logger.warning(f"Place ID {place_id} not in known_places table")
+            raise HTTPException(status_code=404, detail="Place ID not found")
+    else:
+        logger.warning("No location ID provided in label-location request")
+        raise HTTPException(status_code=400, detail="Place ID is required")

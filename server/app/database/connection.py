@@ -1,6 +1,6 @@
 """
-database/util.py
-~~~~~~~~~~~~~~~~
+database/connection.py
+~~~~~~~~~~~~~~~~~~~~~~
 Low-level SQLite connection and maintenance helpers.
 
 get_conn() is the single point through which all DB access flows — it enables
@@ -67,13 +67,12 @@ def rebuild_db(*table_names):
     """Drop and recreate the named tables, then replay backup files to repopulate them.
 
     This is a maintenance/recovery function.  Pass table names to rebuild;
-    only health_data/health_sources, location_history/location_overland, and
+    only health_data/health_sources, location_shortcuts/location_overland, and
     fx_rates are currently supported for replay.
     """
-    from database.integration import init_db
-    from upload.utils import input_csv
+    from database.setup import init_db, insert_log
+    from upload.location.shortcuts import input_csv
     from database.exchange.util import insert_fx_file
-    from database.integration import insert_log
 
     logger.info("Rebuilding database from CSV logs...")
     with get_conn() as conn:
@@ -91,7 +90,7 @@ def rebuild_db(*table_names):
             if f.endswith(".csv"):
                 input_csv(open(HEALTH_BACKUP_DIR / f, "r"))
 
-    if "location_history" in table_names and "location_overland" in table_names:
+    if "location_shortcuts" in table_names and "location_overland" in table_names:
         for f in sorted(os.listdir(LOCATION_BACKUP_DIR)):
             if f.endswith(".csv"):
                 reader = csv.DictReader(LOCATION_BACKUP_DIR / f)
@@ -99,7 +98,6 @@ def rebuild_db(*table_names):
                     try:
                         log = Log.from_strings(**row)
                         insert_log(log)
-                        inserted += 1
                     except Exception as e:
                         # Skip bad rows
                         logger.warning(f"Bad row on line {idx+2}.\t CSV entry: {row}\tException: {e}")
@@ -131,10 +129,10 @@ def to_iso_str(s: str | int | float | datetime) -> str:
         dt = datetime.fromisoformat(s)
     else:
         dt = s
-    
+
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     else:
         dt = dt.astimezone(timezone.utc)
-    
+
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")

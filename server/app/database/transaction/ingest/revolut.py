@@ -14,11 +14,10 @@ import io
 import json
 from datetime import datetime
 import logging
-from typing import Optional
-
-from config.notifications import send_notification
+from notifications import send_notification
 from database.exchange.util import convert_to_gbp
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
+from database.transaction.ingest.util import safe_float
 
 logger = logging.getLogger(__name__)
 
@@ -79,14 +78,6 @@ def _parse_timestamp(dt_str: str) -> str:
     return dt.isoformat()
 
 
-def _safe_float(value: str) -> Optional[float]:
-    """Parse a string to float, returning None for blank or unparseable values."""
-    try:
-        return float(value) if value.strip() != "" else None
-    except (ValueError, AttributeError):
-        return None
-
-
 def insert(csv_text: str, source: str = "revolut"):
     """Parse and upsert all rows from a Revolut CSV export.
 
@@ -120,7 +111,7 @@ def insert(csv_text: str, source: str = "revolut"):
 
                 tx_id = _generate_id(row)
 
-                amount = _safe_float(row.get("Amount", ""))
+                amount = safe_float(row.get("Amount", ""))
                 if amount is None:
                     logger.warning(f"Row missing amount. Skipping... {row}")
                     skipped += 1
@@ -130,8 +121,8 @@ def insert(csv_text: str, source: str = "revolut"):
                 description = row.get("Description", "").strip()
                 tx_type = row.get("Type", "").strip()
                 state = row.get("State", "").strip().upper() or None
-                fees = _safe_float(row.get("Fee", "0")) or 0.0
-                running_balance = _safe_float(row.get("Balance", ""))
+                fees = safe_float(row.get("Fee", "0")) or 0.0
+                running_balance = safe_float(row.get("Balance", ""))
 
                 detail_type = _map_detail_type(tx_type)
                 transaction_type = "CREDIT" if amount >= 0 else "DEBIT"

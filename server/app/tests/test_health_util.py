@@ -11,7 +11,7 @@ Covers:
 
 import pytest
 
-from upload.health.health_util import (
+from upload.health.processing import (
     _aggregate,
     _get_agg_type,
     _parse_sources,

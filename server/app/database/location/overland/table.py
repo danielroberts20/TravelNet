@@ -1,8 +1,9 @@
 import logging
 
-from database.util import get_conn, to_iso_str
+from database.connection import get_conn, to_iso_str
 from database.location.overland.util import _normalise_ts
 from models.telemetry import OverlandPayload
+from triggers import location_change
 
 logger = logging.getLogger(__name__)
 
@@ -113,5 +114,7 @@ def insert_overland(payload: OverlandPayload, device_id: str):
     logger.upload(
         f"Overland batch: {len(payload.locations)} received, "
         + f"{inserted} inserted, {skipped} skipped (duplicates/errors)")
+    
+    location_change.run()
 
     return {"result": "ok"}
