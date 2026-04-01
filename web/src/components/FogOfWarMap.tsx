@@ -72,7 +72,7 @@ function gridCluster(points: Position2[], cellDeg: number): Position2[] {
     if (c) { c.sumLon += lon; c.sumLat += lat; c.count++; }
     else cells.set(key, { sumLon: lon, sumLat: lat, count: 1 });
   }
-  return Array.from(cells.values()).map(c => [c.sumLon / c.count, c.sumLat / c.count]);
+  return Array.from(cells.values()).map((c: { sumLon: number; sumLat: number; count: number }) => [c.sumLon / c.count, c.sumLat / c.count] as Position2);
 }
 
 interface FlatPoly {
@@ -117,8 +117,9 @@ export default function FogOfWarMap() {
 
       const countries = topojson.feature(
         worldData as Topology<Objects>,
-        (worldData as Topology<{ countries: Objects }>).objects.countries,
-      ) as GeoJSON.FeatureCollection;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (worldData as any).objects.countries,
+      ) as unknown as GeoJSON.FeatureCollection;
 
       setWorldFeatures(countries.features);
       setLoading(false);
@@ -166,7 +167,6 @@ export default function FogOfWarMap() {
           data: flatCountries,
           getPolygon: d => d.polygon,
           getFillColor: d => visitedSet.has(d.featureIdx) ? AMBER : DARK_COUNTRY,
-          stroked: false,
           filled: true,
           pickable: false,
           updateTriggers: { getFillColor: [visitedSet] },
@@ -184,7 +184,6 @@ export default function FogOfWarMap() {
         data: [{ polygon: [WORLD_OUTER, ...holes] }],
         getPolygon: d => d.polygon,
         getFillColor: FOG_FILL,
-        stroked: false,
         filled: true,
         pickable: false,
       }),
@@ -201,7 +200,7 @@ export default function FogOfWarMap() {
         layers={layers}
       >
         <Map
-          mapLib={maplibregl as Parameters<typeof Map>[0]['mapLib']}
+          mapLib={maplibregl as unknown as Parameters<typeof Map>[0]['mapLib']}
           mapStyle={DARK_MATTER_STYLE}
           reuseMaps
         />

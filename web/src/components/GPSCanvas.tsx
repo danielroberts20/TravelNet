@@ -73,10 +73,11 @@ export default function GPSCanvas() {
       .attr('stroke', isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)')
       .attr('stroke-width', 0.5);
 
-    const countries = topojson.feature(world, (world.objects as Record<string, topojson.Objects>).countries);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const countries = topojson.feature(world, (world.objects as Record<string, any>).countries);
     mapGroup.append('g')
       .selectAll('path')
-      .data((countries as GeoJSON.FeatureCollection).features)
+      .data((countries as unknown as GeoJSON.FeatureCollection).features)
       .join('path')
       .attr('d', path)
       .attr('fill', isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)')
