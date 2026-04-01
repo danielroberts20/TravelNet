@@ -65,14 +65,14 @@ function circleHole(lon: number, lat: number, r: number, n = 24): Position2[] {
 
 // Grid-cluster GPS points to reduce fog-hole count while preserving coverage
 function gridCluster(points: Position2[], cellDeg: number): Position2[] {
-  const cells = new Map<string, { sumLon: number; sumLat: number; count: number }>();
+  const cells: Record<string, { sumLon: number; sumLat: number; count: number }> = {};
   for (const [lon, lat] of points) {
     const key = `${Math.floor(lon / cellDeg)},${Math.floor(lat / cellDeg)}`;
-    const c = cells.get(key);
+    const c = cells[key];
     if (c) { c.sumLon += lon; c.sumLat += lat; c.count++; }
-    else cells.set(key, { sumLon: lon, sumLat: lat, count: 1 });
+    else cells[key] = { sumLon: lon, sumLat: lat, count: 1 };
   }
-  return Array.from(cells.values()).map((c: { sumLon: number; sumLat: number; count: number }) => [c.sumLon / c.count, c.sumLat / c.count] as Position2);
+  return Object.values(cells).map(c => [c.sumLon / c.count, c.sumLat / c.count] as Position2);
 }
 
 interface FlatPoly {
