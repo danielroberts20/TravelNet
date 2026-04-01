@@ -54,7 +54,7 @@ def insert_log(log: Log):
     """Insert a single Shortcuts telemetry log row (location + cellular state)."""
     with get_conn() as conn:
         location_id = insert_location(conn, log.timestamp, log.latitude, log.longitude, log.altitude,
-                                      log.activity, log.device, log.is_locked, log.battery,
+                                      log.device, log.is_locked, log.battery,
                                       log.is_charging, log.is_connected_charger, log.BSSID, log.RSSI)
 
         insert_cellular_state(conn, log.cellular_states, location_id)

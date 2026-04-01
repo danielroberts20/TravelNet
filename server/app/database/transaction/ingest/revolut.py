@@ -17,7 +17,7 @@ import logging
 from notifications import send_notification
 from database.exchange.util import convert_to_gbp
 from database.connection import get_conn, to_iso_str
-from database.transaction.ingest.util import safe_float
+from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp, safe_float
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +134,8 @@ def insert(csv_text: str, source: str = "revolut"):
 
                 raw_json = json.dumps(dict(row), ensure_ascii=False)
 
+                lat, lon = get_closest_lat_lon_by_timestamp(cursor, timestamp)
+                logger.info(f"Closest lat/lon to transaction {tx_id} is {lat}, {lon}")
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO transactions (
