@@ -207,11 +207,14 @@ export default function FogOfWarMap() {
         pickable: false,
         opacity: fogOpacity,
         transitions: { opacity: 400 },
+        // Additive blending (src_alpha * src + 1 * dst): brightens fog at hole edges.
+        // Uses luma.gl v9 string-based DeviceParameters (blendFunc[] is luma.gl v8).
         parameters: {
           blend: true,
-          // GL.SRC_ALPHA (770) + GL.ONE (1): additive blend brightens fog at edges
-          blendFunc: [770, 1],
-        },
+          blendColorOperation: 'add',
+          blendColorSrcFactor: 'src-alpha',
+          blendColorDstFactor: 'one',
+        } as object,
       }),
     ];
   }, [loading, isZoomedIn, flatCountries, visitedSet, fogClusters]);
