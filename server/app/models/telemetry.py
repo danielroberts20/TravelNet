@@ -47,7 +47,6 @@ class Log:
     latitude: float
     longitude: float
     altitude: float | None
-    activity: str | None
     device: str | None
     is_locked: bool | None
     battery: int | None
@@ -65,7 +64,6 @@ class Log:
             latitude=parse_float(kwargs["latitude"]),
             longitude=parse_float(kwargs["longitude"]),
             altitude=parse_float(kwargs["altitude"]),
-            activity=parse_string(kwargs["activity"]),
             device=parse_string(kwargs["device"]),
             is_locked=parse_bool_yes_no(kwargs["is_locked"]),
             battery=parse_int(kwargs["battery"]),

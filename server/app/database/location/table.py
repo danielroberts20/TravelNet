@@ -26,7 +26,6 @@ def init() -> None:
             latitude REAL NOT NULL CHECK(latitude BETWEEN -90 AND 90),
             longitude REAL NOT NULL CHECK(longitude BETWEEN -180 AND 180),
             altitude REAL,                       -- meters
-            activity TEXT,     
 
             -- Device data      
             device TEXT NOT NULL,                         -- e.g. "Mac", "iPhone"
@@ -85,7 +84,6 @@ def init_unified_view():
                 latitude                         AS lat,
                 longitude                        AS lon,
                 altitude                         AS altitude,
-                activity                         AS activity,
                 CAST(battery AS REAL) / 100.0    AS battery,
                 NULL                             AS speed,
                 device                           AS device,
@@ -97,7 +95,7 @@ def init_unified_view():
         """)
 
 def insert_location(conn: sqlite3.Connection, timestamp: int, latitude: float, longitude: float, altitude: Optional[float],
-                    activity: Optional[str], device: str, is_locked: Optional[bool], battery: Optional[int],
+                    device: str, is_locked: Optional[bool], battery: Optional[int],
                     is_charging: Optional[bool], is_connected_charger: Optional[bool], BSSID: Optional[str], RSSI: Optional[int]):
     """Insert a location_shortcuts row and return its id (existing or newly inserted).
 
@@ -112,17 +110,16 @@ def insert_location(conn: sqlite3.Connection, timestamp: int, latitude: float, l
             INSERT OR IGNORE INTO location_shortcuts (
                 timestamp, 
                 latitude, longitude, altitude, 
-                activity, device, is_locked, 
+                device, is_locked, 
                 battery, is_charging, is_connected_charger, 
                 BSSID, RSSI
                 ) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (new_ts,
                 latitude,
                 longitude,
                 altitude,
-                activity,
                 device,
                 is_locked,
                 battery,
