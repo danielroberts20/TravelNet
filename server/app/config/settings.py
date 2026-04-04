@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # --- SMTP / email alerts ---
     smtp_host: str = Field(alias="ALERT_SMTP_HOST")
     smtp_port: int = Field(alias="ALERT_SMTP_PORT")          # coerced to int automatically
+    smtp_username: str = Field(alias="ALERT_SMTP_USERNAME")
     email_sender: str = Field(alias="ALERT_EMAIL_SENDER")
     email_password: str = Field(alias="ALERT_EMAIL_PASSWORD")
     email_recipient: str = Field(alias="ALERT_EMAIL_RECIPIENT")
@@ -59,6 +60,7 @@ class Settings(BaseSettings):
         return {
             "smtp_host": self.smtp_host,
             "smtp_port": self.smtp_port,
+            "username": self.smtp_username,
             "sender": self.email_sender,
             "password": self.email_password,
             "recipient": self.email_recipient,
