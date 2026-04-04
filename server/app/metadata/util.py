@@ -70,7 +70,7 @@ def get_last_uploads() -> dict:
                 "SELECT MAX(timestamp) FROM location_overland"
             ),
             "health": latest(
-                "SELECT MAX(timestamp) FROM health_data"
+                "SELECT MAX(timestamp) FROM health_quantity"
             ),
             "transactions": latest(
                 "SELECT MAX(timestamp) FROM transactions"

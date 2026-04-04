@@ -34,12 +34,12 @@ def _get_distinct_locations(start_date: date, end_date: date) -> list[tuple[floa
     """Return distinct (rounded_lat, rounded_lon) pairs from location_unified in the window."""
     sql = """
         SELECT DISTINCT
-            ROUND(lat, :p) AS lat,
-            ROUND(lon, :p) AS lon
+            ROUND(latitude, :p) AS latitude,
+            ROUND(longitude, :p) AS longitude
         FROM location_unified
         WHERE DATE(timestamp) BETWEEN :start AND :end
-          AND lat IS NOT NULL
-          AND lon IS NOT NULL
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
     """
     with get_conn(read_only=True) as conn:
         rows = conn.execute(sql, {
@@ -47,7 +47,7 @@ def _get_distinct_locations(start_date: date, end_date: date) -> list[tuple[floa
             "start": start_date.isoformat(),
             "end": end_date.isoformat(),
         }).fetchall()
-    return [(row["lat"], row["lon"]) for row in rows]
+    return [(row["latitude"], row["longitude"]) for row in rows]
 
 
 def _fetch_hourly(lat: float, lon: float, start_date: date, end_date: date) -> dict | None:
