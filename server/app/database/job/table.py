@@ -32,7 +32,7 @@ def init() -> None:
         sql_query TEXT,
 
         entry_point TEXT NOT NULL,
-        timeout INTEGER NOT NULL,
+        timeout_s INTEGER NOT NULL,
 
         worker_id TEXT,
         error_message TEXT
@@ -54,7 +54,7 @@ def insert_job(job: Job) -> None:
                 id, status, created_at,
                 code_path, requirements_path,
                 data_mode, data_path, sql_query,
-                entry_point, timeout
+                entry_point, timeout_s
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -82,7 +82,7 @@ def row_to_job(row) -> Job:
         data_path=row["data_path"],
         sql_query=row["sql_query"],
         entry_point=row["entry_point"],
-        timeout=row["timeout"],
+        timeout=row["timeout_s"],
         status=Status(row["status"]),
         created_at=datetime.fromisoformat(row["created_at"]),
         started_at=datetime.fromisoformat(row["started_at"]) if row["started_at"] else None,
@@ -124,7 +124,7 @@ def update_job(job_id: str, job: Job) -> None:
                 id = ?, status = ?, created_at = ?,
                 code_path = ?, requirements_path = ?,
                 data_mode = ?, data_path = ?, sql_query = ?,
-                entry_point = ?, timeout = ?, started_at = ?, finished_at = ?, worker_id = ?
+                entry_point = ?, timeout_s = ?, started_at = ?, finished_at = ?, worker_id = ?
             WHERE id = ?
         """, (
             job.id,
