@@ -1,7 +1,7 @@
 import logging
 
 from config.general import LOCATION_CHANGE_RADIUS_M, LOCATION_MINIMUM_POINTS, LOCATION_STATIONARITY_RADIUS_M, LOCATION_STAY_DURATION_MINS
-from database.location.util import insert_geocode, reverse_geocode
+from database.location.util import get_place_id, insert_geocode, reverse_geocode
 from triggers.dispatch import dispatch, haversine_m
 from database.connection import get_conn, to_iso_str
 from datetime import datetime, timedelta, timezone
@@ -18,6 +18,10 @@ def init() -> None:
                 latitude         REAL NOT NULL,
                 longitude         REAL NOT NULL,
                 first_seen  TEXT NOT NULL,   -- ISO 8601 UTC
+                visit_count     INTEGER NOT NULL DEFAULT 0,
+                last_visited    TEXT,                          -- ISO 8601 UTC
+                total_time_mins INTEGER NOT NULL DEFAULT 0,
+                current_visit_id INTEGER REFERENCES place_visits(id),
                 label       TEXT             -- optional manual label, e.g. "Hostel, Chiang Mai"
             );""")
 
@@ -57,17 +61,6 @@ def compute_centroid(points):
     avg_lon = sum(p['longitude'] for p in points) / len(points)
     return avg_lat, avg_lon
 
-def is_new_location(lat, lon):
-    with get_conn() as conn:
-        rows = conn.execute("""
-        SELECT latitude, longitude FROM known_places
-        """)
-    result = rows.fetchall()
-    return all(
-        haversine_m(lat, lon, r['latitude'], r['longitude']) > LOCATION_CHANGE_RADIUS_M
-        for r in result
-    ) # Returns True for empty result, which is correct as no known places is valid
-
 def get_address(lat, lon):
     with get_conn() as conn:
         row = conn.execute("""
@@ -99,27 +92,127 @@ def get_address(lat, lon):
         }
 
 def run():
+    check_departure() 
+
     centroid = compute_centroid(get_most_recent_points())
     if centroid is None:
         return
     
     lat, lon = centroid
-    now = datetime.now(timezone.utc)
+    now = to_iso_str(datetime.now(timezone.utc))
+    nearest = get_nearest_known_place(lat, lon)
 
-    if is_new_location(lat, lon):
+    if nearest is None:
         with get_conn() as conn:
+            cursor = conn.execute("""
+                INSERT INTO known_places (latitude, longitude, first_seen, visit_count, last_visited)
+                VALUES (?, ?, ?, 1, ?)
+            """, (lat, lon, now, now))
+            place_id = cursor.lastrowid
+
+            visit_cursor = conn.execute("""
+                INSERT INTO place_visits (place_id, arrived_at)
+                VALUES (?, ?)
+            """, (place_id, now))
+            visit_id = visit_cursor.lastrowid
+
             conn.execute("""
-            INSERT INTO known_places (latitude, longitude, first_seen)
-            VALUES (?, ?, ?)
-            """, (lat, lon, to_iso_str(now)))
+                UPDATE known_places SET current_visit_id = ? WHERE id = ?
+            """, (visit_id, place_id))
+
         logger.info("New location detected at %.5f, %.5f", lat, lon)
 
         address = get_address(lat, lon)
         name = address.get("city") or address.get("suburb") or address.get("road") or address.get("region") or f"{lat:.3f}, {lon:.3f}"
 
         dispatch(trigger="location_change", 
-                 payload={"lat": lat, "lon": lon, "first_seen": to_iso_str(now)}, 
+                 payload={"lat": lat, "lon": lon, "first_seen": now}, 
                  cooldown_hours = 1,
                  noti_title="📍 New Location Discovered",
                  noti_body=f"Discovered near {name}. Tap here to add a Journal entry.")
-    
+    else:
+        place_id = nearest['id']
+        with get_conn() as conn:
+            row = conn.execute("""
+                SELECT current_visit_id FROM known_places WHERE id = ?
+            """, (place_id,)).fetchone()
+
+            if row['current_visit_id'] is not None:
+                logger.info(f"Return visit to known place {place_id}")
+                return
+
+            visit_cursor = conn.execute("""
+                INSERT INTO place_visits (place_id, arrived_at)
+                VALUES (?, ?)
+            """, (place_id, now))
+            conn.execute("""
+                UPDATE known_places
+                SET visit_count = visit_count + 1,
+                    last_visited = ?,
+                    current_visit_id = ?
+                WHERE id = ?
+            """, (now, visit_cursor.lastrowid, place_id))
+
+def get_current_visit():
+    """Returns (visit_id, place_id, lat, lon, arrived_at) for the open visit, or None."""
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT pv.id, pv.place_id, kp.latitude, kp.longitude, pv.arrived_at
+            FROM place_visits pv
+            JOIN known_places kp ON kp.id = pv.place_id
+            WHERE pv.departed_at IS NULL
+            ORDER BY pv.arrived_at DESC
+            LIMIT 1
+        """).fetchone()
+    return row
+
+def check_departure():
+    visit = get_current_visit()
+    if visit is None:
+        return
+
+    visit_id, place_id, kp_lat, kp_lon, arrived_at = visit
+
+    points = get_most_recent_points()
+    if not points:
+        return
+
+    # If any recent point is still within radius, we haven't departed
+    for p in points:
+        if haversine_m(kp_lat, kp_lon, p['latitude'], p['longitude']) <= LOCATION_CHANGE_RADIUS_M:
+            return
+
+    # All recent points are outside radius — departure confirmed
+    now = datetime.now(timezone.utc)
+    departed_at = to_iso_str(now)
+    arrived_dt = datetime.fromisoformat(arrived_at)
+    duration_mins = int((now - arrived_dt).total_seconds() / 60)
+
+    with get_conn() as conn:
+        conn.execute("""
+            UPDATE place_visits
+            SET departed_at = ?, duration_mins = ?
+            WHERE id = ?
+        """, (departed_at, duration_mins, visit_id))
+
+        conn.execute("""
+            UPDATE known_places
+            SET total_time_mins = total_time_mins + ?,
+                current_visit_id = NULL
+            WHERE id = ?
+        """, (duration_mins, place_id))
+
+    logger.info("Departed known place %d after %d mins", place_id, duration_mins)
+
+def get_nearest_known_place(lat, lon):
+    """Returns the nearest known place row if within radius, else None."""
+    with get_conn() as conn:
+        rows = conn.execute("SELECT id, latitude, longitude FROM known_places").fetchall()
+    closest = None
+    closest_dist = float('inf')
+    for r in rows:
+        dist = haversine_m(lat, lon, r['latitude'], r['longitude'])
+        if dist <= LOCATION_CHANGE_RADIUS_M and dist < closest_dist:
+            closest = r
+            closest_dist = dist
+    return closest

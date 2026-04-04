@@ -41,3 +41,22 @@ def init() -> None:
             CREATE INDEX IF NOT EXISTS idx_places_city
                 ON places(city);
         """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS place_visits (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            place_id        INTEGER NOT NULL REFERENCES known_places(id),
+            arrived_at      TEXT NOT NULL,     -- ISO 8601 UTC
+            departed_at     TEXT,              -- NULL until departure detected
+            duration_mins   INTEGER            -- NULL until departure detected
+        );""")
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_place_visits_arrived_at
+                ON place_visits(arrived_at);
+        """)
+
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_place_visits_departed_at
+                ON place_visits(departed_at);
+        """)
