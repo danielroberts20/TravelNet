@@ -138,13 +138,14 @@ def run():
             """, (place_id,)).fetchone()
 
             if row['current_visit_id'] is not None:
-                logger.info(f"Return visit to known place {place_id}")
+                logger.info(f"Still at known place {place_id}, no action needed")
                 return
 
             visit_cursor = conn.execute("""
                 INSERT INTO place_visits (place_id, arrived_at)
                 VALUES (?, ?)
             """, (place_id, now))
+            logger.info(f"Return visit to known place {place_id}")
             conn.execute("""
                 UPDATE known_places
                 SET visit_count = visit_count + 1,
