@@ -12,7 +12,7 @@ from database.health.workouts.table import init as init_workouts
 from database.health.mood.table import init as init_mood
 from database.transaction.table import init as init_transactions
 from database.triggers.table import init as init_triggers
-from database.job.table import init as init_jobs
+from database.compute.table import init as init_compute
 from database.location.overland.table import init as init_overland
 from database.location.gap_annotations.table import init as init_gap_annotations
 from database.weather.table import init as init_weather
@@ -41,7 +41,7 @@ def init_db():
     init_mood()
     init_transactions()
     init_triggers()
-    init_jobs()
+    init_compute()
     init_overland()
     init_gap_annotations()
     init_weather()

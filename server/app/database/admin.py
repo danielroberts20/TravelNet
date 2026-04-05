@@ -20,7 +20,7 @@ RESETTABLE_TABLES = [
     "health_sleep",
     "workouts",
     "workout_route",
-    "jobs",
+    "compute",
     "cellular_state",
     "weather_hourly",
     "weather_daily",

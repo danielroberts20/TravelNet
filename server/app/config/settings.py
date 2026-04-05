@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     upload_token: str = Field(alias="UPLOAD_TOKEN")
     overland_token: str = Field(alias="OVERLAND_TOKEN")
 
+    # --- SSH ---
+    compute_host: str = Field(alias="COMPUTE_HOST")
+    compute_port: int = Field(alias="COMPUTE_PORT")
+    compute_username: str = Field(alias="COMPUTE_USERNAME")
+    compute_password: str = Field(alias="COMPUTE_PASSWORD")
+
     # --- Notification webhooks ---
     custom_notification_time_sensitive: str = Field(alias="CUSTOM_NOTIFICATION_TIME_SENSITIVE")
     custom_notification_not_time_sensitive: str = Field(alias="CUSTOM_NOTIFICATION_NOT_TIME_SENSITIVE")
@@ -35,6 +41,10 @@ class Settings(BaseSettings):
 
     # --- External APIs ---
     fx_api_key: str = Field(alias="FX_API_KEY")
+
+    # --- Wake On LAN ---
+    wol_host: str = Field(alias="WOL_HOST")
+    wol_api_key: str = Field(alias="WOL_API_KEY")
 
     # --- GitHub ---
     github_public_stats_token: str = Field(alias="GITHUB_PUBLIC_STATS_TOKEN")

@@ -1,9 +1,9 @@
 """
-jobs/models.py
-~~~~~~~~~~~~~~
-Domain models for the ML job queue.
+compute/models.py
+~~~~~~~~~~~~~~~~~
+Domain models for the ML compute queue.
 
-Jobs are submitted by a worker client, executed on a GPU worker, and their
+Compute tasks are submitted by a worker client, executed on a GPU worker, and their
 results returned via status callbacks.
 """
 
@@ -14,7 +14,7 @@ import uuid
 
 
 class Status(Enum):
-    """Lifecycle states a job can be in."""
+    """Lifecycle states a compute task can be in."""
 
     QUEUED    = "queued"
     RUNNING   = "running"
@@ -23,14 +23,14 @@ class Status(Enum):
 
 
 class DataMode(Enum):
-    """Describes how input data is provided to the job."""
+    """Describes how input data is provided to the compute task."""
 
     INLINE = "inline"   # data uploaded as a file attachment
     SQL    = "sql"      # data fetched from the live DB via a SQL query
 
 
-class Job:
-    """Represents a single ML job submitted to the queue."""
+class Compute:
+    """Represents a single ML compute task submitted to the queue."""
 
     def __init__(
         self,
@@ -48,7 +48,7 @@ class Job:
         worker_id: Optional[str] = None,
         timeout: int = 3600,
     ):
-        """Initialise a Job.
+        """Initialise a Compute task.
 
         Parameters
         ----------
@@ -61,9 +61,9 @@ class Job:
         status:             Initial lifecycle status (default QUEUED).
         entry_point:        Name of the function to call in code_path (default 'main').
         created_at:         Submission timestamp; defaults to now.
-        started_at:         Set when a worker picks up the job.
-        finished_at:        Set when the job completes or fails.
-        worker_id:          Identifier of the worker that ran the job.
+        started_at:         Set when a worker picks up the task.
+        finished_at:        Set when the task completes or fails.
+        worker_id:          Identifier of the worker that ran the task.
         timeout:            Max execution time in seconds (default 3600).
         """
         self.created_at  = created_at or datetime.now()

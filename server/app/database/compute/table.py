@@ -1,23 +1,23 @@
 """
-database/job/table.py
-~~~~~~~~~~~~~~~~~~~~~
-Schema and CRUD helpers for the jobs table.
+database/compute/table.py
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Schema and CRUD helpers for the compute table.
 
-Jobs represent ML/analysis tasks submitted by a worker client.  A job moves
+Compute tasks represent ML/analysis tasks submitted by a worker client.  A task moves
 through the states: QUEUED → RUNNING → COMPLETED | FAILED.
 """
 
 from datetime import datetime
 
-from jobs.models import DataMode, Job, Status
+from compute.models import DataMode, Compute, Status
 from database.connection import get_conn, to_iso_str
 
 
 def init() -> None:
-    """Create the jobs table and its indexes if they do not exist."""
+    """Create the compute table and its indexes if they do not exist."""
     with get_conn() as conn:
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS jobs (
+        CREATE TABLE IF NOT EXISTS compute (
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL,
         created_at TEXT NOT NULL,
@@ -39,18 +39,18 @@ def init() -> None:
         );
         """)
 
-        # Index for querying active jobs by status + creation order
+        # Index for querying active compute tasks by status + creation order
         conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_jobs_status_created
-        ON jobs (status, created_at);""")
+        CREATE INDEX IF NOT EXISTS idx_compute_status_created
+        ON compute (status, created_at);""")
 
 
-def insert_job(job: Job) -> None:
-    """Persist a new Job to the database."""
-    new_created = to_iso_str(job.created_at)
+def insert_compute(item: Compute) -> None:
+    """Persist a new Compute task to the database."""
+    new_created = to_iso_str(item.created_at)
     with get_conn() as conn:
         conn.execute("""
-            INSERT INTO jobs (
+            INSERT INTO compute (
                 id, status, created_at,
                 code_path, requirements_path,
                 data_mode, data_path, sql_query,
@@ -58,23 +58,23 @@ def insert_job(job: Job) -> None:
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            job.id,
-            job.status.value,
+            item.id,
+            item.status.value,
             new_created,
-            job.code_path,
-            job.requirements_path,
-            job.data_mode.value,
-            job.data_path,
-            job.sql_query,
-            job.entry_point,
-            job.timeout
+            item.code_path,
+            item.requirements_path,
+            item.data_mode.value,
+            item.data_path,
+            item.sql_query,
+            item.entry_point,
+            item.timeout
         ))
         conn.commit()
 
 
-def row_to_job(row) -> Job:
-    """Convert a sqlite3.Row to a Job object."""
-    return Job(
+def row_to_compute(row) -> Compute:
+    """Convert a sqlite3.Row to a Compute object."""
+    return Compute(
         id=row["id"],
         code_path=row["code_path"],
         requirements_path=row["requirements_path"],
@@ -91,12 +91,12 @@ def row_to_job(row) -> Job:
     )
 
 
-def get_next_queued_job() -> Job | None:
-    """Return the oldest QUEUED job from the DB, or None if the queue is empty."""
+def get_next_queued_compute() -> Compute | None:
+    """Return the oldest QUEUED compute task from the DB, or None if the queue is empty."""
     with get_conn() as conn:
         row = conn.execute("""
             SELECT *
-            FROM jobs
+            FROM compute
             WHERE status = ?
             ORDER BY created_at ASC
             LIMIT 1
@@ -105,41 +105,41 @@ def get_next_queued_job() -> Job | None:
         if not row:
             return None
 
-        return row_to_job(row)
+        return row_to_compute(row)
 
 
-def update_job(job_id: str, job: Job) -> None:
-    """Persist all mutable fields of job back to the DB.
+def update_compute(compute_id: str, item: Compute) -> None:
+    """Persist all mutable fields of a Compute task back to the DB.
 
-    Does nothing if job_id does not match job.id (safety guard against
+    Does nothing if compute_id does not match item.id (safety guard against
     accidentally updating the wrong row).
     """
-    if job_id != job.id:
+    if compute_id != item.id:
         return
-    new_start = to_iso_str(job.started_at) if job.started_at else None
-    new_finish = to_iso_str(job.finished_at) if job.finished_at else None
+    new_start = to_iso_str(item.started_at) if item.started_at else None
+    new_finish = to_iso_str(item.finished_at) if item.finished_at else None
     with get_conn() as conn:
         conn.execute("""
-            UPDATE jobs SET
+            UPDATE compute SET
                 id = ?, status = ?, created_at = ?,
                 code_path = ?, requirements_path = ?,
                 data_mode = ?, data_path = ?, sql_query = ?,
                 entry_point = ?, timeout_s = ?, started_at = ?, finished_at = ?, worker_id = ?
             WHERE id = ?
         """, (
-            job.id,
-            job.status.value,
-            to_iso_str(job.created_at),
-            job.code_path,
-            job.requirements_path,
-            job.data_mode.value,
-            job.data_path,
-            job.sql_query,
-            job.entry_point,
-            job.timeout,
+            item.id,
+            item.status.value,
+            to_iso_str(item.created_at),
+            item.code_path,
+            item.requirements_path,
+            item.data_mode.value,
+            item.data_path,
+            item.sql_query,
+            item.entry_point,
+            item.timeout,
             new_start,
             new_finish,
-            job.worker_id,
-            job_id
+            item.worker_id,
+            compute_id
         ))
         conn.commit()
