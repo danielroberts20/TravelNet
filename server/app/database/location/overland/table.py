@@ -1,9 +1,11 @@
 import logging
+import json
 
 from database.connection import get_conn, to_iso_str
 from database.location.overland.util import _normalise_ts
 from models.telemetry import OverlandPayload
 from triggers import location_change
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,24 +15,25 @@ def init():
         conn.execute("""
         CREATE TABLE IF NOT EXISTS location_overland (
             id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_id           TEXT,
-            timestamp           TEXT NOT NULL,          -- ISO 8601 UTC
-            lat                 REAL NOT NULL,
-            lon                 REAL NOT NULL,
+            device_id           TEXT NOT NULL,
+            timestamp           TEXT NOT NULL,
+            latitude            REAL NOT NULL CHECK(latitude  BETWEEN -90  AND 90),
+            longitude           REAL NOT NULL CHECK(longitude BETWEEN -180 AND 180),
             altitude            REAL,
-            speed               REAL,                   -- m/s, NULL if unavailable
-            horizontal_accuracy REAL,                   -- metres
-            vertical_accuracy   REAL,                   -- metres, NULL if unavailable
-            motion              TEXT,                   -- JSON array e.g. '["walking"]'
+            speed               REAL,
+            horizontal_accuracy REAL,
+            vertical_accuracy   REAL,
+            motion              TEXT,
             activity            TEXT,
             wifi_ssid           TEXT,
             battery_state       TEXT,
             battery_level       REAL,
-            pauses              INTEGER,                -- BOOLEAN as 0/1
+            pauses              INTEGER,
             desired_accuracy    REAL,
             significant_change  TEXT,
-            raw_json            TEXT,                   -- full original feature for safety
-            inserted_at         TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            place_id            INTEGER REFERENCES places(id),
+            raw_json            TEXT,
+            inserted_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
             UNIQUE(device_id, timestamp)
         );""")
 
@@ -42,6 +45,16 @@ def init():
         conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_overland_device_ts
             ON location_overland(device_id, timestamp);
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_overland_lat_lon
+            ON location_overland(latitude, longitude);
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_overland_place
+            ON location_overland(place_id);
         """)        
 
 def insert_overland(payload: OverlandPayload, device_id: str):
@@ -53,7 +66,6 @@ def insert_overland(payload: OverlandPayload, device_id: str):
     """
     inserted = 0
     skipped = 0
-    import json
     
     with get_conn() as conn:
 
@@ -63,29 +75,37 @@ def insert_overland(payload: OverlandPayload, device_id: str):
 
             lon, lat = geo.coordinates[0], geo.coordinates[1]
             new_ts = to_iso_str(_normalise_ts(props.timestamp))
+            lat_snap, lon_snap = round(lat, 3), round(lon, 3)
+            conn.execute("""
+                INSERT OR IGNORE INTO places (lat_snap, lon_snap) VALUES (?, ?)
+                """, (lat_snap, lon_snap))
+            row = conn.execute("""
+                SELECT id FROM places WHERE lat_snap = ? AND lon_snap = ?
+                """, (lat_snap, lon_snap)).fetchone()
+            place_id = row[0] if row else None
 
             try:
                 conn.execute("""
                 INSERT OR IGNORE INTO location_overland (
-                            device_id, timestamp, lat, lon, altitude,
+                            device_id, timestamp, latitude, longitude, altitude,
                             speed, horizontal_accuracy, vertical_accuracy,
                             motion, activity, wifi_ssid, 
                             battery_state, battery_level, 
-                            pauses, desired_accuracy, significant_change, raw_json
+                            pauses, desired_accuracy, significant_change, raw_json, place_id
                             ) VALUES (
-                        :device_id, :timestamp, :lat, :lon, :altitude,
+                        :device_id, :timestamp, :latitude, :longitude, :altitude,
                     :speed, :horizontal_accuracy, :vertical_accuracy,
                         :motion, :activity, :wifi_ssid,
                         :battery_state, :battery_level,
                         :pauses, :desired_accuracy, :significant_change,
-                        :raw_json
+                        :raw_json, :place_id
                     )
                     """,
                     {
                         "device_id":           device_id,
                         "timestamp":           new_ts,
-                        "lat":                 lat,
-                        "lon":                 lon,
+                        "latitude":            lat,
+                        "longitude":           lon,
                         "altitude":            props.altitude,
                         "speed":               props.speed,
                         "horizontal_accuracy": props.horizontal_accuracy,
@@ -99,6 +119,7 @@ def insert_overland(payload: OverlandPayload, device_id: str):
                         "desired_accuracy":    props.desired_accuracy,
                         "significant_change":  props.significant_change,
                         "raw_json":            json.dumps(feature.model_dump()),
+                        "place_id":            place_id
                     },
                 )
 

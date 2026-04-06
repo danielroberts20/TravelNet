@@ -31,7 +31,7 @@ def get_unified_location(
     until: Unix timestamp (seconds), inclusive
     """
     rows = conn.execute("""
-        SELECT timestamp, lat, lon, altitude, activity,
+        SELECT timestamp, latitude, longitude, altitude, activity,
                battery, speed, device, accuracy, source
         FROM location_unified
         WHERE datetime(timestamp) >= datetime(:since, 'unixepoch')
@@ -79,7 +79,7 @@ def _deduplicate(points: list[dict]) -> list[dict]:
             if abs(pt_ts - ots) <= TIME_WINDOW:
                 op = overland[i]
                 # Same location — drop Shortcuts point
-                if _dist(pt["lat"], pt["lon"], op["lat"], op["lon"]) <= DIST_THRESHOLD:
+                if _dist(pt["latitude"], pt["longitude"], op["latitude"], op["longitude"]) <= DIST_THRESHOLD:
                     matched = True
                     break
                 # Different location — keep both (genuine divergence)

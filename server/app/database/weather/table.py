@@ -70,6 +70,10 @@ def init() -> None:
                 CREATE VIEW IF NOT EXISTS location_weather AS
                 SELECT
                     u.*,
+                    p.country_code,
+                    p.country,
+                    p.city,
+                    p.suburb,
                     -- hourly
                     h.temperature_c,
                     h.apparent_temperature_c,
@@ -89,13 +93,15 @@ def init() -> None:
                     d.windspeed_max_kmh,
                     d.windgusts_max_kmh
                 FROM location_unified u
+                LEFT JOIN places p
+                    ON u.place_id = p.id
                 LEFT JOIN weather_hourly h
-                    ON  ROUND(u.lat, 2) = h.latitude
-                    AND ROUND(u.lon, 2) = h.longitude
-                    AND strftime('%Y-%m-%dT%H:00', u.timestamp) = h.timestamp
+                    ON  ROUND(u.latitude, 2) = h.latitude
+                    AND ROUND(u.longitude, 2) = h.longitude
+                    AND strftime('%Y-%m-%dT%H:00Z', u.timestamp) = h.timestamp
                 LEFT JOIN weather_daily d
-                    ON  ROUND(u.lat, 2) = d.latitude
-                    AND ROUND(u.lon, 2) = d.longitude
+                    ON  ROUND(u.latitude, 2) = d.latitude
+                    AND ROUND(u.longitude, 2) = d.longitude
                     AND DATE(u.timestamp) = d.date;
             """)
             logger.info("Migration complete: weather_hourly, weather_daily tables and views created.")

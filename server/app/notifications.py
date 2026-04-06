@@ -93,6 +93,7 @@ def send_email(
     body: str,
     smtp_host: str,
     smtp_port: int,
+    username: str,
     sender: str,
     password: str,
     recipient: str,
@@ -109,7 +110,7 @@ def send_email(
 
     with smtplib.SMTP(smtp_host, smtp_port) as smtp:
         smtp.starttls()
-        smtp.login(sender, password)
+        smtp.login(username, password)
         smtp.send_message(msg)
 
 

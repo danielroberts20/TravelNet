@@ -1,7 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
 import io
-import json
 import logging
 import statistics
 from typing import Any
@@ -10,7 +9,9 @@ import pandas as pd  # type: ignore
 
 from config.general import DATA_DIR, INTERVAL_MINUTES
 from upload.health.constants import METRIC_AGGREGATION, SNAKE_TO_DISPLAY
-from database.health.table import insert_health_entry
+from database.health.table import insert_health_quantity
+from database.health.heart_rate.table import insert_heart_rate
+from database.health.sleep.table import insert_sleep_stage
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +84,8 @@ def handle_standard_metric(display_name: str, units: str, data: list[dict]):
 
     for bucket_ts, values in buckets.items():
         aggregated_value = _aggregate(values, agg_type)
-        value_json = json.dumps({f"{display_name} ({units})": aggregated_value})
-        insert_health_entry(bucket_ts, display_name, value_json, list(bucket_sources[bucket_ts]))
+        for source in (list(bucket_sources[bucket_ts]) or [None]):
+            insert_health_quantity(bucket_ts, display_name, aggregated_value, units, source)
 
 
 def handle_heart_rate(display_name: str, data: list[dict]):
@@ -107,15 +108,12 @@ def handle_heart_rate(display_name: str, data: list[dict]):
         bucket_sources[bucket_ts].update(_parse_sources(point))
 
     for bucket_ts, field_values in buckets.items():
-        aggregated = {}
-        if "Min" in field_values:
-            aggregated["Min (count/min)"] = min(field_values["Min"])
-        if "Avg" in field_values:
-            aggregated["Avg (count/min)"] = statistics.mean(field_values["Avg"])
-        if "Max" in field_values:
-            aggregated["Max (count/min)"] = max(field_values["Max"])
-        if aggregated:
-            insert_health_entry(bucket_ts, display_name, json.dumps(aggregated), list(bucket_sources[bucket_ts]))
+        min_bpm = min(field_values["Min"]) if "Min" in field_values else None
+        avg_bpm = statistics.mean(field_values["Avg"]) if "Avg" in field_values else None
+        max_bpm = max(field_values["Max"]) if "Max" in field_values else None
+        if min_bpm is not None and avg_bpm is not None and max_bpm is not None:
+            for source in (list(bucket_sources[bucket_ts]) or [None]):
+                insert_heart_rate(bucket_ts, min_bpm, avg_bpm, max_bpm, source)
 
 
 def handle_sleep_analysis(display_name: str, data: list[dict]):
@@ -133,17 +131,13 @@ def handle_sleep_analysis(display_name: str, data: list[dict]):
             logger.warning("Skipping sleep segment - bad date: %s", e)
             continue
 
-        bucket_ts = bucket_timestamp(start_unix, INTERVAL_MINUTES)
         qty = point.get("qty")
         stage = point.get("value", "Unspecified")
         sources = _parse_sources(point)
+        duration_hr = float(qty) if qty is not None else 0.0
 
-        value_json = json.dumps({
-            "end": end_unix,
-            "Sleep Analysis (hr)": float(qty) if qty is not None else None,
-            "stage": stage,
-        })
-        insert_health_entry(bucket_ts, display_name, value_json, sources)
+        for source in (sources or [None]):
+            insert_sleep_stage(start_unix, end_unix, stage, duration_hr, source)
 
 
 def handle_special_qty(display_name: str, units: str, data: list[dict], extra_field: str):
@@ -164,11 +158,10 @@ def handle_special_qty(display_name: str, units: str, data: list[dict], extra_fi
         qty = point.get("qty")
         extra = point.get(extra_field)
         sources = _parse_sources(point)
-        value_json = json.dumps({
-            f"{display_name} ({units})": float(qty) if qty is not None else None,
-            extra_field: extra,
-        })
-        insert_health_entry(bucket_ts, display_name, value_json, sources)
+        value = float(qty) if qty is not None else None
+        if value is not None:
+            for source in (sources or [None]):
+                insert_health_quantity(bucket_ts, display_name, value, units, source)
 
 
 # ---------------------------------------------------------------------------

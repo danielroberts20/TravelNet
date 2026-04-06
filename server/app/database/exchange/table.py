@@ -19,14 +19,13 @@ def init() -> None:
         # FX rates table
         conn.execute("""
         CREATE TABLE IF NOT EXISTS fx_rates (
-            id INTEGER PRIMARY KEY,
-            date TEXT NOT NULL,
+            id              INTEGER PRIMARY KEY,
+            date            TEXT NOT NULL,
             source_currency TEXT NOT NULL,
             target_currency TEXT NOT NULL,
-            rate REAL NOT NULL,
-            timestamp TEXT NOT NULL,            -- Time when fetched
-            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-
+            rate            REAL NOT NULL,
+            timestamp      TEXT NOT NULL,
+            created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
             UNIQUE(date, source_currency, target_currency)
         )
         """)
@@ -46,7 +45,7 @@ def init() -> None:
         """)
 
         conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_fx_source_target
+        CREATE INDEX IF NOT EXISTS idx_fx_pair
             ON fx_rates(source_currency, target_currency);
         """)
 

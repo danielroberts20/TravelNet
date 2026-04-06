@@ -1,8 +1,8 @@
 """
 scheduled_tasks/check_health_gaps.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Scan the health_data table for days that are missing all metrics, or that have
-an incomplete set of expected metrics, since data collection began.
+Scan the health_quantity table for days that are missing all metrics, or that
+have an incomplete set of expected metrics, since data collection began.
 
 Scheduled: daily.  Logs a WARNING for each problematic day and returns a
 summary dict with gap and partial counts so CronJobMailer can report them.
@@ -53,10 +53,10 @@ def check_health_gaps() -> dict:
     with get_conn() as conn:
         # Earliest date in the table — use as floor so we don't warn before data collection began
         row = conn.execute(
-            "SELECT date(MIN(timestamp), 'unixepoch') FROM health_data"
+            "SELECT MIN(DATE(timestamp)) FROM health_quantity"
         ).fetchone()
         if not row or not row[0]:
-            logger.warning("Health gap check: no data in health_data table.")
+            logger.warning("Health gap check: no data in health_quantity table.")
             return {"gaps": 0, "partial": 0}
 
         start_date = date.fromisoformat(row[0])
@@ -65,9 +65,9 @@ def check_health_gaps() -> dict:
         # Fetch all (date, metric) pairs in range
         rows = conn.execute(
             """
-            SELECT date(timestamp, 'unixepoch') AS day, metric
-            FROM health_data
-            WHERE date(timestamp, 'unixepoch') BETWEEN ? AND ?
+            SELECT DATE(timestamp) AS day, metric
+            FROM health_quantity
+            WHERE DATE(timestamp) BETWEEN ? AND ?
             """,
             (start_date.isoformat(), yesterday.isoformat()),
         ).fetchall()
