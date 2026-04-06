@@ -1,6 +1,6 @@
 services:
   ingest:
-    build: ./app
+    build: .
     container_name: travelnet
     env_file: .env
     environment:
