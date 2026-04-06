@@ -1289,6 +1289,193 @@ section {
   text-transform: uppercase;
 }
 
+/* --- Trevor Page ------------------------------------------ */
+.trevor-page-hero {
+  position: relative;
+  overflow: hidden;
+  padding: var(--space-10) var(--space-6) var(--space-9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.trevor-page-glow {
+  position: absolute;
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(191, 90, 242, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: glowPulse 8s ease-in-out infinite;
+}
+
+.trevor-page-avatar-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-purple) 0%, rgba(191, 90, 242, 0.4) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  box-shadow: 0 8px 32px rgba(191, 90, 242, 0.4);
+  margin-bottom: var(--space-4);
+  flex-shrink: 0;
+}
+
+.trevor-page-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: rgba(191, 90, 242, 0.1);
+  border: 1px solid rgba(191, 90, 242, 0.25);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-purple);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-4);
+}
+
+.trevor-page-title {
+  font-size: clamp(52px, 10vw, 96px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.0;
+  color: var(--text-primary);
+  margin-bottom: var(--space-4);
+}
+
+.trevor-page-subtitle {
+  font-size: clamp(16px, 2.5vw, 19px);
+  color: var(--text-secondary);
+  max-width: 560px;
+  line-height: 1.6;
+  margin-bottom: var(--space-6);
+}
+
+.trevor-page-ctas {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Example queries grid */
+.trevor-queries-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+}
+
+.trevor-query-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+
+.trevor-query-card:hover {
+  border-color: rgba(191, 90, 242, 0.3);
+  box-shadow: 0 0 0 3px rgba(191, 90, 242, 0.06);
+}
+
+.trevor-query-card-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-purple);
+}
+
+.trevor-query-card-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  font-style: italic;
+}
+
+/* Wide chat preview */
+.trevor-page-chat-wide {
+  max-width: 720px;
+  margin: var(--space-7) auto 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  position: relative;
+}
+
+.trevor-page-chat-wide .trevor-msg {
+  max-width: 72%;
+}
+
+/* Architecture steps */
+.trevor-arch-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+  position: relative;
+}
+
+.trevor-arch-step {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  position: relative;
+}
+
+.trevor-arch-step-icon {
+  font-size: 24px;
+  margin-bottom: var(--space-3);
+}
+
+.trevor-arch-step-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-purple);
+  margin-bottom: var(--space-2);
+}
+
+.trevor-arch-step-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+  letter-spacing: -0.01em;
+}
+
+.trevor-arch-step-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Features grid on Trevor page */
+.trevor-page-features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+  max-width: 720px;
+}
+
 /* --- Mobile -------------------------------------------- */
 @media (max-width: 768px) {
   .nav { padding: 0 var(--space-4); }
@@ -1305,4 +1492,9 @@ section {
   .trevor-split { grid-template-columns: 1fr; gap: var(--space-6); }
   .trevor-panel { width: calc(100vw - var(--space-8)); max-width: 300px; }
   .trevor-widget { bottom: var(--space-4); right: var(--space-4); }
+
+  .trevor-queries-grid { grid-template-columns: 1fr; }
+  .trevor-arch-steps { grid-template-columns: 1fr; }
+  .trevor-page-chat-wide { margin-top: var(--space-5); }
+  .trevor-page-ctas { flex-direction: column; align-items: center; }
 }

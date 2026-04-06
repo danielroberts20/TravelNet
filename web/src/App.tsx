@@ -5,6 +5,7 @@ import About from './pages/About';
 import Journey from './pages/Journey';
 import Explorer from './pages/Explorer';
 import ML from './pages/ML';
+import Trevor from './pages/Trevor';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/journey" element={<Journey />} />
           <Route path="/explorer" element={<Explorer />} />
           <Route path="/ml" element={<ML />} />
+          <Route path="/trevor" element={<Trevor />} />
         </Route>
       </Routes>
     </BrowserRouter>

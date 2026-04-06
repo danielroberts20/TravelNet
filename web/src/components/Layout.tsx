@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { title: 'Journey',     path: '/journey'  },
   { title: 'Explorer',    path: '/explorer' },
   { title: 'ML Insights', path: '/ml'       },
+  { title: 'Trevor',      path: '/trevor'   },
   { title: 'About',       path: '/about'    },
 ];
 
