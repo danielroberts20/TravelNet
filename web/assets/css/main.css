@@ -1469,11 +1469,10 @@ section {
 
 /* Features grid on Trevor page */
 .trevor-page-features {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-3);
   margin-top: var(--space-7);
-  max-width: 720px;
 }
 
 /* --- Mobile -------------------------------------------- */
@@ -1495,6 +1494,7 @@ section {
 
   .trevor-queries-grid { grid-template-columns: 1fr; }
   .trevor-arch-steps { grid-template-columns: 1fr; }
+  .trevor-page-features { grid-template-columns: 1fr; }
   .trevor-page-chat-wide { margin-top: var(--space-5); }
   .trevor-page-ctas { flex-direction: column; align-items: center; }
 }

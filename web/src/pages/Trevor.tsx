@@ -197,7 +197,7 @@ export default function Trevor() {
           <p className="section-eyebrow reveal">Architecture</p>
           <h2 className="section-title reveal">Tool-calling retrieval.</h2>
           <p className="section-subtitle reveal">
-            Instead of a hardcoded router, the LLM decides which tool to invoke based on what the
+            Instead of a hardcoded router, the LLM decides which tools to invoke based on what the
             question requires. Cross-stream queries trigger both in a single turn.
           </p>
 
@@ -240,7 +240,7 @@ export default function Trevor() {
         <div className="section-inner" style={{ textAlign: 'center' }}>
           <div className="trevor-page-avatar-lg reveal" style={{ margin: '0 auto var(--space-4)' }}>✦</div>
           <h2 className="section-title reveal" style={{ marginBottom: 'var(--space-3)' }}>Follow the build.</h2>
-          <p className="section-subtitle reveal" style={{ marginBottom: 'var(--space-6)' }}>
+          <p className="section-subtitle reveal" style={{ marginBottom: 'var(--space-6)', marginLeft: 'auto', marginRight: 'auto' }}>
             Trevor is under active development alongside TravelNet. The data collection stage is
             underway — journal entries and telemetry are being gathered throughout the trip.
           </p>
