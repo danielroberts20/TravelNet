@@ -1,6 +1,6 @@
 services:
   ingest:
-    build: ./app
+    build: .
     container_name: travelnet
     env_file: .env
     environment:
@@ -29,6 +29,7 @@ services:
       FASTAPI_URL:           "http://ingest:8000"
       FASTAPI_API_KEY:       "${UPLOAD_TOKEN}"
       DOCKER_CONTAINER_NAME: "travelnet"
+      TREVOR_CONTAINER_NAME: "trevor"
     volumes:
       - /mnt/linux/docker/services/travelnet/data:/data:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

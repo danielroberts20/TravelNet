@@ -79,7 +79,7 @@ class DailyDigestHandler(logging.Handler):
         ts = to_iso_str(datetime.fromtimestamp(record.created, tz=timezone.utc))
         self._queue.put((ts, record.levelname, record.name, record.module, record.lineno, record.getMessage()))
     
-    def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient):
+    def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient, username):
        from notifications import send_email
        from database.logging.table import fetch_and_clear, restore_log_digest
        with self._lock:
@@ -106,6 +106,7 @@ class DailyDigestHandler(logging.Handler):
                sender=sender,
                password=password,
                recipient=recipient,
+               username=username,
            )
        except Exception:
            restore_log_digest(rows)

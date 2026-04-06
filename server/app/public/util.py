@@ -182,7 +182,7 @@ def get_db_stats() -> dict:
             )
             health_records = _fetchone(
                 conn,
-                "SELECT COUNT(*) FROM health_data"
+                "SELECT COUNT(*) FROM health_quantity"
             )
             transactions = _fetchone(
                 conn,

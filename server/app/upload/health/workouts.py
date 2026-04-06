@@ -6,6 +6,36 @@ from upload.health.processing import parse_unix
 
 logger = logging.getLogger(__name__)
 
+# Unit conversion factors to SI base units
+_DISTANCE_TO_M: dict[str, float] = {
+    "m": 1.0,
+    "km": 1000.0,
+    "mi": 1609.344,
+    "ft": 0.3048,
+    "yd": 0.9144,
+}
+_SPEED_TO_MS: dict[str, float] = {
+    "m/s": 1.0,
+    "km/h": 1 / 3.6,
+    "mph": 0.44704,
+}
+
+
+def _to_metres(value: float | None, units: str | None) -> float | None:
+    """Convert a distance value to metres. Returns raw value if units unknown."""
+    if value is None:
+        return None
+    factor = _DISTANCE_TO_M.get((units or "").lower().strip())
+    return round(value * factor, 3) if factor else value
+
+
+def _to_ms(value: float | None, units: str | None) -> float | None:
+    """Convert a speed value to m/s. Returns raw value if units unknown."""
+    if value is None:
+        return None
+    factor = _SPEED_TO_MS.get((units or "").lower().strip())
+    return round(value * factor, 4) if factor else value
+
 
 def _qty(obj: dict | None) -> float | None:
     """Safely extract the 'qty' field from a HAE quantity dict, or None."""
@@ -58,23 +88,20 @@ def handle_workout_upload(data: dict[str, Any]):
         active_energy = _qty(w.get("activeEnergyBurned"))
         total_energy = _qty(w.get("totalEnergy"))
 
-        # Distance
+        # Distance — normalise to metres
         distance_obj = w.get("distance")
-        distance = _qty(distance_obj)
-        distance_units = _units(distance_obj)
+        distance_m = _to_metres(_qty(distance_obj), _units(distance_obj))
 
-        # Speed
+        # Speed — normalise to m/s
         avg_speed_obj = w.get("avgSpeed") or w.get("speed")
-        avg_speed = _qty(avg_speed_obj)
-        max_speed = _qty(w.get("maxSpeed"))
-        speed_units = _units(avg_speed_obj) or _units(w.get("maxSpeed"))
+        avg_speed_ms = _to_ms(_qty(avg_speed_obj), _units(avg_speed_obj) or _units(w.get("speed")))
+        max_speed_ms = _to_ms(_qty(w.get("maxSpeed")), _units(w.get("maxSpeed")))
 
-        # Elevation
+        # Elevation — normalise to metres
         elev_up_obj = w.get("elevationUp")
         elev_down_obj = w.get("elevationDown")
-        elevation_up = _qty(elev_up_obj)
-        elevation_down = _qty(elev_down_obj)
-        elevation_units = _units(elev_up_obj) or _units(elev_down_obj)
+        elevation_up_m = _to_metres(_qty(elev_up_obj), _units(elev_up_obj))
+        elevation_down_m = _to_metres(_qty(elev_down_obj), _units(elev_down_obj))
 
         # Heart rate
         hr = w.get("heartRate") or {}
@@ -82,29 +109,20 @@ def handle_workout_upload(data: dict[str, Any]):
         hr_avg = _qty(w.get("avgHeartRate")) or _qty(hr.get("avg"))
         hr_max = _qty(w.get("maxHeartRate")) or _qty(hr.get("max"))
 
-        # Intensity / environment
+        # Intensity / cadence
         intensity_met = _qty(w.get("intensity"))
-        humidity = _qty(w.get("humidity"))
-        temp_obj = w.get("temperature")
-        temperature = _qty(temp_obj)
-        temperature_units = _units(temp_obj)
-
-        # Step / cadence
         step_cadence = _qty(w.get("stepCadence"))
         flights_climbed = _qty(w.get("flightsClimbed"))
 
-        # Swimming-specific
+        # Swimming-specific — lap_length normalised to metres
         lap_length_obj = w.get("lapLength")
-        lap_length = _qty(lap_length_obj)
-        lap_length_units = _units(lap_length_obj)
+        lap_length_m = _to_metres(_qty(lap_length_obj), _units(lap_length_obj))
         stroke_style = w.get("strokeStyle")
         swolf_score = w.get("swolfScore")
         salinity = w.get("salinity")
         swim_stroke_count = _qty(w.get("totalSwimmingStrokeCount"))
         swim_cadence = _qty(w.get("swimCadence"))
 
-        # General
-        location = w.get("location")
         is_indoor = w.get("isIndoor")
 
         was_inserted = insert_workout(
@@ -112,30 +130,22 @@ def handle_workout_upload(data: dict[str, Any]):
             name=name,
             start_ts=start_ts,
             end_ts=end_ts,
-            duration=int(duration),
-            location=location,
+            duration_s=int(duration),
             is_indoor=is_indoor,
             active_energy_kcal=active_energy,
             total_energy_kcal=total_energy,
-            distance=distance,
-            distance_units=distance_units,
-            avg_speed=avg_speed,
-            max_speed=max_speed,
-            speed_units=speed_units,
-            elevation_up=elevation_up,
-            elevation_down=elevation_down,
-            elevation_units=elevation_units,
+            distance_m=distance_m,
+            avg_speed_ms=avg_speed_ms,
+            max_speed_ms=max_speed_ms,
+            elevation_up_m=elevation_up_m,
+            elevation_down_m=elevation_down_m,
             hr_min=hr_min,
             hr_avg=hr_avg,
             hr_max=hr_max,
             intensity_met=intensity_met,
-            humidity=humidity,
-            temperature=temperature,
-            temperature_units=temperature_units,
             step_cadence=step_cadence,
             flights_climbed=flights_climbed,
-            lap_length=lap_length,
-            lap_length_units=lap_length_units,
+            lap_length_m=lap_length_m,
             stroke_style=stroke_style,
             swolf_score=swolf_score,
             salinity=salinity,

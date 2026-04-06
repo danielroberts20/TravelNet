@@ -375,10 +375,10 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="trevor-feature-item reveal">
-                  <span className="trevor-feature-item-icon">🚨</span>
+                  <span className="trevor-feature-item-icon">💭</span>
                   <div>
-                    <span className="trevor-feature-item-title">Anomaly Explainer</span>
-                    <span className="trevor-feature-item-text">When TravelNet&apos;s ML layer flags an unusual spending spike or movement pattern, Trevor retrieves surrounding journal context and explains what likely happened — in plain English.</span>
+                    <span className="trevor-feature-item-title">Reasoning Freedom</span>
+                    <span className="trevor-feature-item-text">Allow Trevor to think creatively and provide nuanced insights that go beyond the TravelNet database. Any speculative reasoning is clearly indicated.</span>
                   </div>
                 </div>
               </div>

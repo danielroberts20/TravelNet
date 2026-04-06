@@ -32,7 +32,7 @@ def init() -> None:
         );""")
 
         conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_cellular_location
+        CREATE INDEX IF NOT EXISTS idx_cellular_shortcut
             ON cellular_state(shortcut_id);
         """)
 

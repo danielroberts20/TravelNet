@@ -6,6 +6,9 @@ from config.logging import configure_logging
 from config.editable import load_overrides
 from database.setup import init_db
 from database.connection import rebuild_db
+from compute.util import ssh_run
+from compute.router import wake
+from compute.util import wake_pc
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -16,7 +19,7 @@ from starlette.responses import JSONResponse
 configure_logging()
 load_overrides()
 
-from jobs.router import router as jobs_router
+from compute.router import router as compute_router
 from upload.router import router as uploads_router
 from database.admin import router as db_router
 from metadata.router import router as metadata_router
@@ -57,7 +60,7 @@ class PublicPathFilterMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(PublicPathFilterMiddleware)
 
-app.include_router(jobs_router, prefix="/jobs")
+app.include_router(compute_router, prefix="/compute")
 app.include_router(uploads_router, prefix="/upload")
 app.include_router(db_router, prefix="/database")
 app.include_router(metadata_router, prefix="/metadata")

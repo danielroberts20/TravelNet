@@ -1,251 +1,261 @@
-import { useEffect, useRef } from 'react';
+/**
+ * GPSCanvas — animated great-circle arc route map.
+ *
+ * Replaces the original D3 SVG implementation with the same deck.gl +
+ * maplibre stack used by FogOfWarMap, keeping identical animation behaviour:
+ *
+ *   1. Origin waypoint dot appears immediately.
+ *   2. Each arc "draws itself" over ARC_DURATION ms.
+ *   3. On arc completion the destination dot settles with a pulse ring.
+ *   4. Brief pause, then the next arc starts.
+ *   5. After the final arc, RESET_PAUSE then full restart.
+ *
+ * Waypoints are sourced from travel.yml via the virtual:travel-yaml module
+ * (see vite.config.ts) — edit travel.yml to change the route, not this file.
+ */
+
+import { useEffect, useRef, useState, useMemo } from 'react';
+import DeckGL from '@deck.gl/react';
+import { PathLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers';
+import type { MapViewState } from '@deck.gl/core';
+import Map from 'react-map-gl';
+import maplibregl from 'maplibre-gl';
 import * as d3 from 'd3';
-import * as topojson from 'topojson-client';
-import type { Topology } from 'topojson-specification';
-import { MAP_WAYPOINTS } from '../data/travel';
+import { MAP_WAYPOINTS, type Waypoint } from '../data/travel';
 
-const WORLD_ATLAS_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
-const ARC_DURATION = 2000;
-const PAUSE_BETWEEN = 400;
-const RESET_PAUSE = 1500;
+const DARK_MATTER_STYLE = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const ARC_DURATION  = 2000; // ms to draw each arc
+const PAUSE_BETWEEN = 400;  // ms pause after each arc completes
+const RESET_PAUSE   = 1500; // ms before restarting the whole sequence
+const PATH_STEPS    = 80;   // great-circle interpolation steps per arc
 
-// Interpolate great circle between two lon/lat points
-function interpolateGreatCircle(
-  from: [number, number],
-  to: [number, number],
-  steps: number,
-): [number, number][] {
-  const coords: [number, number][] = [];
+// Pacific-centred view so the full Pacific route sits comfortably on screen
+const VIEW_STATE: MapViewState = {
+  longitude: 150,
+  latitude: 10,
+  zoom: 2.0,
+  pitch: 0,
+  bearing: 0,
+};
+
+// Arc colour: iOS blue
+const BLUE:  [number, number, number, number] = [10, 132, 255, 220];
+// Waypoint dot colour: iOS green
+const GREEN: [number, number, number, number] = [48, 209, 88, 255];
+// Label colour: white, slightly muted
+const LABEL: [number, number, number, number] = [255, 255, 255, 153];
+
+type Pos = [number, number];
+
+// Compute a great-circle path between two [lon, lat] points
+function greatCircle(from: Pos, to: Pos, steps: number): Pos[] {
+  const interp = d3.geoInterpolate(from, to);
+  const path: Pos[] = [];
   for (let i = 0; i <= steps; i++) {
-    coords.push(d3.geoInterpolate(from, to)(i / steps) as [number, number]);
+    path.push(interp(i / steps) as Pos);
   }
-  return coords;
+  return path;
+}
+
+interface ArcDef {
+  fullPath: Pos[]; // PATH_STEPS + 1 points
+}
+
+function buildArcs(waypoints: Waypoint[]): ArcDef[] {
+  const arcs: ArcDef[] = [];
+  for (let i = 0; i < waypoints.length - 1; i++) {
+    const a = waypoints[i];
+    const b = waypoints[i + 1];
+    arcs.push({ fullPath: greatCircle([a.lon, a.lat], [b.lon, b.lat], PATH_STEPS) });
+  }
+  return arcs;
+}
+
+interface AnimState {
+  phase: 'drawing' | 'pausing';
+  arcIdx: number;
+  fraction: number;      // 0–1 progress of current arc (only in 'drawing')
+  settledCount: number;  // how many waypoints have a solid dot + label
+  elapsed: number;       // ms elapsed in current phase (only in 'pausing')
 }
 
 export default function GPSCanvas() {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const worldRef = useRef<Topology | null>(null);
-  const animFrameRef = useRef<number>(0);
+  // frame is incremented on every RAF tick to drive re-renders
+  const [frame, setFrame] = useState(0);
+  const animRef  = useRef<AnimState>({ phase: 'pausing', arcIdx: 0, fraction: 0, settledCount: 1, elapsed: 0 });
+  const lastTime = useRef(0);
+  const rafId    = useRef(0);
 
-  function initMap(world: Topology) {
-    const svg = d3.select(svgRef.current!);
-    svg.selectAll('*').remove();
-
-    const container = svgRef.current!.parentElement!;
-    const rect = container.getBoundingClientRect();
-    const width = rect.width || 960;
-    const height = rect.height || 400;
-    const navH = 44;
-
-    svg
-      .attr('width', width)
-      .attr('height', height)
-      .attr('viewBox', `0 0 ${width} ${height}`)
-      .style('display', 'block');
-
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    const projection = d3.geoEquirectangular()
-      .rotate([-150, 0])
-      .fitExtent([[0, navH], [width, height]], {
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [[
-            [100, 55], [210, 55], [210, -50], [100, -50], [100, 55],
-          ]],
-        },
-      } as d3.GeoPermissibleObjects);
-
-    const path = d3.geoPath().projection(projection);
-
-    const defs = svg.append('defs');
-    defs.append('clipPath').attr('id', 'map-clip')
-      .append('rect').attr('x', 0).attr('y', navH).attr('width', width).attr('height', height - navH);
-
-    const mapGroup = svg.append('g').attr('clip-path', 'url(#map-clip)');
-
-    const graticule = d3.geoGraticule().step([15, 15]);
-    mapGroup.append('path')
-      .datum(graticule())
-      .attr('d', path)
-      .attr('fill', 'none')
-      .attr('stroke', isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)')
-      .attr('stroke-width', 0.5);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const countries = topojson.feature(world, (world.objects as Record<string, any>).countries);
-    mapGroup.append('g')
-      .selectAll('path')
-      .data((countries as unknown as GeoJSON.FeatureCollection).features)
-      .join('path')
-      .attr('d', path)
-      .attr('fill', isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)')
-      .attr('stroke', isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.14)')
-      .attr('stroke-width', 0.5);
-
-    const arcGroup = mapGroup.append('g');
-    const dotGroup = mapGroup.append('g');
-    const labelGroup = mapGroup.append('g');
-
-    type ArcEntry = {
-      path: d3.Selection<SVGPathElement, GeoJSON.LineString, null, undefined>;
-      length: number;
-    };
-
-    const arcs: ArcEntry[] = [];
-
-    for (let i = 0; i < MAP_WAYPOINTS.length - 1; i++) {
-      const wp1 = MAP_WAYPOINTS[i];
-      const wp2 = MAP_WAYPOINTS[i + 1];
-      const arcData: GeoJSON.LineString = {
-        type: 'LineString',
-        coordinates: interpolateGreatCircle([wp1.lon, wp1.lat], [wp2.lon, wp2.lat], 80),
-      };
-
-      const arcPath = arcGroup.append<SVGPathElement>('path')
-        .datum(arcData)
-        .attr('d', path)
-        .attr('fill', 'none')
-        .attr('stroke', '#0A84FF')
-        .attr('stroke-width', 2)
-        .attr('stroke-linecap', 'round')
-        .style('filter', 'drop-shadow(0 0 4px rgba(10,132,255,0.6))');
-
-      const totalLength = arcPath.node()!.getTotalLength();
-      arcPath.attr('stroke-dasharray', totalLength).attr('stroke-dashoffset', totalLength);
-      arcs.push({ path: arcPath as unknown as d3.Selection<SVGPathElement, GeoJSON.LineString, null, undefined>, length: totalLength });
-    }
-
-    type WpWithDom = typeof MAP_WAYPOINTS[0] & {
-      _dot?: d3.Selection<SVGCircleElement, unknown, null, undefined>;
-      _pulse?: d3.Selection<SVGCircleElement, unknown, null, undefined>;
-      _label?: d3.Selection<SVGTextElement, unknown, null, undefined>;
-    };
-
-    const wps: WpWithDom[] = MAP_WAYPOINTS.map(wp => ({ ...wp }));
-    const isMobile = width < 500;
-
-    wps.forEach(wp => {
-      const projected = projection([wp.lon, wp.lat]);
-      if (!projected) return;
-      const [px, py] = projected;
-
-      wp._dot = dotGroup.append('circle')
-        .attr('cx', px).attr('cy', py).attr('r', 4)
-        .attr('fill', '#30D158').attr('stroke', isDark ? '#000' : '#fff').attr('stroke-width', 1.5)
-        .style('opacity', 0);
-
-      wp._pulse = dotGroup.append('circle')
-        .attr('cx', px).attr('cy', py).attr('r', 4)
-        .attr('fill', 'none').attr('stroke', 'rgba(48,209,88,0.4)').attr('stroke-width', 1.5)
-        .style('opacity', 0);
-
-      wp._label = labelGroup.append('text')
-        .attr('x', px + 7).attr('y', py + 4)
-        .attr('font-size', isMobile ? 9 : 11)
-        .attr('font-family', '-apple-system,"SF Pro Text","Helvetica Neue",sans-serif')
-        .attr('font-weight', 500)
-        .attr('fill', isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)')
-        .style('opacity', 0)
-        .text(isMobile ? '' : wp.label);
-    });
-
-    const leadDot = mapGroup.append('circle')
-      .attr('r', 5).attr('fill', '#0A84FF')
-      .style('filter', 'drop-shadow(0 0 6px rgba(10,132,255,0.8))').style('opacity', 0);
-    const leadPulse = mapGroup.append('circle')
-      .attr('r', 5).attr('fill', 'none')
-      .attr('stroke', 'rgba(10,132,255,0.4)').attr('stroke-width', 1.5).style('opacity', 0);
-
-    function animatePulse(ring: WpWithDom['_pulse']) {
-      if (!ring || ring.style('opacity') === '0') return;
-      ring.style('opacity', 1).attr('r', 4).attr('stroke-opacity', 0.6);
-      ring.transition().duration(1200).attr('r', 14).attr('stroke-opacity', 0)
-        .on('end', () => { ring.attr('r', 4).attr('stroke-opacity', 0.6); animatePulse(ring); });
-    }
-
-    function showWaypoint(i: number, cb?: () => void) {
-      const wp = wps[i];
-      if (!wp || !wp._dot) { cb?.(); return; }
-      wp._dot.transition().duration(300).style('opacity', 1);
-      wp._label?.transition().duration(300).style('opacity', 1);
-      animatePulse(wp._pulse);
-      if (cb) setTimeout(cb, 300);
-    }
-
-    function animateArc(i: number) {
-      if (i >= arcs.length) {
-        leadDot.style('opacity', 0);
-        leadPulse.style('opacity', 0);
-        setTimeout(animateSequence, RESET_PAUSE);
-        return;
-      }
-      const arc = arcs[i];
-      const pathNode = (arc.path.node() as SVGPathElement);
-
-      leadDot.style('opacity', 1);
-      leadPulse.style('opacity', 1);
-
-      arc.path.transition().duration(ARC_DURATION).ease(d3.easeLinear)
-        .attr('stroke-dashoffset', 0)
-        .on('end', () => showWaypoint(i + 1, () => setTimeout(() => animateArc(i + 1), PAUSE_BETWEEN)));
-
-      const startTime = performance.now();
-      function moveDot(now: number) {
-        const t = Math.min((now - startTime) / ARC_DURATION, 1);
-        try {
-          const pt = pathNode.getPointAtLength(arc.length * t);
-          leadDot.attr('cx', pt.x).attr('cy', pt.y);
-          leadPulse.attr('cx', pt.x).attr('cy', pt.y);
-          const pulse = (Math.sin(now / 300) + 1) / 2;
-          leadPulse.attr('r', 5 + pulse * 8).attr('stroke-opacity', 0.4 * (1 - pulse));
-        } catch { /* ignore */ }
-        if (t < 1) animFrameRef.current = requestAnimationFrame(moveDot);
-      }
-      animFrameRef.current = requestAnimationFrame(moveDot);
-    }
-
-    function animateSequence() {
-      arcs.forEach(a => a.path.attr('stroke-dashoffset', a.length).attr('stroke', '#0A84FF'));
-      wps.forEach(wp => {
-        wp._dot?.style('opacity', 0);
-        wp._pulse?.style('opacity', 0);
-        wp._label?.style('opacity', 0);
-      });
-      leadDot.style('opacity', 0);
-      leadPulse.style('opacity', 0);
-      showWaypoint(0, () => animateArc(0));
-    }
-
-    animateSequence();
-  }
+  // Pre-compute arc paths once — they only change when waypoints change
+  const arcs = useMemo(() => buildArcs(MAP_WAYPOINTS), []);
 
   useEffect(() => {
-    let resizeTimer: ReturnType<typeof setTimeout>;
+    function tick(now: number) {
+      const dt = Math.min(now - (lastTime.current || now), 50); // cap to 50 ms
+      lastTime.current = now;
+      const s = animRef.current;
 
-    function handleResize() {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        if (worldRef.current) initMap(worldRef.current);
-      }, 200);
+      if (s.phase === 'drawing') {
+        s.fraction = Math.min(1, s.fraction + dt / ARC_DURATION);
+        if (s.fraction >= 1) {
+          // Arc complete — settle the destination waypoint
+          s.settledCount = s.arcIdx + 2;
+          s.phase = 'pausing';
+          s.elapsed = 0;
+        }
+      } else {
+        // pausing
+        s.elapsed += dt;
+        const isLast = s.arcIdx === arcs.length - 1;
+        const pauseEnd = (s.fraction >= 1 && isLast) ? RESET_PAUSE : PAUSE_BETWEEN;
+
+        if (s.elapsed >= pauseEnd) {
+          s.elapsed = 0;
+          if (s.fraction >= 1 && isLast) {
+            // Full reset
+            s.arcIdx = 0;
+            s.fraction = 0;
+            s.settledCount = 1;
+            // stay in 'pausing' for one PAUSE_BETWEEN before restarting
+          } else {
+            if (s.fraction >= 1) s.arcIdx++; // advance after a completed arc
+            s.fraction = 0;
+            s.phase = 'drawing';
+          }
+        }
+      }
+
+      setFrame(f => (f + 1) & 0x7fff);
+      rafId.current = requestAnimationFrame(tick);
     }
 
-    fetch(WORLD_ATLAS_URL)
-      .then(r => r.json())
-      .then((world: Topology) => {
-        worldRef.current = world;
-        initMap(world);
-        window.addEventListener('resize', handleResize);
-      })
-      .catch(e => console.warn('[GPSCanvas] Failed to load world atlas:', e));
+    rafId.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId.current);
+  }, [arcs]);
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animFrameRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // ── Layer computation (runs every frame) ─────────────────────────────────
+  const s = animRef.current;
 
-  return <svg ref={svgRef} id="gps-map" className="hero-map-canvas" style={{ width: '100%', height: '100%', display: 'block' }} />;
+  // Settled arcs: all arcs before the current one (fully drawn)
+  const settledPaths: Pos[][] = arcs.slice(0, s.arcIdx).map(a => a.fullPath);
+
+  // Current arc: partial or full path depending on phase
+  let currentPath: Pos[] = [];
+  const arc = arcs[s.arcIdx];
+  if (arc) {
+    if (s.phase === 'pausing' && s.fraction >= 1) {
+      // Arc completed — move it into settled and leave currentPath empty
+      settledPaths.push(arc.fullPath);
+    } else if (s.fraction > 0) {
+      const steps = Math.min(PATH_STEPS, Math.floor(s.fraction * PATH_STEPS));
+      currentPath = arc.fullPath.slice(0, steps + 1);
+    }
+  }
+
+  // Lead dot: tip of the currently-drawing arc
+  const leadPos: Pos | null = (s.phase === 'drawing' && currentPath.length > 1)
+    ? currentPath[currentPath.length - 1]
+    : null;
+
+  // Settled waypoint dots + labels
+  const settledDots = MAP_WAYPOINTS.slice(0, s.settledCount);
+
+  // Pulse ring: animates using wall-clock time so it runs independently of arc timing
+  const pt = performance.now() / 1200;
+  const pulsePhase = (Math.sin(pt * Math.PI * 2) + 1) / 2; // 0–1, ~0.83 Hz
+  const pulseR     = 4 + pulsePhase * 10;                    // 4–14 px
+  const pulseAlpha = Math.round((1 - pulsePhase) * 0.6 * 255); // 153–0
+
+  const layers = [
+    // Settled arcs (fully drawn)
+    settledPaths.length > 0 && new PathLayer<Pos[]>({
+      id: 'arcs-settled',
+      data: settledPaths,
+      getPath: d => d,
+      getColor: BLUE,
+      getWidth: 2,
+      widthUnits: 'pixels',
+      widthMinPixels: 1,
+      pickable: false,
+    }),
+
+    // Currently-drawing arc (partial)
+    currentPath.length > 1 && new PathLayer<Pos[]>({
+      id: 'arc-current',
+      data: [currentPath],
+      getPath: d => d,
+      getColor: BLUE,
+      getWidth: 2,
+      widthUnits: 'pixels',
+      widthMinPixels: 1,
+      pickable: false,
+    }),
+
+    // Pulse rings around settled waypoints
+    settledDots.length > 0 && new ScatterplotLayer<Waypoint>({
+      id: 'dots-pulse',
+      data: settledDots,
+      getPosition: d => [d.lon, d.lat],
+      getRadius: pulseR,
+      radiusUnits: 'pixels',
+      getFillColor: [48, 209, 88, pulseAlpha],
+      pickable: false,
+    }),
+
+    // Settled waypoint solid dots
+    settledDots.length > 0 && new ScatterplotLayer<Waypoint>({
+      id: 'dots-settled',
+      data: settledDots,
+      getPosition: d => [d.lon, d.lat],
+      getRadius: 4,
+      radiusUnits: 'pixels',
+      getFillColor: GREEN,
+      pickable: false,
+    }),
+
+    // Lead dot (moving tip of the current arc)
+    leadPos && new ScatterplotLayer<Pos>({
+      id: 'dot-lead',
+      data: [leadPos],
+      getPosition: d => d,
+      getRadius: 5,
+      radiusUnits: 'pixels',
+      getFillColor: BLUE,
+      pickable: false,
+    }),
+
+    // Labels for settled waypoints
+    settledDots.length > 0 && new TextLayer<Waypoint>({
+      id: 'labels',
+      data: settledDots,
+      getPosition: d => [d.lon, d.lat],
+      getText: d => d.label,
+      getSize: 11,
+      getColor: LABEL,
+      fontFamily: '-apple-system, "Helvetica Neue", sans-serif',
+      fontWeight: '500',
+      getTextAnchor: 'start',
+      getAlignmentBaseline: 'center',
+      getPixelOffset: d => [8, d.above ? -10 : 10],
+      pickable: false,
+    }),
+  ];
+
+  // Suppress unused-variable warning — frame is consumed by reading animRef
+  void frame;
+
+  return (
+    <DeckGL
+      viewState={VIEW_STATE}
+      controller={false}
+      layers={layers}
+      style={{ width: '100%', height: '100%' }}
+    >
+      <Map
+        mapLib={maplibregl as unknown as Parameters<typeof Map>[0]['mapLib']}
+        mapStyle={DARK_MATTER_STYLE}
+        reuseMaps
+      />
+    </DeckGL>
+  );
 }

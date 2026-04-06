@@ -37,23 +37,26 @@ def init() -> None:
             transaction_detail  TEXT,                   -- DEPOSIT / CONVERSION / CARD_PAYMENT / ATM / TRANSFER / ACCRUAL_CHARGE / INTEREST etc.
             state               TEXT,                   -- COMPLETED / PENDING / FAILED (Revolut); NULL for Wise
             is_internal         INTEGER DEFAULT 0,      -- 1 = pot transfer or internal move between own accounts
-            is_interest         INTEGER DEFAULT 0,      -- 1 = interest payment
+            is_interest         INTEGER DEFAULT 0,
             running_balance     REAL,
-            raw                 TEXT NOT NULL,           -- full original row as JSON blob
-            
+            place_id            INTEGER REFERENCES places(id),
+            raw                 TEXT NOT NULL,
             PRIMARY KEY (id, currency, source)
         );
         """)
 
-        # Indexes for performance
         conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_transactions_timestamp ON transactions(timestamp);
-        """)
-        
-        conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_transactions_source    ON transactions(source);
+        CREATE INDEX IF NOT EXISTS idx_txn_timestamp ON transactions(timestamp);
         """)
 
         conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_transactions_currency  ON transactions(currency);
+        CREATE INDEX IF NOT EXISTS idx_txn_source ON transactions(source);
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_txn_currency ON transactions(currency);
+        """)
+
+        conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_txn_place ON transactions(place_id);
         """)

@@ -24,30 +24,36 @@ def init() -> None:
     with get_conn() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS gap_annotations (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                id          INTEGER PRIMARY KEY,
                 start_ts    TEXT NOT NULL,
-                end_ts      TEXT NOT NULL, 
-                description TEXT    NOT NULL,
-                created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+                end_ts      TEXT NOT NULL,
+                reason      TEXT NOT NULL,
+                description TEXT,
+                place_id    INTEGER REFERENCES places(id),
+                created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
             );
         """)
         conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_gap_annotations_start
+            CREATE INDEX IF NOT EXISTS idx_gap_start
                 ON gap_annotations(start_ts);
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_gap_end
+                ON gap_annotations(end_ts);
         """)
 
 
-def insert_annotation(start_ts: int, end_ts: int, description: str) -> int:
+def insert_annotation(start_ts: int, end_ts: int, reason: str, description: str | None = None) -> int:
     """Insert a new gap annotation and return its auto-assigned row id."""
     new_start = to_iso_str(start_ts)
     new_end = to_iso_str(end_ts)
     with get_conn() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO gap_annotations (start_ts, end_ts, description)
-            VALUES (?, ?, ?)
+            INSERT INTO gap_annotations (start_ts, end_ts, reason, description)
+            VALUES (?, ?, ?, ?)
             """,
-            (new_start, new_end, description),
+            (new_start, new_end, reason, description),
         )
         conn.commit()
         return cursor.lastrowid

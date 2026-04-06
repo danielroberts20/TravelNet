@@ -16,7 +16,7 @@ def safe_float(value: str) -> Optional[float]:
 
 def get_closest_lat_lon_by_timestamp(cursor, timestamp: str) -> tuple[Optional[float], Optional[float]]:
     lat_lon = cursor.execute("""
-        SELECT lat, lon
+        SELECT latitude, longitude
         FROM location_unified
         WHERE timestamp <= ?
         AND timestamp >= datetime(?, '-15 minutes')
@@ -27,6 +27,6 @@ def get_closest_lat_lon_by_timestamp(cursor, timestamp: str) -> tuple[Optional[f
     if not lat_lon:
         lat, lon = None, None
     else:
-        lat, lon = lat_lon["lat"], lat_lon["lon"]
+        lat, lon = lat_lon["latitude"], lat_lon["longitude"]
 
     return lat, lon

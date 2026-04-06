@@ -12,3 +12,5 @@ numpy
 scikit-learn
 slowapi==0.1.9
 pyyaml
+wakeonlan
+paramiko
