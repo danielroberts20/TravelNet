@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { useStats } from '../hooks/useStats';
 import { GITHUB_REPO, TREVOR_REPO, DOCS_URL, PERSONAL_SITE } from '../data/travel';
@@ -86,8 +86,6 @@ function TrevorWidget() {
 export default function Layout() {
   const stats = useStats();
   const location = useLocation();
-  const isJourney = location.pathname === '/journey';
-
   const statusDotColor =
     stats?.status === 'travelling' ? 'var(--accent-teal)' :
     stats?.status === 'finished'   ? 'var(--accent-orange)' :
@@ -119,14 +117,9 @@ export default function Layout() {
         </div>
       </nav>
 
-      {/* Journey page is full-screen — no wrapper */}
-      {isJourney ? (
+      <div className="page-wrapper">
         <Outlet />
-      ) : (
-        <div className="page-wrapper">
-          <Outlet />
-        </div>
-      )}
+      </div>
 
       <footer className="footer">
         <div className="footer-inner">
