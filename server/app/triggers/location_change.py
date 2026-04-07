@@ -120,7 +120,7 @@ def run():
                 UPDATE known_places SET current_visit_id = ? WHERE id = ?
             """, (visit_id, place_id))
 
-        logger.info("New location detected at %.5f, %.5f", lat, lon)
+        logger.important("New location detected at %.5f, %.5f", lat, lon)
 
         address = get_address(lat, lon)
         name = address.get("city") or address.get("suburb") or address.get("road") or address.get("region") or f"{lat:.3f}, {lon:.3f}"
@@ -145,7 +145,7 @@ def run():
                 INSERT INTO place_visits (place_id, arrived_at)
                 VALUES (?, ?)
             """, (place_id, now))
-            logger.info(f"Return visit to known place {place_id}")
+            logger.important(f"Return visit to known place {place_id}")
             conn.execute("""
                 UPDATE known_places
                 SET visit_count = visit_count + 1,
@@ -203,7 +203,7 @@ def check_departure():
             WHERE id = ?
         """, (duration_mins, place_id))
 
-    logger.info("Departed known place %d after %d mins", place_id, duration_mins)
+    logger.important("Departed known place %d after %d mins", place_id, duration_mins)
 
 def get_nearest_known_place(lat, lon):
     """Returns the nearest known place row if within radius, else None."""

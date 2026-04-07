@@ -261,7 +261,7 @@ def run() -> dict:
 
         logger.debug("(%.2f, %.2f): done.", lat, lon)
 
-    logger.info(
+    logger.important(
         "Weather fetch complete. Cells: %d | "
         "Hourly: %d inserted, %d failed | "
         "Daily: %d inserted, %d failed.",
