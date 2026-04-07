@@ -1,6 +1,7 @@
 import paramiko
 import os
 import threading
+from datetime import datetime, timezone
 import time
 from config.settings import settings
 from notifications import send_notification
@@ -72,6 +73,10 @@ def wake_pc():
         params={"api_key": settings.wol_api_key},
         timeout=5
     )
+    
+    with open("/tmp/last_wol_sent", "w") as f:
+        f.write(datetime.now(timezone.utc).isoformat())
+
     # Start polling if not already running
     if _poll_thread is None or not _poll_thread.is_alive():
         _poll_thread = threading.Thread(target=_poll_ssh, daemon=True)
@@ -99,3 +104,10 @@ def shutdown_pc(callback=None) -> threading.Thread:
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     return thread
+
+def get_last_wol():
+    try:
+        with open("/tmp/last_wol_sent", "r") as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "1970-01-01T00:00:00+00:00"

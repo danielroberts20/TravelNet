@@ -7,7 +7,7 @@ from auth import require_upload_token
 from compute.models import DataMode, Status
 from database.compute.table import get_next_queued_compute, insert_compute, update_compute
 from compute.storage import store_compute
-from compute.util import is_pc_active, shutdown_pc, ssh_run, wake_pc
+from compute.util import get_last_wol, is_pc_active, shutdown_pc, ssh_run, wake_pc
 
 
 router = APIRouter()
@@ -113,14 +113,20 @@ async def start_next_compute():
 @router.post("/wake", dependencies=[Depends(require_upload_token)])
 def wake():
     wake_pc()
+    logger.info("Wake command sent to PC")
     return {"status": "wake command sent"}
 
 @router.get("/pc-status", dependencies=[Depends(require_upload_token)])
 def pc_status():
     return {"active": is_pc_active()}
 
+@router.get("/last-wol", dependencies=[Depends(require_upload_token)])
+def last_wol():
+    return {"timestamp": get_last_wol()}
+
 @router.post("/shutdown", dependencies=[Depends(require_upload_token)])
 def shutdown():
     shutdown_pc()
+    logger.info("Shutdown command sent to PC")
     return {"status": "shutdown command sent"}
 
