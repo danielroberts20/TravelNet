@@ -10,8 +10,6 @@ Public-facing read-only stats endpoint.
 
 import logging
 from fastapi import APIRouter, Request  # type: ignore
-from fastapi.responses import JSONResponse
-from public.fog_of_war.util import get_fog_of_war_geojson
 from slowapi import Limiter  # type: ignore
 from slowapi.util import get_remote_address  # type: ignore
 
@@ -32,8 +30,3 @@ async def public_stats(request: Request):
     """
     return build_public_stats()
 
-@router.get("/fog-of-war")
-@limiter.limit("30/minute")
-def fog_of_war(request: Request):
-    geojson = get_fog_of_war_geojson()
-    return JSONResponse(content=geojson)

@@ -45,7 +45,7 @@ export default defineConfig({
         manualChunks: {
           'deck': ['@deck.gl/core', '@deck.gl/layers', '@deck.gl/react'],
           'maplibre': ['maplibre-gl', 'react-map-gl'],
-          'geo': ['d3', 'topojson-client'],
+          'geo': ['d3'],
         },
       },
     },
