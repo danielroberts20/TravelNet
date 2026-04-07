@@ -8,26 +8,26 @@ import threading
 from config.general import ERROR_FILE, LOG_FILE, WARN_FILE
 from database.connection import get_conn, to_iso_str
 
-# Custom level: below INFO, for high-frequency upload acknowledgement messages
-UPLOAD_LEVEL = 15
-logging.addLevelName(UPLOAD_LEVEL, "UPLOAD")
+# Custom level: above INFO, for key informational events worth surfacing
+IMPORTANT_LEVEL = 25
+logging.addLevelName(IMPORTANT_LEVEL, "IMPORTANT")
 
-def _upload(self, message, *args, **kwargs):
-    """Log at the custom UPLOAD level (15), below INFO."""
-    if self.isEnabledFor(UPLOAD_LEVEL):
-        self._log(UPLOAD_LEVEL, message, args, **kwargs)
+def _important(self, message, *args, **kwargs):
+    """Log at the custom IMPORTANT level (25), above INFO but below WARNING."""
+    if self.isEnabledFor(IMPORTANT_LEVEL):
+        self._log(IMPORTANT_LEVEL, message, args, **kwargs)
 
-logging.Logger.upload = _upload
+logging.Logger.important = _important
 
 
 class ColouredFormatter(logging.Formatter):
     COLOURS = {
-        "DEBUG":    "\033[36m",   # cyan
-        "UPLOAD":   "\033[93m",   # bright yellow
-        "INFO":     "\033[32m",   # green
-        "WARNING":  "\033[33m",   # yellow
-        "ERROR":    "\033[31m",   # red
-        "CRITICAL": "\033[35m",   # magenta
+        "DEBUG":     "\033[36m",   # cyan
+        "INFO":      "\033[32m",   # green
+        "IMPORTANT": "\033[96m",   # bright cyan
+        "WARNING":   "\033[33m",   # yellow
+        "ERROR":     "\033[31m",   # red
+        "CRITICAL":  "\033[35m",   # magenta
     }
     RESET = "\033[0m"
 
@@ -119,18 +119,18 @@ def configure_logging():
     """Configure root logger with file, console, and digest handlers.
 
     Sets up four handlers:
-      - info_handler:    RotatingFile at UPLOAD+ (all user-facing events)
+      - info_handler:    RotatingFile at INFO+
       - warn_handler:    RotatingFile at WARNING+
       - error_handler:   RotatingFile at ERROR+
-      - console_handler: coloured stdout at UPLOAD+
+      - console_handler: coloured stdout at INFO+
       - digest_handler:  DB-backed WARNING+ handler for daily email digest
     """
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-    # All UPLOAD+ logs
+    # All INFO+ logs
     info_handler = RotatingFileHandler(LOG_FILE, maxBytes=5*1024*1024, backupCount=5)
-    info_handler.setLevel(UPLOAD_LEVEL)
+    info_handler.setLevel(logging.INFO)
     info_handler.setFormatter(formatter)
 
     # WARN+ logs
@@ -143,9 +143,9 @@ def configure_logging():
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(formatter)
 
-    # Stream logs to stdout (coloured) — UPLOAD+ so the /logs page can filter them
+    # Stream logs to stdout (coloured) — INFO+ so the /logs page can filter them
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(UPLOAD_LEVEL)
+    console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(ColouredFormatter(
         "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
     ))
@@ -156,7 +156,7 @@ def configure_logging():
     digest_handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
-    root_logger.setLevel(UPLOAD_LEVEL)
+    root_logger.setLevel(logging.INFO)
     root_logger.addHandler(info_handler)
     root_logger.addHandler(warn_handler)
     root_logger.addHandler(error_handler)

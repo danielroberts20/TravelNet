@@ -205,7 +205,7 @@ def _dispatch(snake_name: str, units: str, data: list[dict]) -> None:
 
 def handle_health_upload(data: dict[str, Any]) -> None:
     """Process a full Health Auto Export payload and insert each metric into the DB."""
-    logger.upload("Processing health data in the background...")
+    logger.info("Processing health data in the background...")
 
     metrics = data.get("metrics")
     if not metrics:
@@ -226,11 +226,11 @@ def handle_health_upload(data: dict[str, Any]) -> None:
             continue
 
         if not points:
-            logger.upload("Metric '%s' has no data points, skipping.", snake_name)
+            logger.info("Metric '%s' has no data points, skipping.", snake_name)
             skipped += 1
             continue
 
-        logger.upload("Processing metric '%s' (%d points)...", snake_name, len(points))
+        logger.info("Processing metric '%s' (%d points)...", snake_name, len(points))
         try:
             _dispatch(snake_name, units, points)
             processed += 1
@@ -238,7 +238,7 @@ def handle_health_upload(data: dict[str, Any]) -> None:
             logger.error("Error processing metric '%s': %s", snake_name, e, exc_info=True)
             skipped += 1
 
-    logger.upload(
+    logger.info(
         f"Finished processing health data: {processed} metrics processed, {skipped} skipped."
     )
 
