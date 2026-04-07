@@ -10,6 +10,7 @@ import logging
 from upload.location.router import router as location_router
 from upload.transaction.router import router as transaction_router
 from upload.health.router import router as health_router
+from upload.journal.router import router as journal_router
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -17,3 +18,4 @@ logger = logging.getLogger(__name__)
 router.include_router(location_router, prefix="/location")
 router.include_router(transaction_router, prefix="/transaction")
 router.include_router(health_router, prefix="/health")
+router.include_router(journal_router, prefix="/journal")
