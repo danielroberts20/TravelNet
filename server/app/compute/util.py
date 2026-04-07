@@ -7,7 +7,7 @@ from config.settings import settings
 from notifications import send_notification
 
 import logging
-logging.getLogger("paramiko").setLevel(logging.WARNING)
+logging.getLogger("paramiko").setLevel(41)
 
 # Global state
 pc_active = False
