@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any
 
-from database.health.mood.table import insert_state_of_mind
+from database.health.mood.table import table as mood_table
 from upload.health.workouts import handle_workout_upload
 from auth import require_upload_token
 from config.general import HEALTH_BACKUP_DIR, WORKOUT_BACKUP_DIR
@@ -86,5 +86,5 @@ async def upload_mood(
     if not entries:
         raise HTTPException(status_code=422, detail="No stateOfMind entries found")
 
-    background_tasks.add_task(insert_state_of_mind, entries)
+    background_tasks.add_task(mood_table.batch_insert, entries)
     return {"status": "success", "queued": len(entries)}

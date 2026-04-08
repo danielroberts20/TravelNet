@@ -1,38 +1,17 @@
 import logging
 
 from config.general import LOCATION_CHANGE_RADIUS_M, LOCATION_MINIMUM_POINTS, LOCATION_STATIONARITY_RADIUS_M, LOCATION_STAY_DURATION_MINS
-from database.location.util import get_place_id, insert_geocode, reverse_geocode
+from database.location.geocoding import get_place_id, insert_geocode, reverse_geocode
+from database.location.known_places.table import table as known_places_table, KnownPlaceRecord
 from triggers.dispatch import dispatch, haversine_m
 from database.connection import get_conn, to_iso_str
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
-def init() -> None:
 
-    with get_conn() as conn:
-
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS known_places (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                latitude         REAL NOT NULL,
-                longitude         REAL NOT NULL,
-                first_seen  TEXT NOT NULL,   -- ISO 8601 UTC
-                visit_count     INTEGER NOT NULL DEFAULT 0,
-                last_visited    TEXT,                          -- ISO 8601 UTC
-                total_time_mins INTEGER NOT NULL DEFAULT 0,
-                current_visit_id INTEGER REFERENCES place_visits(id),
-                label       TEXT             -- optional manual label, e.g. "Hostel, Chiang Mai"
-            );""")
-
-def label_place(place_id: int, label: str):
-    with get_conn() as conn:
-        cursor = conn.execute("""
-        UPDATE known_places
-        SET label = ?
-        WHERE id = ?
-        """, (label, place_id))
-        return cursor.rowcount > 0
+def label_place(place_id: int, label: str) -> bool:
+    return known_places_table.label_place(place_id, label)
 
 def get_most_recent_points():    
     now = datetime.now(timezone.utc)
@@ -103,31 +82,20 @@ def run():
     nearest = get_nearest_known_place(lat, lon)
 
     if nearest is None:
-        with get_conn() as conn:
-            cursor = conn.execute("""
-                INSERT INTO known_places (latitude, longitude, first_seen, visit_count, last_visited)
-                VALUES (?, ?, ?, 1, ?)
-            """, (lat, lon, arrived_at, arrived_at))
-            place_id = cursor.lastrowid
-
-            visit_cursor = conn.execute("""
-                INSERT INTO place_visits (place_id, arrived_at)
-                VALUES (?, ?)
-            """, (place_id, arrived_at))
-            visit_id = visit_cursor.lastrowid
-
-            conn.execute("""
-                UPDATE known_places SET current_visit_id = ? WHERE id = ?
-            """, (visit_id, place_id))
+        place_id = known_places_table.insert(KnownPlaceRecord(
+            latitude=lat, longitude=lon, first_seen=arrived_at,
+        ))
+        visit_id = known_places_table.insert_visit(place_id, arrived_at)
+        known_places_table.set_current_visit(place_id, visit_id)
 
         logger.important("New location detected at %.5f, %.5f", lat, lon)
 
         address = get_address(lat, lon)
         name = address.get("city") or address.get("suburb") or address.get("road") or address.get("region") or f"{lat:.3f}, {lon:.3f}"
 
-        dispatch(trigger="location_change", 
-                 payload={"lat": lat, "lon": lon, "first_seen": now}, 
-                 cooldown_hours = 1,
+        dispatch(trigger="location_change",
+                 payload={"lat": lat, "lon": lon, "first_seen": now},
+                 cooldown_hours=1,
                  noti_title="📍 New Location Discovered",
                  noti_body=f"Discovered near {name}. Tap here to add a Journal entry.")
     else:
@@ -137,24 +105,15 @@ def run():
                 SELECT current_visit_id, label FROM known_places WHERE id = ?
             """, (place_id,)).fetchone()
 
-            name = row['label'] if row['label'] else f"known place {place_id}"
+        name = row['label'] if row['label'] else f"known place {place_id}"
 
-            if row['current_visit_id'] is not None:
-                logger.info(f"Still at {name}, no action needed")
-                return
+        if row['current_visit_id'] is not None:
+            logger.info(f"Still at {name}, no action needed")
+            return
 
-            visit_cursor = conn.execute("""
-                INSERT INTO place_visits (place_id, arrived_at)
-                VALUES (?, ?)
-            """, (place_id, arrived_at))
-            logger.important(f"Return visit to {name}")
-            conn.execute("""
-                UPDATE known_places
-                SET visit_count = visit_count + 1,
-                    last_visited = ?,
-                    current_visit_id = ?
-                WHERE id = ?
-            """, (arrived_at, visit_cursor.lastrowid, place_id))
+        visit_id = known_places_table.insert_visit(place_id, arrived_at)
+        logger.important(f"Return visit to {name}")
+        known_places_table.increment_visit_count(place_id, arrived_at, visit_id)
 
 def get_current_visit():
     """Returns (visit_id, place_id, lat, lon, arrived_at) for the open visit, or None."""
@@ -199,24 +158,11 @@ def check_departure():
     departed_dt = datetime.fromisoformat(departed_at)
     duration_mins = int((departed_dt - arrived_dt).total_seconds() / 60)
 
+    known_places_table.close_visit(visit_id, place_id, departed_at, duration_mins)
+
     with get_conn() as conn:
-        conn.execute("""
-            UPDATE place_visits
-            SET departed_at = ?, duration_mins = ?
-            WHERE id = ?
-        """, (departed_at, duration_mins, visit_id))
-
-        conn.execute("""
-            UPDATE known_places
-            SET total_time_mins = total_time_mins + ?,
-                current_visit_id = NULL
-            WHERE id = ?
-        """, (duration_mins, place_id))
-
-        name = conn.execute("""
-            SELECT label FROM known_places WHERE id = ?
-        """, (place_id,)).fetchone()
-        name = name['label'] if name['label'] else f"known place {place_id}"
+        row = conn.execute("SELECT label FROM known_places WHERE id = ?", (place_id,)).fetchone()
+    name = row['label'] if row['label'] else f"known place {place_id}"
 
     logger.important(f"Departed {name} after {duration_mins} mins")
 

@@ -9,9 +9,9 @@ import pandas as pd  # type: ignore
 
 from config.general import DATA_DIR, INTERVAL_MINUTES
 from upload.health.constants import METRIC_AGGREGATION, SNAKE_TO_DISPLAY
-from database.health.table import insert_health_quantity
-from database.health.heart_rate.table import insert_heart_rate
-from database.health.sleep.table import insert_sleep_stage
+from database.health.table import table as health_table, HealthQuantityRecord
+from database.health.heart_rate.table import table as heart_rate_table, HeartRateRecord
+from database.health.sleep.table import table as sleep_table, SleepRecord
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ def handle_standard_metric(display_name: str, units: str, data: list[dict]):
     for bucket_ts, values in buckets.items():
         aggregated_value = _aggregate(values, agg_type)
         for source in (list(bucket_sources[bucket_ts]) or [None]):
-            insert_health_quantity(bucket_ts, display_name, aggregated_value, units, source)
+            health_table.insert(HealthQuantityRecord(bucket_ts, display_name, aggregated_value, units, source))
 
 
 def handle_heart_rate(display_name: str, data: list[dict]):
@@ -113,7 +113,7 @@ def handle_heart_rate(display_name: str, data: list[dict]):
         max_bpm = max(field_values["Max"]) if "Max" in field_values else None
         if min_bpm is not None and avg_bpm is not None and max_bpm is not None:
             for source in (list(bucket_sources[bucket_ts]) or [None]):
-                insert_heart_rate(bucket_ts, min_bpm, avg_bpm, max_bpm, source)
+                heart_rate_table.insert(HeartRateRecord(bucket_ts, min_bpm, avg_bpm, max_bpm, source))
 
 
 def handle_sleep_analysis(display_name: str, data: list[dict]):
@@ -137,7 +137,7 @@ def handle_sleep_analysis(display_name: str, data: list[dict]):
         duration_hr = float(qty) if qty is not None else 0.0
 
         for source in (sources or [None]):
-            insert_sleep_stage(start_unix, end_unix, stage, duration_hr, source)
+            sleep_table.insert(SleepRecord(start_unix, end_unix, stage, duration_hr, source))
 
 
 def handle_special_qty(display_name: str, units: str, data: list[dict], extra_field: str):
@@ -161,7 +161,7 @@ def handle_special_qty(display_name: str, units: str, data: list[dict], extra_fi
         value = float(qty) if qty is not None else None
         if value is not None:
             for source in (sources or [None]):
-                insert_health_quantity(bucket_ts, display_name, value, units, source)
+                health_table.insert(HealthQuantityRecord(bucket_ts, display_name, value, units, source))
 
 
 # ---------------------------------------------------------------------------

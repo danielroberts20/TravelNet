@@ -54,8 +54,8 @@ class DailyDigestHandler(logging.Handler):
 
     def _init_table(self):
         """Create the log_digest table if it does not already exist."""
-        from database.logging.table import init as init_log_digest
-        init_log_digest()
+        from database.logging.table import table as log_digest_table
+        log_digest_table.init()
 
     def _start_worker(self):
         """Spawn the daemon thread that drains the queue into the DB."""
@@ -64,13 +64,17 @@ class DailyDigestHandler(logging.Handler):
 
     def _worker(self):
         """Continuously consume records from the queue and INSERT them into the DB."""
-        from database.logging.table import insert_log_digest
+        from database.logging.table import table as log_digest_table, LogDigestRecord
         while True:
             record = self._queue.get()
             if record is None:
                 break
             try:
-                insert_log_digest(record)
+                ts, level, logger_name, module, lineno, message = record
+                log_digest_table.insert(LogDigestRecord(
+                    ts=ts, level=level, logger_name=logger_name,
+                    module=module, lineno=lineno, message=message,
+                ))
             except Exception:
                 pass  # Never let the digest handler crash the server
 
@@ -78,39 +82,39 @@ class DailyDigestHandler(logging.Handler):
         """Enqueue a log record tuple for async DB insertion."""
         ts = to_iso_str(datetime.fromtimestamp(record.created, tz=timezone.utc))
         self._queue.put((ts, record.levelname, record.name, record.module, record.lineno, record.getMessage()))
-    
+
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient, username):
-       from notifications import send_email
-       from database.logging.table import fetch_and_clear, restore_log_digest
-       with self._lock:
-           rows = fetch_and_clear()
-           if not rows:
-               return
+        from notifications import send_email
+        from database.logging.table import table as log_digest_table
+        with self._lock:
+            rows = log_digest_table.fetch_and_clear()
+            if not rows:
+                return
 
-       try:
-           now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
-           lines = [
-               f"TravelNet daily alert digest — {now}",
-               f"{len(rows)} event(s) at WARNING or above:\n",
-               "=" * 60,
-           ]
-           for ts, level, logger, module, lineno, message in rows:
-               lines.append(f"{ts} | {level} | {logger} | {module}:{lineno} | {message}")
-           lines.append("=" * 60)
+        try:
+            now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+            lines = [
+                f"TravelNet daily alert digest — {now}",
+                f"{len(rows)} event(s) at WARNING or above:\n",
+                "=" * 60,
+            ]
+            for r in rows:
+                lines.append(f"{r.ts} | {r.level} | {r.logger_name} | {r.module}:{r.lineno} | {r.message}")
+            lines.append("=" * 60)
 
-           send_email(
-               subject=f"[TravelNet] {len(rows)} alert(s) — {now}",
-               body="\n".join(lines),
-               smtp_host=smtp_host,
-               smtp_port=smtp_port,
-               sender=sender,
-               password=password,
-               recipient=recipient,
-               username=username,
-           )
-       except Exception:
-           restore_log_digest(rows)
-           raise
+            send_email(
+                subject=f"[TravelNet] {len(rows)} alert(s) — {now}",
+                body="\n".join(lines),
+                smtp_host=smtp_host,
+                smtp_port=smtp_port,
+                sender=sender,
+                password=password,
+                recipient=recipient,
+                username=username,
+            )
+        except Exception:
+            log_digest_table.restore(rows)
+            raise
 
 
 digest_handler = DailyDigestHandler()

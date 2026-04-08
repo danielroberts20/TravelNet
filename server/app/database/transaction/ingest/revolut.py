@@ -15,7 +15,7 @@ import json
 from datetime import datetime
 import logging
 from notifications import send_notification
-from database.exchange.util import convert_to_gbp
+from database.exchange.fx import convert_to_gbp
 from database.connection import get_conn, to_iso_str
 from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp, safe_float
 

@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Query, UploadFile, File, HTTPException, status, Depends, BackgroundTasks  # type: ignore
 from config.general import LOCATION_SHORTCUTS_BACKUP_DIR
 from auth import require_upload_token, verify_overland_token
-from database.location.overland.table import insert_overland
+from database.location.overland.table import table as overland_table
 from models.telemetry import OverlandPayload
 from upload.location.shortcuts import input_csv
 from upload.location.overland.backup import append_to_daily_buffer, log_previous_day_backup
@@ -59,7 +59,7 @@ async def upload_overland(
     """Accept an Overland GPS payload, append it to the daily JSONL buffer, and queue DB insert."""
     logger.info(f"Received Overland payload with {len(payload.locations)} entries.")
     background_tasks.add_task(append_to_daily_buffer, payload)
-    background_tasks.add_task(insert_overland, payload, device_id)
+    background_tasks.add_task(overland_table.insert_payload, payload, device_id)
     return {"result": "ok"}
 
 
