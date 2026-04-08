@@ -12,7 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from metadata.util import _backup_info, _format_uptime, _latest_in_dir
+from metadata.system import _format_uptime
+from metadata.backups import _backup_info, _latest_in_dir
 
 
 # ---------------------------------------------------------------------------
