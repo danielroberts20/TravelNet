@@ -134,18 +134,20 @@ def run():
         place_id = nearest['id']
         with get_conn() as conn:
             row = conn.execute("""
-                SELECT current_visit_id FROM known_places WHERE id = ?
+                SELECT current_visit_id, label FROM known_places WHERE id = ?
             """, (place_id,)).fetchone()
 
+            name = row['label'] if row['label'] else f"known place {place_id}"
+
             if row['current_visit_id'] is not None:
-                logger.info(f"Still at known place {place_id}, no action needed")
+                logger.info(f"Still at {name}, no action needed")
                 return
 
             visit_cursor = conn.execute("""
                 INSERT INTO place_visits (place_id, arrived_at)
                 VALUES (?, ?)
             """, (place_id, now))
-            logger.important(f"Return visit to known place {place_id}")
+            logger.important(f"Return visit to {name}")
             conn.execute("""
                 UPDATE known_places
                 SET visit_count = visit_count + 1,
@@ -203,7 +205,12 @@ def check_departure():
             WHERE id = ?
         """, (duration_mins, place_id))
 
-    logger.important("Departed known place %d after %d mins", place_id, duration_mins)
+        name = conn.execute("""
+            SELECT label FROM known_places WHERE id = ?
+        """, (place_id,)).fetchone()
+        name = name['label'] if name['label'] else f"known place {place_id}"
+
+    logger.important(f"Departed {name} after {duration_mins} mins")
 
 def get_nearest_known_place(lat, lon):
     """Returns the nearest known place row if within radius, else None."""
