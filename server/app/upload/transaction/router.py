@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, field_validator  # type: ignore
 from database.transaction.ingest.revolut import insert as insert_revolut
 
 from auth import require_upload_token
-from database.exchange.util import convert_to_gbp
+from database.exchange.fx import convert_to_gbp
 from database.connection import get_conn, to_iso_str
 from upload.transaction.wise_upload import parse_wise_upload
 

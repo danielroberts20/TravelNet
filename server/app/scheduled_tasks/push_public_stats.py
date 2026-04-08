@@ -20,7 +20,7 @@ import requests
 
 from config.settings import settings
 from notifications import CronJobMailer
-from public.util import build_public_stats
+from public.stats import build_public_stats
 
 logger = logging.getLogger(__name__)
 

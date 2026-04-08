@@ -13,7 +13,7 @@ from fastapi import APIRouter, Request  # type: ignore
 from slowapi import Limiter  # type: ignore
 from slowapi.util import get_remote_address  # type: ignore
 
-from public.util import build_public_stats
+from public.stats import build_public_stats
 
 logger = logging.getLogger(__name__)
 

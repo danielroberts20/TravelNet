@@ -1,6 +1,6 @@
 """
-public/util.py
-~~~~~~~~~~~~~~
+public/stats.py
+~~~~~~~~~~~~~~~
 Query logic for the public stats endpoint.
 Reads from the SQLite DB (counts only, no raw data) and travel.yml
 (itinerary / current leg inference).

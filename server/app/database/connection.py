@@ -72,7 +72,7 @@ def rebuild_db(*table_names):
     """
     from database.setup import init_db, insert_log
     from upload.location.shortcuts import input_csv
-    from database.exchange.util import insert_fx_file
+    from database.exchange.fx import insert_fx_file
 
     logger.info("Rebuilding database from CSV logs...")
     with get_conn() as conn:

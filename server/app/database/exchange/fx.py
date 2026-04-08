@@ -1,26 +1,36 @@
+"""
+database/exchange/fx.py
+~~~~~~~~~~~~~~~~~~~~~~~~
+FX rate query helpers and API usage management for the exchange module.
+
+Provides:
+  - get_gbp_rate() / convert_to_gbp() — rate lookup with date-tolerance fallback
+  - insert_fx_json() / insert_fx_file() — bulk ingest from API responses or backups
+  - get_api_usage() / reset_api_usage() / set_api_usage() — track monthly API call counts
+"""
+
 from datetime import date, datetime, timedelta
 import json
 import logging
 from typing import Optional
 
-from database.exchange.table import insert_fx_rate
+from database.exchange.table import table as fx_table, FxRateRecord
 from config.general import SOURCE_CURRENCY
 from database.connection import get_conn
 
 
 logger = logging.getLogger(__name__)
 
-def get_gbp_rate(currency: str, on_date: date, tolerance_days: int = 7) -> Optional[float]:
-    """
-    Return the GBP -> currency rate for the given date.
-    Tries exact match first, then searches within ±tolerance_days.
 
+def get_gbp_rate(currency: str, on_date: date, tolerance_days: int = 7) -> Optional[float]:
+    """Return the GBP → currency rate for the given date.
+
+    Tries exact match first, then searches within ±tolerance_days.
     Returns None if no rate is found within the tolerance window.
     """
-
     if currency == "GBP":
         return 1.0
-    
+
     with get_conn() as conn:
         cursor = conn.cursor()
 
@@ -31,7 +41,7 @@ def get_gbp_rate(currency: str, on_date: date, tolerance_days: int = 7) -> Optio
         row = cursor.fetchone()
         if row:
             return row[0]
-        
+
         # Fall back to nearest date within tolerance
         for delta in range(1, tolerance_days + 1):
             for candidate in [on_date - timedelta(days=delta), on_date + timedelta(days=delta)]:
@@ -44,11 +54,12 @@ def get_gbp_rate(currency: str, on_date: date, tolerance_days: int = 7) -> Optio
                     return row[0]
         return None
 
+
 def convert_to_gbp(amount: float, currency: str, on_date: date, tolerance_days: int = 7) -> Optional[float]:
     """Convert amount in currency to GBP using the stored FX rate for on_date.
 
     Falls back to the nearest available rate within tolerance_days if an exact
-    date match is unavailable.  Returns None if no rate is found.
+    date match is unavailable. Returns None if no rate is found.
     """
     if currency == "GBP":
         return round(amount, 6)
@@ -57,27 +68,33 @@ def convert_to_gbp(amount: float, currency: str, on_date: date, tolerance_days: 
         return None
     return round(amount / rate, 6)
 
-def insert_fx_json(quotes: dict):
+
+def insert_fx_json(quotes: dict) -> None:
+    """Insert FX rates from a timeframe API response.
+
+    :param quotes: dict of date -> {currency_pair -> rate}
+                   e.g. {"2026-03-01": {"GBPUSD": 1.25, ...}}
     """
-    Insert FX rates from a timeframe API response.
-    :param quotes: dict of date -> {currency_pair -> rate} (e.g. {"2026-03-01": {"GBPUSD": 1.25, ...}})
-    """
-    for date, pairs in quotes.items():
+    for date_str, pairs in quotes.items():
         for source_target_pair, rate in pairs.items():
             source_currency = source_target_pair[:3]
             target_currency = source_target_pair[3:]
 
             if source_currency != SOURCE_CURRENCY:
-                logger.warning(f"Unexpected source currency '{source_currency}' in FX data for {date} (expected {SOURCE_CURRENCY})")
+                logger.warning(
+                    f"Unexpected source currency '{source_currency}' in FX data for "
+                    f"{date_str} (expected {SOURCE_CURRENCY})"
+                )
                 continue
 
-            insert_fx_rate(
-                date=date,
+            fx_table.insert(FxRateRecord(
+                date=date_str,
                 source_currency=source_currency,
                 target_currency=target_currency,
                 rate=float(rate),
-                ts=int(datetime.strptime(date, "%Y-%m-%d").timestamp()),
-            )
+                timestamp=int(datetime.strptime(date_str, "%Y-%m-%d").timestamp()),
+            ))
+
 
 def insert_fx_file(fx_path: str) -> None:
     """Load a JSON backup file and insert all FX rates it contains."""
@@ -85,6 +102,7 @@ def insert_fx_file(fx_path: str) -> None:
         fx_data = json.load(f)
     for fx in fx_data:
         insert_fx_json(fx)
+
 
 def get_api_usage(service: str = "exchangerate.host") -> dict:
     """Return current usage count and month for a service."""

@@ -1,3 +1,17 @@
+"""
+database/location/geocoding.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Nominatim reverse-geocoding helpers and place-id lookup/creation.
+
+get_place_id()   — upsert a places row and return its id (used at every
+                   location insert point to snap lat/lon to the nearest
+                   0.001° grid cell).
+insert_geocode() — update a places row with a geocoding result from
+                   reverse_geocode().
+reverse_geocode() — call the Nominatim API for a single lat/lon.
+batch_geocode()   — geocode a list of coordinates with a 1s rate-limit delay.
+"""
+
 from datetime import datetime, timezone
 import time
 
@@ -16,6 +30,7 @@ def reverse_geocode(lat: float, lon: float) -> dict:
     resp.raise_for_status()
     return resp.json()
 
+
 def batch_geocode(coords: list[tuple[float, float]]) -> list[dict]:
     """Batch geocode a list of (lat, lon) tuples using Nominatim's bulk endpoint."""
     locations = []
@@ -28,6 +43,7 @@ def batch_geocode(coords: list[tuple[float, float]]) -> list[dict]:
             print(f"Error geocoding {lat}, {lon}: {e}")
             locations.append({})
     return locations
+
 
 def insert_geocode(place_id: int, geocode: dict) -> None:
     with get_conn() as conn:
@@ -54,7 +70,8 @@ def insert_geocode(place_id: int, geocode: dict) -> None:
             place_id
         ))
 
-def get_place_id(lat: float, lon: float) -> int|None:
+
+def get_place_id(lat: float, lon: float) -> int | None:
     lat_snap, lon_snap = round(lat, 3), round(lon, 3)
     with get_conn() as conn:
         conn.execute("""
