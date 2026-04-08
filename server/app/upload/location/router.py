@@ -27,8 +27,15 @@ async def upload_csv(
 
     decoded = contents.decode("utf-8")
     now = datetime.now()
-    with open(LOCATION_SHORTCUTS_BACKUP_DIR / f"{now.strftime('%Y-%m-%d')}.csv", "w") as f:
-        f.write(decoded)
+    backup_path = LOCATION_SHORTCUTS_BACKUP_DIR / f"{now.strftime('%Y-%m-%d')}.csv"
+    file_exists = backup_path.exists()
+    with open(backup_path, "a") as f:
+        if file_exists:
+            # Strip header row on subsequent appends to keep a single header per daily file
+            lines = decoded.splitlines(keepends=True)
+            f.writelines(lines[1:])
+        else:
+            f.write(decoded)
 
     csv_file = io.StringIO(decoded)
     background_tasks.add_task(input_csv, csv_file)
@@ -50,7 +57,7 @@ async def upload_overland(
         device_id: str = Query(default="unknown"),
 ):
     """Accept an Overland GPS payload, append it to the daily JSONL buffer, and queue DB insert."""
-    logger.upload(f"Received Overland payload with {len(payload.locations)} entries.")
+    logger.info(f"Received Overland payload with {len(payload.locations)} entries.")
     background_tasks.add_task(append_to_daily_buffer, payload)
     background_tasks.add_task(insert_overland, payload, device_id)
     return {"result": "ok"}

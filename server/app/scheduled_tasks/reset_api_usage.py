@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     configure_logging()
-    logger.info("Resetting FX API usage counter...")
+    logger.important("Resetting FX API usage counter...")
     services = ["exchangerate.host", "open-meteo"]
 
     with CronJobMailer("reset_api_usage", settings.smtp_config,

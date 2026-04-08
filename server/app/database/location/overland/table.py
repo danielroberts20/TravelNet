@@ -132,7 +132,7 @@ def insert_overland(payload: OverlandPayload, device_id: str):
         
         conn.commit()
 
-    logger.upload(
+    logger.info(
         f"Overland batch: {len(payload.locations)} received, "
         + f"{inserted} inserted, {skipped} skipped (duplicates/errors)")
     

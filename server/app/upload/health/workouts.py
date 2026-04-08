@@ -53,7 +53,7 @@ def _units(obj: dict | None) -> str | None:
 
 def handle_workout_upload(data: dict[str, Any]):
     """Parse and insert all workouts (and their route points) from a HAE workout export."""
-    logger.upload("Processing workout data in the background...")
+    logger.info("Processing workout data in the background...")
 
     workouts = data.get("workouts")
     if not workouts:
@@ -154,12 +154,12 @@ def handle_workout_upload(data: dict[str, Any]):
         )
 
         if not was_inserted:
-            logger.upload("Workout '%s' (%s) already exists, skipping.", workout_id, name)
+            logger.info("Workout '%s' (%s) already exists, skipping.", workout_id, name)
             skipped += 1
             continue
 
         inserted += 1
-        logger.upload("Inserted workout '%s' (%s).", workout_id, name)
+        logger.info("Inserted workout '%s' (%s).", workout_id, name)
 
         # Route points - only insert if workout was new to avoid duplicates
         route = w.get("route", [])

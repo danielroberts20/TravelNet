@@ -1,10 +1,17 @@
 import logging
 import os
+from typing import Optional
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends  # type: ignore
 from fastapi.responses import FileResponse  # type: ignore
+from pydantic import BaseModel  # type: ignore
 
 from auth import require_upload_token
 from database.connection import backup_db, get_conn
+from database.pruning import (
+    CASCADE_ONLY, DEFAULT_TABLES, TABLE_CONFIG,
+    get_prune_counts, prune_before, validate_tables,
+)
 
 
 router = APIRouter()
@@ -36,6 +43,56 @@ RESETTABLE_TABLES = [
     "ml_segments",
     "ml_anomalies",
 ]
+
+
+class PruneRequest(BaseModel):
+    cutoff: str
+    tables: Optional[list[str]] = None
+
+
+@router.get("/prune/tables", dependencies=[Depends(require_upload_token)])
+async def prune_tables_list():
+    """Return the tables eligible for pruning and their cascade relationships."""
+    return {
+        "tables": list(TABLE_CONFIG.keys()),
+        "cascade_only": list(CASCADE_ONLY),
+        "default": DEFAULT_TABLES,
+    }
+
+
+@router.post("/prune/preview", dependencies=[Depends(require_upload_token)])
+async def prune_preview(req: PruneRequest):
+    """Return row counts that would be deleted — no data is modified."""
+    try:
+        conn = get_conn(read_only=True)
+        counts = get_prune_counts(conn, req.cutoff, req.tables)
+        conn.close()
+        return {"counts": counts}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/prune/execute", dependencies=[Depends(require_upload_token)])
+async def prune_execute(req: PruneRequest):
+    """Create a pre-prune backup then delete rows older than cutoff."""
+    try:
+        validate_tables(req.tables or DEFAULT_TABLES)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    try:
+        backup_path = backup_db(prefix="pre_prune")
+        conn = get_conn()
+        deleted = prune_before(conn, req.cutoff, req.tables)
+        conn.close()
+        logger.warning(
+            f"Prune executed: cutoff={req.cutoff}, tables={req.tables}, "
+            f"deleted={deleted}, backup={backup_path}"
+        )
+        return {"deleted": deleted, "backup": str(backup_path)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/download", dependencies=[Depends(require_upload_token)])

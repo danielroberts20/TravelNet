@@ -27,6 +27,7 @@ def init() -> None:
                 road          TEXT,
                 display_name  TEXT,
                 geocoded_at   TEXT,
+                timezone      TEXT,
                 created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
                 UNIQUE(lat_snap, lon_snap)
             );

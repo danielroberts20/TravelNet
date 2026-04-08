@@ -50,7 +50,6 @@ def compute_centroid(points):
     if len(points) < LOCATION_MINIMUM_POINTS:
         return None
 
-    # Check spread — if points are too dispersed, we're still moving
     anchor_lat = points[0]['latitude']
     anchor_lon = points[0]['longitude']
     for p in points[1:]:
@@ -59,7 +58,8 @@ def compute_centroid(points):
 
     avg_lat = sum(p['latitude'] for p in points) / len(points)
     avg_lon = sum(p['longitude'] for p in points) / len(points)
-    return avg_lat, avg_lon
+    earliest = min(p['timestamp'] for p in points)  # earliest point in the cluster
+    return avg_lat, avg_lon, earliest
 
 def get_address(lat, lon):
     with get_conn() as conn:
@@ -98,7 +98,7 @@ def run():
     if centroid is None:
         return
     
-    lat, lon = centroid
+    lat, lon, arrived_at = centroid
     now = to_iso_str(datetime.now(timezone.utc))
     nearest = get_nearest_known_place(lat, lon)
 
@@ -107,20 +107,20 @@ def run():
             cursor = conn.execute("""
                 INSERT INTO known_places (latitude, longitude, first_seen, visit_count, last_visited)
                 VALUES (?, ?, ?, 1, ?)
-            """, (lat, lon, now, now))
+            """, (lat, lon, arrived_at, arrived_at))
             place_id = cursor.lastrowid
 
             visit_cursor = conn.execute("""
                 INSERT INTO place_visits (place_id, arrived_at)
                 VALUES (?, ?)
-            """, (place_id, now))
+            """, (place_id, arrived_at))
             visit_id = visit_cursor.lastrowid
 
             conn.execute("""
                 UPDATE known_places SET current_visit_id = ? WHERE id = ?
             """, (visit_id, place_id))
 
-        logger.info("New location detected at %.5f, %.5f", lat, lon)
+        logger.important("New location detected at %.5f, %.5f", lat, lon)
 
         address = get_address(lat, lon)
         name = address.get("city") or address.get("suburb") or address.get("road") or address.get("region") or f"{lat:.3f}, {lon:.3f}"
@@ -134,25 +134,27 @@ def run():
         place_id = nearest['id']
         with get_conn() as conn:
             row = conn.execute("""
-                SELECT current_visit_id FROM known_places WHERE id = ?
+                SELECT current_visit_id, label FROM known_places WHERE id = ?
             """, (place_id,)).fetchone()
 
+            name = row['label'] if row['label'] else f"known place {place_id}"
+
             if row['current_visit_id'] is not None:
-                logger.info(f"Still at known place {place_id}, no action needed")
+                logger.info(f"Still at {name}, no action needed")
                 return
 
             visit_cursor = conn.execute("""
                 INSERT INTO place_visits (place_id, arrived_at)
                 VALUES (?, ?)
-            """, (place_id, now))
-            logger.info(f"Return visit to known place {place_id}")
+            """, (place_id, arrived_at))
+            logger.important(f"Return visit to {name}")
             conn.execute("""
                 UPDATE known_places
                 SET visit_count = visit_count + 1,
                     last_visited = ?,
                     current_visit_id = ?
                 WHERE id = ?
-            """, (now, visit_cursor.lastrowid, place_id))
+            """, (arrived_at, visit_cursor.lastrowid, place_id))
 
 def get_current_visit():
     """Returns (visit_id, place_id, lat, lon, arrived_at) for the open visit, or None."""
@@ -178,16 +180,24 @@ def check_departure():
     if not points:
         return
 
-    # If any recent point is still within radius, we haven't departed
+    last_in_radius = None
     for p in points:
         if haversine_m(kp_lat, kp_lon, p['latitude'], p['longitude']) <= LOCATION_CHANGE_RADIUS_M:
-            return
+            if last_in_radius is None or p['timestamp'] > last_in_radius:
+                last_in_radius = p['timestamp']
 
-    # All recent points are outside radius — departure confirmed
-    now = datetime.now(timezone.utc)
-    departed_at = to_iso_str(now)
+    if last_in_radius is not None:
+        return  # still at location
+
+    # All recent points outside radius — use timestamp of last in-radius point as departure time
+    # Fall back to arrived_at + 1 min if somehow no in-radius point found in history
+    departed_at = get_last_in_radius_timestamp(kp_lat, kp_lon, arrived_at)
+    if departed_at is None:
+        departed_at = to_iso_str(datetime.now(timezone.utc))  # fallback only
+
     arrived_dt = datetime.fromisoformat(arrived_at)
-    duration_mins = int((now - arrived_dt).total_seconds() / 60)
+    departed_dt = datetime.fromisoformat(departed_at)
+    duration_mins = int((departed_dt - arrived_dt).total_seconds() / 60)
 
     with get_conn() as conn:
         conn.execute("""
@@ -203,7 +213,12 @@ def check_departure():
             WHERE id = ?
         """, (duration_mins, place_id))
 
-    logger.info("Departed known place %d after %d mins", place_id, duration_mins)
+        name = conn.execute("""
+            SELECT label FROM known_places WHERE id = ?
+        """, (place_id,)).fetchone()
+        name = name['label'] if name['label'] else f"known place {place_id}"
+
+    logger.important(f"Departed {name} after {duration_mins} mins")
 
 def get_nearest_known_place(lat, lon):
     """Returns the nearest known place row if within radius, else None."""
@@ -217,3 +232,16 @@ def get_nearest_known_place(lat, lon):
             closest = r
             closest_dist = dist
     return closest
+
+def get_last_in_radius_timestamp(kp_lat, kp_lon, arrived_at: str):
+    """Find the most recent location point within radius since the visit started."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT timestamp, latitude, longitude FROM location_unified
+            WHERE timestamp >= ?
+            ORDER BY timestamp DESC
+        """, (arrived_at,)).fetchall()
+    for r in rows:
+        if haversine_m(kp_lat, kp_lon, r['latitude'], r['longitude']) <= LOCATION_CHANGE_RADIUS_M:
+            return r['timestamp']
+    return None

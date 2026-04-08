@@ -2,7 +2,7 @@ from config.editable import load_overrides
 load_overrides()
 
 import calendar
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 from dateutil.relativedelta import relativedelta
 import logging
@@ -112,15 +112,51 @@ def get_fx_for_month(month: int = None, year: int = None) -> dict:
     }
 
 
+def get_fx_for_day(date: datetime = None) -> dict:
+    """
+    Fetch and store FX rates for a single day.
+    :param date: datetime to fetch rates for; defaults to 2 days ago (UTC) to ensure
+                 rates are finalised across all timezones before retrieval
+    :return: dict with keys: date_label, dates_inserted, backup_path
+    :raises RuntimeError: if the API returns an error or no quotes
+    """
+    if date is None:
+        date = datetime.now(timezone.utc) - timedelta(days=2)
+    date_string = date.strftime("%Y-%m-%d")
+
+    logger.info(f"Fetching FX rates for {date_string}...")
+
+    response = get_fx_rate_at_date(date_string)
+    if response is None:
+        raise RuntimeError(f"FX API returned no response for {date_string}")
+
+    quotes = _extract_quotes(response)
+    if not quotes:
+        raise RuntimeError(f"FX API returned no quotes for {date_string}")
+
+    insert_fx_json({date_string: quotes})
+
+    backup_path = FX_BACKUP_DIR / f"{date_string}.json"
+    with open(backup_path, "w") as f:
+        json.dump(response, f, indent=2)
+    logger.info(f"Saved FX rates to {backup_path}")
+
+    return {
+        "date_label": date_string,
+        "dates_inserted": 1,
+        "backup_path": str(backup_path),
+    }
+
+
 if __name__ == "__main__":
     configure_logging()
 
-    prev_month = datetime.now() - relativedelta(months=1)
-    logger.info(f"Getting FX rates for previous month ({prev_month.strftime('%B %Y')})...")
+    target = datetime.now(timezone.utc) - timedelta(days=2)
+    logger.info(f"Getting FX rates for {target.strftime('%Y-%m-%d')} (2 days ago)...")
 
     with CronJobMailer("get_fx", settings.smtp_config,
-                       detail="Pull FX rates for previous month") as job:
-        result = get_fx_for_month()
-        job.add_metric("month", result["month_label"])
+                       detail="Pull FX rates for previous day") as job:
+        result = get_fx_for_day()
+        job.add_metric("date", result["date_label"])
         job.add_metric("dates inserted", result["dates_inserted"])
         job.add_metric("backup path", result["backup_path"])
