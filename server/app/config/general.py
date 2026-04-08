@@ -173,6 +173,11 @@ SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from")("GBP")
 
 INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation")(5)
 
+
+# ---------------------------------------------------------------------------
+# Journal
+# ---------------------------------------------------------------------------
+JOURNAL_STALENESS_HOURS = editable("JOURNAL_STALENESS_HOURS", "Number of hours after which a journal entry is considered stale")(18)
 # ---------------------------------------------------------------------------
 # Location deduplication
 # ---------------------------------------------------------------------------
