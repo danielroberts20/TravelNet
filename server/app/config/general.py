@@ -10,7 +10,6 @@ be overridden via config_overrides.json without a code change.
 Directory constants are created on module import (mkdir exist_ok=True) so
 the application never starts with a missing backup directory.
 """
-# Storage directory (Docker volume)
 from datetime import datetime
 from pathlib import Path
 from config.editable import editable
@@ -18,9 +17,8 @@ from yarl import URL # type: ignore
 
 
 # ---------------------------------------------------------------------------
-# Directories
+# Storage & Backups
 # ---------------------------------------------------------------------------
-
 
 DATA_DIR = Path("/data")
 
@@ -62,88 +60,53 @@ if DATA_DIR.exists():
     for backup_dir in BACKUP_DIRS:
         backup_dir.mkdir(parents=True, exist_ok=True)
 
+STALE_DAYS = editable("STALE_DAYS", "Number of days to consider a backup stale", group="Storage & Backups")(7)
+
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
 LOG_DIR = Path("./logs/")
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / "server.log"
 WARN_FILE = LOG_DIR / "server.warn.log"
 ERROR_FILE = LOG_DIR / "server.error.log"
 
+
+# ---------------------------------------------------------------------------
+# Runtime Configuration
+# ---------------------------------------------------------------------------
+
 OVERRIDES_PATH = DATA_DIR / "config_overrides.json"
 
 TRAVEL_YML = Path("/travel.yml")
+
 
 # ---------------------------------------------------------------------------
 # Notifications
 # ---------------------------------------------------------------------------
 
-AVAILABLE_NOTIFICATIONS = editable("AVAILABLE_NOTIFICATIONS", "Pushcut notification Webhook URL and internal name")({
+AVAILABLE_NOTIFICATIONS = editable("AVAILABLE_NOTIFICATIONS", "Pushcut notification Webhook URL and internal name", group="Notifications")({
     "travelnet_test": "https://api.pushcut.io/KjvFN6-uKZjR0S3lNehts/notifications/TravelNet%20Test",
 })
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# API & Access Control
 # ---------------------------------------------------------------------------
 
 PUBLIC_ALLOWED_PREFIXES = ["/public/"]
 
-# ---------------------------------------------------------------------------
-# Location
-# ---------------------------------------------------------------------------
-LOCATION_CHANGE_RADIUS_M = editable("LOCATION_CHANGE_RADIUS_M", "Distance in meters to consider a location change")(500)
-LOCATION_STAY_DURATION_MINS = editable("LOCATION_STAY_DURATION_MINS", "Duration in minutes to consider a stay at a location")(30)
-LOCATION_MINIMUM_POINTS = editable("LOCATION_MINIMUM_POINTS", "Minimum number of location points within the stay duration to consider it a valid stay")(5)
-LOCATION_STATIONARITY_RADIUS_M = editable("LOCATION_STATIONARITY_RADIUS_M", "Distance in meters that location points must be within to be considered stationary rather than in transit")(150)
 
 # ---------------------------------------------------------------------------
-# Weather
+# Travel Itinerary
 # ---------------------------------------------------------------------------
 
-STALE_DAYS = editable("STALE_DAYS", "Number of days to consider a backup stale")(7)
-
-
-OPEN_METEO_URL = (URL("https://archive-api.open-meteo.com/v1/archive"))
-
-HOURLY_VARS = editable("HOURLY_VARS", "OpenMeteo API variables that are per hour")([
-    "temperature_2m",
-    "apparent_temperature",
-    "precipitation",
-    "windspeed_10m",
-    "winddirection_10m",
-    "weathercode",
-    "uv_index",
-    "cloudcover",
-    "is_day"
-    ])
-
-DAILY_VARS = editable("DAILY_VARS", "OpenMeteo API variables that are per day")([
-    "sunrise",
-    "sunset",
-    "precipitation_sum",
-    "precipitation_hours",
-    "snowfall_sum",
-    "wind_speed_10m_max",
-    "wind_gusts_10m_max"
-])
-
-
-# Coordinate rounding resolution — matches Open-Meteo's ~10 km grid
-COORD_PRECISION = editable("COORD_PRECISION", "Number of decimal places to round lat/lon coordinates for OpenMeteo requests")(1)
-
-# Seconds between API requests — be a polite free-tier citizen
-REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMeteo request.\nPolite not to spam a free service")(0.5)
-
-# ---------------------------------------------------------------------------
-# Countries/Travel Legs
-# ---------------------------------------------------------------------------
-COUNTRY_DEPARTURE_DATES = editable("COUNTRY_DEPARTURE_DATES", "Dates")({
+COUNTRY_DEPARTURE_DATES = editable("COUNTRY_DEPARTURE_DATES", "Dates", group="Travel Itinerary")({
     "UK": (datetime(year=2026, month=6, day=11)),
     "USA": datetime(year=2026, month=9, day=2)
 })
-
-# ---------------------------------------------------------------------------
-# Directories
-# ---------------------------------------------------------------------------
 
 TRAVEL_START_DATE = COUNTRY_DEPARTURE_DATES.get("UK")
 TRAVEL_START_DATE_TIMESTAMP = int(TRAVEL_START_DATE.timestamp())
@@ -159,46 +122,91 @@ def _refresh_derived():
 
 
 # ---------------------------------------------------------------------------
-# Transaction
+# Location
 # ---------------------------------------------------------------------------
 
-
-FX_URL = URL("https://api.exchangerate.host/timeframe")
-CURRENCIES = editable("CURRENCIES", "Currencies used on travel")(["GBP", "USD", "CAD", "EUR", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"])
-SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from")("GBP")
-
-# ---------------------------------------------------------------------------
-# Health
-# ---------------------------------------------------------------------------
-
-INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation")(5)
-
-
-# ---------------------------------------------------------------------------
-# Journal
-# ---------------------------------------------------------------------------
-JOURNAL_STALENESS_HOURS = editable("JOURNAL_STALENESS_HOURS", "Number of hours after which a journal entry is considered stale")(18)
-# ---------------------------------------------------------------------------
-# Location deduplication
-# ---------------------------------------------------------------------------
+LOCATION_CHANGE_RADIUS_M = editable("LOCATION_CHANGE_RADIUS_M", "Distance in meters to consider a location change", group="Location")(500)
+LOCATION_STAY_DURATION_MINS = editable("LOCATION_STAY_DURATION_MINS", "Duration in minutes to consider a stay at a location", group="Location")(30)
+LOCATION_MINIMUM_POINTS = editable("LOCATION_MINIMUM_POINTS", "Minimum number of location points within the stay duration to consider it a valid stay", group="Location")(5)
+LOCATION_STATIONARITY_RADIUS_M = editable("LOCATION_STATIONARITY_RADIUS_M", "Distance in meters that location points must be within to be considered stationary rather than in transit", group="Location")(150)
+LOCATION_NOISE_ACCURACY_THRESHOLD = editable("LOCATION_NOISE_ACCURACY_THRESHOLD", "Threshold for horizontal accuracy to consider a location point as tier 1 noise", group="Location")(100)
 
 LOCATION_TIME_WINDOW = editable(
     "LOCATION_TIME_WINDOW",
-    "Seconds — match window between Overland and Shortcuts points when deduplicating"
+    "Seconds — match window between Overland and Shortcuts points when deduplicating",
+    group="Location"
 )(60)
 
 LOCATION_DIST_THRESHOLD = editable(
     "LOCATION_DIST_THRESHOLD",
-    "Degrees — distance below which two points are considered the same location (~1 km)"
+    "Degrees — distance below which two points are considered the same location (~1 km)",
+    group="Location"
 )(0.01)
-
-# ---------------------------------------------------------------------------
-# Gap annotations
-# ---------------------------------------------------------------------------
 
 GAP_ANNOTATION_TOLERANCE_MINUTES = editable(
     "GAP_ANNOTATION_TOLERANCE_MINUTES",
     "Tolerance in minutes applied on each side of an annotation when checking\n"
     "whether it covers a detected data gap.  A value of 10 means an annotation\n"
-    "needs to start at most 10 min before the gap and end at most 10 min after it."
+    "needs to start at most 10 min before the gap and end at most 10 min after it.",
+    group="Location"
 )(10)
+
+
+# ---------------------------------------------------------------------------
+# Weather
+# ---------------------------------------------------------------------------
+
+OPEN_METEO_URL = (URL("https://archive-api.open-meteo.com/v1/archive"))
+
+HOURLY_VARS = editable("HOURLY_VARS", "OpenMeteo API variables that are per hour", group="Weather")([
+    "temperature_2m",
+    "apparent_temperature",
+    "precipitation",
+    "windspeed_10m",
+    "winddirection_10m",
+    "weathercode",
+    "uv_index",
+    "cloudcover",
+    "is_day"
+    ])
+
+DAILY_VARS = editable("DAILY_VARS", "OpenMeteo API variables that are per day", group="Weather")([
+    "sunrise",
+    "sunset",
+    "precipitation_sum",
+    "precipitation_hours",
+    "snowfall_sum",
+    "wind_speed_10m_max",
+    "wind_gusts_10m_max"
+])
+
+# Coordinate rounding resolution — matches Open-Meteo's ~10 km grid
+COORD_PRECISION = editable("COORD_PRECISION", "Number of decimal places to round lat/lon coordinates for OpenMeteo requests", group="Weather")(1)
+
+# Seconds between API requests — be a polite free-tier citizen
+REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMeteo request.\nPolite not to spam a free service", group="Weather")(0.5)
+
+
+# ---------------------------------------------------------------------------
+# Foreign Exchange
+# ---------------------------------------------------------------------------
+
+FX_BASE_URL = URL("https://api.exchangerate.host")
+FX_TIMEFRAME_URL = FX_BASE_URL / "timeframe"
+FX_DATE_URL = FX_BASE_URL / "historical"
+CURRENCIES = editable("CURRENCIES", "Currencies used on travel", group="Foreign Exchange")(["GBP", "USD", "CAD", "EUR", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"])
+SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from", group="Foreign Exchange")("GBP")
+
+
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation", group="Health")(5)
+
+
+# ---------------------------------------------------------------------------
+# Journal
+# ---------------------------------------------------------------------------
+
+JOURNAL_STALENESS_HOURS = editable("JOURNAL_STALENESS_HOURS", "Number of hours after which a journal entry is considered stale", group="Journal")(18)
