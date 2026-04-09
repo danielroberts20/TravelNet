@@ -63,7 +63,7 @@ def push_stats_to_github(payload: dict) -> None:
     body = {
         "message": f"chore: update public stats [{now}]",
         "content": encoded,
-        "branch": "demo-website",
+        "branch": "main",
     }
     if sha:
         body["sha"] = sha
