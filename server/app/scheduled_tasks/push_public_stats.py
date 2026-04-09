@@ -35,7 +35,7 @@ def get_current_sha(headers: dict) -> str | None:
     Returns None if the file doesn't exist yet (first run).
     """
     url = f"{GITHUB_API}/repos/{settings.github_repo}/contents/{TARGET_PATH}"
-    resp = requests.get(url, headers=headers, timeout=10)
+    resp = requests.get(url, headers=headers, timeout=10, params={"ref": "demo-website"})
     if resp.status_code == 200:
         return resp.json().get("sha")
     if resp.status_code == 404:

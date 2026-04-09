@@ -12,7 +12,7 @@ from typing import Dict, Optional
 import requests
 from database.connection import increment_api_usage
 from config.logging import configure_logging
-from config.general import CURRENCIES, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
+from config.general import CURRENCIES, FX_BACKUP_DIR, FX_DATE_URL, FX_TIMEFRAME_URL, SOURCE_CURRENCY
 from config.settings import settings
 from database.exchange.fx import insert_fx_json
 from notifications import CronJobMailer
@@ -44,7 +44,7 @@ def get_fx_rate_at_date(date_string: str, retry_time: int = 5, *currencies: str,
             "source": kwargs.get("source", SOURCE_CURRENCY),
             "currencies": ",".join(list(currencies)),
         }
-        response = requests.get(FX_URL, params=params)
+        response = requests.get(FX_DATE_URL, params=params)
         increment_api_usage("exchangerate.host")
         if response.json().get("success") is not True or "error" in response.json():
             if response.json().get("error", {}).get("type", {}) == "rate_limit_reached":
@@ -85,7 +85,7 @@ def get_fx_for_month(month: int = None, year: int = None) -> dict:
         "source": SOURCE_CURRENCY,
         "currencies": ",".join(CURRENCIES),
     }
-    response = requests.get(FX_URL, params=params).json()
+    response = requests.get(FX_TIMEFRAME_URL, params=params).json()
     increment_api_usage("exchangerate.host")
 
     if response.get("success") is not True:
