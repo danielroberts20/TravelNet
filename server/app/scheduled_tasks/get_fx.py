@@ -44,7 +44,8 @@ def get_fx_rate_at_date(date_string: str, retry_time: int = 5, *currencies: str,
             "source": kwargs.get("source", SOURCE_CURRENCY),
             "currencies": ",".join(list(currencies)),
         }
-        response = requests.get(FX_DATE_URL, params=params)
+        response = requests.get(FX_DATE_URL, params=params, timeout=30)
+        response.raise_for_status()
         increment_api_usage("exchangerate.host")
         if response.json().get("success") is not True or "error" in response.json():
             if response.json().get("error", {}).get("type", {}) == "rate_limit_reached":
@@ -57,7 +58,8 @@ def get_fx_rate_at_date(date_string: str, retry_time: int = 5, *currencies: str,
         else:
             logger.info(f"Successful FX API call for {date_string}")
             return response.json()
-    except ValueError:
+    except (ValueError, requests.exceptions.RequestException) as e:
+        logger.error(f"FX API request failed for {date_string}: {e}")
         return None
 
 
@@ -85,7 +87,9 @@ def get_fx_for_month(month: int = None, year: int = None) -> dict:
         "source": SOURCE_CURRENCY,
         "currencies": ",".join(CURRENCIES),
     }
-    response = requests.get(FX_TIMEFRAME_URL, params=params).json()
+    resp = requests.get(FX_TIMEFRAME_URL, params=params, timeout=30)
+    resp.raise_for_status()
+    response = resp.json()
     increment_api_usage("exchangerate.host")
 
     if response.get("success") is not True:

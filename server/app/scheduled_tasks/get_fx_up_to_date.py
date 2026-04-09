@@ -97,7 +97,9 @@ def get_fx_up_to_date(target_date: date = None):
         "currencies": ",".join(CURRENCIES),
     }
 
-    response = requests.get(FX_URL, params=params).json()
+    resp = requests.get(FX_URL, params=params, timeout=30)
+    resp.raise_for_status()
+    response = resp.json()
     increment_api_usage("exchangerate.host")
 
     if response.get("success") is not True:
