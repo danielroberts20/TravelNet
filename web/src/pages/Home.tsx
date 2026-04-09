@@ -257,15 +257,15 @@ export default function Home() {
             </div>
 
             <div className="feature-card reveal" data-accent="purple">
-              <div className="feature-icon-wrap" data-bg="purple">💬</div>
+              <div className="feature-icon-wrap" data-bg="purple">🔬</div>
               <h3 className="feature-title">Trevor</h3>
               <p className="feature-desc">
                 A RAG-based AI assistant that lets you have a conversation with three years of personal travel data — journal entries, GPS traces, health metrics, and spending logs.
               </p>
-              <a href="https://github.com/danielroberts20/Trevor-For-TravelNet" class="feature-tag" target="_blank" rel="noopener">
-                <span style="width:6px;height:6px;border-radius:50%;background:var(--accent-orange);display:inline-block;"></span>
-                Coming soon &mdash; GitHub &rarr;
-              </a>
+              <Link to="/trevor" className="feature-tag">
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-orange)', display: 'inline-block' }}></span>
+                Coming soon
+              </Link>
             </div>
 
           </div>
