@@ -14,6 +14,8 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+from config.general import LOCATION_NOISE_ACCURACY_THRESHOLD
+from database.location.noise.table import table as noise_table, LocationNoiseRecord
 from database.base import BaseTable
 from database.connection import get_conn, to_iso_str
 from database.location.overland.util import _normalise_ts
@@ -201,8 +203,21 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
 
                     if cursor.rowcount:
                         inserted += 1
+                        overland_id = cursor.lastrowid
                     else:
                         skipped += 1
+                        row = conn.execute(
+                            "SELECT id FROM location_overland WHERE device_id = ? AND timestamp = ?",
+                            (device_id, ts),
+                        ).fetchone()
+                        overland_id = row[0] if row else None
+                    
+                    if overland_id and props.horizontal_accuracy and props.horizontal_accuracy > LOCATION_NOISE_ACCURACY_THRESHOLD:
+                        noise_table.insert(LocationNoiseRecord(overland_id, tier=1, reason='accuracy_threshold'))
+                        logger.important(
+                            f"High accuracy value ({props.horizontal_accuracy}m) for point at "
+                            f"{ts} ({lat}, {lon}). Inserted to noise table as tier 1 noise."
+                        )
                 except Exception as e:
                     logger.error(f"Failed to insert Overland point {props.timestamp}: {e}")
 
@@ -212,6 +227,8 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
             f"Overland batch: {len(payload.locations)} received, "
             f"{inserted} inserted, {skipped} skipped (duplicates/errors)"
         )
+
+
         return inserted, skipped
 
 
