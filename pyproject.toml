@@ -1,2 +1,5 @@
 [tool.pytest.ini_options]
 testpaths = ["server/tests"]
+
+[tool.setuptools]
+packages = []
