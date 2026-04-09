@@ -13,11 +13,14 @@ batch_geocode()   — geocode a list of coordinates with a 1s rate-limit delay.
 """
 
 from datetime import datetime, timezone
+import logging
 import time
 
 import requests
 
 from database.connection import get_conn, to_iso_str
+
+logger = logging.getLogger(__name__)
 
 
 def reverse_geocode(lat: float, lon: float) -> dict:
@@ -40,7 +43,7 @@ def batch_geocode(coords: list[tuple[float, float]]) -> list[dict]:
             locations.append(loc)
             time.sleep(1)
         except Exception as e:
-            print(f"Error geocoding {lat}, {lon}: {e}")
+            logger.error(f"Error geocoding {lat}, {lon}: {e}")
             locations.append({})
     return locations
 

@@ -73,12 +73,6 @@ async def get_next_compute_legacy():
         return {"compute": None}
 
 
-@router.post("/update-status", dependencies=[Depends(require_upload_token)])
-async def update_compute_status(compute_id: str, status: Status):
-    """Update the status of a compute task by ID (placeholder — not yet implemented)."""
-    raise HTTPException(status_code=501, detail="Not implemented")
-
-
 @router.post("/gpu-info", dependencies=[Depends(require_upload_token)])
 async def gpu_info(data: dict[str, Any], background_tasks: BackgroundTasks):
     """Accept a GPU telemetry report from a worker node and log it."""
