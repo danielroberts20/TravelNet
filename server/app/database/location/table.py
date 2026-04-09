@@ -88,7 +88,7 @@ class LocationShortcutsTable(BaseTable[LocationRecord]):
                     o.latitude,
                     o.longitude,
                     o.altitude,
-                    o.activity,
+                    o.motion              AS activity,
                     o.battery_level       AS battery,
                     o.speed,
                     o.device_id           AS device,
