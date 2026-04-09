@@ -631,6 +631,7 @@ section {
 .feature-card[data-accent="teal"]   { --card-accent: var(--accent-teal); }
 .feature-card[data-accent="orange"] { --card-accent: var(--accent-orange); }
 .feature-card[data-accent="purple"] { --card-accent: var(--accent-purple); }
+.feature-card[data-accent="red"]   { --card-accent: var(--accent-red); }
 
 .feature-icon-wrap {
   width: 44px;
@@ -647,6 +648,7 @@ section {
 .feature-icon-wrap[data-bg="teal"]   { background: rgba(48, 209, 88, 0.12); }
 .feature-icon-wrap[data-bg="orange"] { background: rgba(255, 159, 10, 0.12); }
 .feature-icon-wrap[data-bg="purple"] { background: rgba(191, 90, 242, 0.12); }
+.feature-icon-wrap[data-bg="red"] { background: rgba(255, 0, 0, 0.12); }
 
 .feature-title {
   font-size: 17px;

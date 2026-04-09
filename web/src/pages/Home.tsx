@@ -245,19 +245,7 @@ export default function Home() {
             </div>
 
             <div className="feature-card reveal" data-accent="purple">
-              <div className="feature-icon-wrap" data-bg="purple">🔬</div>
-              <h3 className="feature-title">Open Dataset</h3>
-              <p className="feature-desc">
-                An anonymised, privacy-fuzzed subset of the full dataset. GPS coordinates offset by ~1&thinsp;km Gaussian noise. Free to explore and build on.
-              </p>
-              <a href={GITHUB_REPO} className="feature-tag" target="_blank" rel="noopener">
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-orange)', display: 'inline-block' }}></span>
-                GitHub &rarr;
-              </a>
-            </div>
-
-            <div className="feature-card reveal" data-accent="purple">
-              <div className="feature-icon-wrap" data-bg="purple">🔬</div>
+              <div className="feature-icon-wrap" data-bg="purple">🧠</div>
               <h3 className="feature-title">Trevor</h3>
               <p className="feature-desc">
                 A RAG-based AI assistant that lets you have a conversation with three years of personal travel data — journal entries, GPS traces, health metrics, and spending logs.
@@ -266,6 +254,18 @@ export default function Home() {
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-orange)', display: 'inline-block' }}></span>
                 Coming soon
               </Link>
+            </div>
+
+            <div className="feature-card reveal" data-accent="red">
+              <div className="feature-icon-wrap" data-bg="red">🔬</div>
+              <h3 className="feature-title">Open Dataset</h3>
+              <p className="feature-desc">
+                An anonymised, privacy-fuzzed subset of the full dataset. GPS coordinates offset by ~1&thinsp;km Gaussian noise. Free to explore and build on.
+              </p>
+              <a href={GITHUB_REPO} className="feature-tag" target="_blank" rel="noopener">
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-orange)', display: 'inline-block' }}></span>
+                GitHub &rarr;
+              </a>
             </div>
 
           </div>
