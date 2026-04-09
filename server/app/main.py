@@ -57,6 +57,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    send_notification(title="TravelNet", body="❌ Server offline", use_prefix=False)
+
 
 app = FastAPI(title="TravelNet API", version="1.0.1", lifespan=lifespan)
 
