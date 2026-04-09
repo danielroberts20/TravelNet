@@ -39,7 +39,7 @@ def run_tests() -> dict:
     :returns: dict with keys passed, failed, errors, exit_code, output.
     """
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "server/app/tests/", "-q", "--tb=short"],
+        [sys.executable, "-m", "pytest", "server/tests/", "-q", "--tb=short"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

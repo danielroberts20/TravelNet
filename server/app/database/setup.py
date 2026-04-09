@@ -1,67 +1,91 @@
-from config.editable import log_config_summary
-from database.connection import get_conn
-from models.telemetry import Log
-from database.places.table import init as init_places
-from database.cellular.table import init as init_cellular, insert_cellular_state
-from database.exchange.table import init as init_fx
-from database.location.table import init as init_location, init_unified_view, insert_location
-from database.health.table import init as init_health
-from database.health.heart_rate.table import init as init_heart_rate
-from database.health.sleep.table import init as init_sleep
-from database.health.workouts.table import init as init_workouts
-from database.health.mood.table import init as init_mood
-from database.transaction.table import init as init_transactions
-from database.triggers.table import init as init_triggers
-from database.compute.table import init as init_compute
-from database.location.overland.table import init as init_overland
-from database.location.gap_annotations.table import init as init_gap_annotations
-from database.weather.table import init as init_weather
-from database.logging.table import init as init_log_digest
-from database.ml.table import init as init_ml
-from triggers.location_change import init as init_location_change
+"""
+database/setup.py
+~~~~~~~~~~~~~~~~~
+Database initialisation entry point.
 
-# -----------------------------
-# Initialization
-# -----------------------------
-def init_db():
+TABLE_REGISTRY lists every BaseTable instance in dependency order:
+- places must be first (FK target for all place_id columns)
+- location_overland and location_shortcuts must precede the unified view
+- known_places must precede place_visits (FK)
+- The unified view is initialised last via location_table.init_unified_view()
+"""
+
+from config.editable import log_config_summary
+from database.base import BaseTable
+from models.telemetry import Log
+
+from database.places.table import table as places_table
+from database.cellular.table import table as cellular_table, CellularRecord
+from database.exchange.table import table as fx_table
+from database.location.table import table as location_table, LocationRecord
+from database.health.table import table as health_table
+from database.health.heart_rate.table import table as heart_rate_table
+from database.health.sleep.table import table as sleep_table
+from database.health.workouts.table import table as workouts_table
+from database.health.mood.table import table as mood_table
+from database.transaction.table import table as transactions_table
+from database.triggers.table import table as trigger_table
+from database.compute.table import table as compute_table
+from database.location.overland.table import table as overland_table
+from database.location.gap_annotations.table import table as gap_annotations_table
+from database.location.known_places.table import table as known_places_table
+from database.location.noise.table import table as noise_table
+from database.weather.table import table as weather_table
+from database.logging.table import table as log_digest_table
+from database.ml.table import table as ml_table
+
+TABLE_REGISTRY: list[BaseTable] = [
+    places_table,           # Must be first — FK target for all place_id columns
+    cellular_table,
+    fx_table,
+    location_table,         # location_shortcuts
+    health_table,
+    heart_rate_table,
+    sleep_table,
+    workouts_table,
+    mood_table,
+    transactions_table,
+    trigger_table,
+    compute_table,
+    overland_table,
+    gap_annotations_table,
+    known_places_table,     # known_places + place_visits (must follow places_table)
+    weather_table,
+    log_digest_table,
+    ml_table,
+    noise_table,
+]
+
+
+def init_db() -> None:
     """Initialise all DB tables and views.
 
-    places must be created first as many other tables reference it via
-    foreign keys.  The unified location view is created last because it
-    depends on both location_shortcuts and location_overland.
+    Calls init() on every table in TABLE_REGISTRY, then creates the unified
+    location view (which depends on both location_shortcuts and location_overland).
     """
-    init_places()        # Must be first — FK target for all place_id columns
-    init_cellular()
-    init_fx()
-    init_location()
-    init_health()
-    init_heart_rate()
-    init_sleep()
-    init_workouts()
-    init_mood()
-    init_transactions()
-    init_triggers()
-    init_compute()
-    init_overland()
-    init_gap_annotations()
-    init_weather()
-    init_log_digest()
-    init_ml()
-    init_location_change()
-    log_config_summary()
+    for t in TABLE_REGISTRY:
+        t.init()
 
     # Must be last — depends on location_shortcuts and location_overland tables
-    init_unified_view()
+    location_table.init_unified_view()
+    noise_table.init_clean_view()
 
-# -----------------------------
-# Insertion helpers
-# -----------------------------
-def insert_log(log: Log):
+    log_config_summary()
+
+
+def insert_log(log: Log) -> None:
     """Insert a single Shortcuts telemetry log row (location + cellular state)."""
-    with get_conn() as conn:
-        location_id = insert_location(conn, log.timestamp, log.latitude, log.longitude, log.altitude,
-                                      log.device, log.is_locked, log.battery,
-                                      log.is_charging, log.is_connected_charger, log.BSSID, log.RSSI)
-
-        insert_cellular_state(conn, log.cellular_states, location_id)
-        conn.commit()
+    location_id = location_table.insert(LocationRecord(
+        timestamp=log.timestamp,
+        latitude=log.latitude,
+        longitude=log.longitude,
+        device=log.device,
+        altitude=log.altitude,
+        is_locked=log.is_locked,
+        battery=log.battery,
+        is_charging=log.is_charging,
+        is_connected_charger=log.is_connected_charger,
+        bssid=log.BSSID,
+        rssi=log.RSSI,
+    ))
+    cellular_table.insert_batch(log.cellular_states, location_id)

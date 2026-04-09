@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from database.health.workouts.table import insert_workout, insert_workout_route_point
+from database.health.workouts.table import table as workouts_table, WorkoutRecord, WorkoutRouteRecord
 from upload.health.processing import parse_unix
 
 logger = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ def handle_workout_upload(data: dict[str, Any]):
 
         is_indoor = w.get("isIndoor")
 
-        was_inserted = insert_workout(
+        was_inserted = workouts_table.insert(WorkoutRecord(
             id=workout_id,
             name=name,
             start_ts=start_ts,
@@ -151,7 +151,7 @@ def handle_workout_upload(data: dict[str, Any]):
             salinity=salinity,
             swim_stroke_count=swim_stroke_count,
             swim_cadence=swim_cadence,
-        )
+        ))
 
         if not was_inserted:
             logger.info("Workout '%s' (%s) already exists, skipping.", workout_id, name)
@@ -177,7 +177,7 @@ def handle_workout_upload(data: dict[str, Any]):
                 logger.warning("Skipping route point for workout '%s' - bad date: %s", workout_id, e)
                 continue
 
-            insert_workout_route_point(
+            workouts_table.insert_route_point(WorkoutRouteRecord(
                 workout_id=workout_id,
                 timestamp=ts,
                 latitude=lat,
@@ -189,7 +189,7 @@ def handle_workout_upload(data: dict[str, Any]):
                 course_accuracy=point.get("courseAccuracy"),
                 horizontal_accuracy=point.get("horizontalAccuracy"),
                 vertical_accuracy=point.get("verticalAccuracy"),
-            )
+            ))
             route_points += 1
 
     logger.info(

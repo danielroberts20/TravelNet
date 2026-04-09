@@ -10,11 +10,18 @@ import sys
 import pytest
 from unittest.mock import patch, MagicMock
 
-# Prevent main.py from touching the real DB or attaching the digest log handler on import
-with patch("database.integration.init_db"), \
-     patch("database.util.backup_db", return_value="/tmp/fake.db"), \
-     patch("config.logging.configure_logging"):
+# Prevent module-level side effects when importing main
+with patch("config.logging.configure_logging"):
     from main import app
+
+
+@pytest.fixture(autouse=True)
+def _mock_lifespan_deps():
+    """Suppress all lifespan startup side effects (DB init, notifications, backups)."""
+    with patch("database.setup.init_db"), \
+         patch("notifications.send_notification"), \
+         patch("scheduled_tasks.departure_backup.schedule_departure_backups"):
+        yield
 
 
 # Prevent main.py side effects when TestClient imports it

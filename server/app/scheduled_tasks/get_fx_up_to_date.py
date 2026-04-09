@@ -11,7 +11,7 @@ from config.editable import load_overrides
 from config.general import CURRENCIES, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
 from config.settings import settings
 from config.logging import configure_logging
-from database.exchange.util import get_api_usage, insert_fx_json
+from database.exchange.fx import get_api_usage, insert_fx_json
 from database.connection import get_conn, increment_api_usage
 from notifications import CronJobMailer
 
@@ -97,7 +97,9 @@ def get_fx_up_to_date(target_date: date = None):
         "currencies": ",".join(CURRENCIES),
     }
 
-    response = requests.get(FX_URL, params=params).json()
+    resp = requests.get(FX_URL, params=params, timeout=30)
+    resp.raise_for_status()
+    response = resp.json()
     increment_api_usage("exchangerate.host")
 
     if response.get("success") is not True:

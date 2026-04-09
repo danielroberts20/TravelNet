@@ -1,3 +1,16 @@
+"""
+compute/ssh.py
+~~~~~~~~~~~~~~
+SSH client helpers and Wake-on-LAN utilities for the remote compute (PC) node.
+
+Provides:
+  - ssh_run()       — execute a command on the remote host in a daemon thread
+  - wake_pc()       — send a WoL magic packet and start SSH polling
+  - shutdown_pc()   — stop Docker containers then issue a Windows shutdown
+  - is_pc_active()  — check the current SSH reachability state
+  - get_last_wol()  — timestamp of the last WoL command sent
+"""
+
 import paramiko
 import os
 import threading
@@ -13,6 +26,7 @@ logging.getLogger("paramiko").setLevel(41)
 pc_active = False
 _poll_thread: threading.Thread | None = None
 
+
 def get_ssh_client() -> paramiko.SSHClient:
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -24,6 +38,7 @@ def get_ssh_client() -> paramiko.SSHClient:
         timeout=5
     )
     return client
+
 
 def ssh_run(command: str, callback=None) -> threading.Thread:
     def _run():
@@ -40,6 +55,7 @@ def ssh_run(command: str, callback=None) -> threading.Thread:
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     return thread
+
 
 def _poll_ssh(interval: int = 10):
     global pc_active
@@ -64,6 +80,7 @@ def _poll_ssh(interval: int = 10):
         pc_active = current_state
         time.sleep(interval)
 
+
 def wake_pc():
     global _poll_thread
     # Send magic packet via WoL service on Pi
@@ -73,7 +90,7 @@ def wake_pc():
         params={"api_key": settings.wol_api_key},
         timeout=5
     )
-    
+
     with open("/tmp/last_wol_sent", "w") as f:
         f.write(datetime.now(timezone.utc).isoformat())
 
@@ -82,8 +99,10 @@ def wake_pc():
         _poll_thread = threading.Thread(target=_poll_ssh, daemon=True)
         _poll_thread.start()
 
+
 def is_pc_active() -> bool:
     return pc_active
+
 
 def shutdown_pc(callback=None) -> threading.Thread:
     def _run():
@@ -104,6 +123,7 @@ def shutdown_pc(callback=None) -> threading.Thread:
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     return thread
+
 
 def get_last_wol():
     try:

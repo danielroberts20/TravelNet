@@ -8,9 +8,11 @@ from fastapi.responses import Response  # type: ignore
 
 from auth import require_upload_token
 from metadata.crontab_tz import reset_crontab_timezone, update_crontab_timezone
-from database.exchange.util import get_api_usage
-from database.location.gap_annotations.table import insert_annotation, list_annotations
-from metadata.util import get_db_stats, get_fx_latest_date, get_last_uploads, get_local_backups, get_pending_digest_count, get_remote_backups, get_uptime, read_last_lines_efficient
+from database.exchange.fx import get_api_usage
+from database.location.gap_annotations.table import table as gap_annotations_table, GapAnnotationRecord
+from metadata.system import get_db_stats, get_pending_digest_count, get_uptime, read_last_lines_efficient
+from metadata.uploads import get_fx_latest_date, get_last_uploads
+from metadata.backups import get_local_backups, get_remote_backups
 from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES, LOG_FILE, OVERRIDES_PATH, STALE_DAYS
 from notifications import send_notification
 from pydantic import BaseModel  # type: ignore
@@ -159,7 +161,9 @@ async def annotate_gap(body: GapAnnotationRequest):
     if end_ts <= start_ts:
         raise HTTPException(status_code=400, detail="end_time must be after start_time")
 
-    annotation_id = insert_annotation(start_ts, end_ts, body.description)
+    annotation_id = gap_annotations_table.insert(GapAnnotationRecord(
+        start_ts=start_ts, end_ts=end_ts, reason="manual", description=body.description,
+    ))
     logger.info(
         "Gap annotation created: id=%d, %s → %s (%s)",
         annotation_id,
@@ -183,7 +187,7 @@ async def annotate_gap(body: GapAnnotationRequest):
 @router.get("/annotations", dependencies=[Depends(require_upload_token)])
 async def get_annotations():
     """Return all recorded gap annotations ordered by start time."""
-    return {"annotations": list_annotations()}
+    return {"annotations": gap_annotations_table.list_annotations()}
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ from zipfile import ZipFile
 from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp
 from notifications import send_notification
 from upload.transaction.constants import WISE_SOURCE_MAP
-from database.exchange.util import convert_to_gbp
+from database.exchange.fx import convert_to_gbp
 from database.connection import get_conn, to_iso_str
 
 # Transaction detail types that indicate internal pot-to-pot moves

@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock, call
 from datetime import datetime
 from scheduled_tasks.get_fx import get_fx_rate_at_date, get_fx_for_month
-from database.exchange.util import insert_fx_json
+from database.exchange.fx import insert_fx_json
 
 
 # --- Sample data ---
@@ -145,14 +145,14 @@ def test_get_fx_for_month_saves_backup():
 # --- insert_fx_json ---
 
 def test_insert_fx_json_inserts_all_dates():
-    """Should call insert_fx_rate once per date per currency pair."""
+    """Should call fx_table.insert once per date per currency pair."""
     quotes = {
         "2026-02-01": {"GBPUSD": 1.36, "GBPAUD": 1.97},
         "2026-02-02": {"GBPUSD": 1.37, "GBPAUD": 1.96},
     }
-    with patch("database.exchange.util.insert_fx_rate") as mock_insert:
+    with patch("database.exchange.fx.fx_table") as mock_table:
         insert_fx_json(quotes)
-    assert mock_insert.call_count == 4  # 2 dates x 2 currencies
+    assert mock_table.insert.call_count == 4  # 2 dates x 2 currencies
 
 
 def test_insert_fx_json_skips_wrong_source(caplog):
@@ -160,24 +160,25 @@ def test_insert_fx_json_skips_wrong_source(caplog):
     quotes = {
         "2026-02-01": {"USDGBP": 0.73, "GBPUSD": 1.36},
     }
-    with patch("database.exchange.util.insert_fx_rate") as mock_insert, \
-         patch("database.exchange.util.SOURCE_CURRENCY", "GBP"):
-        with caplog.at_level("WARNING", logger="database.exchange.util"):
+    with patch("database.exchange.fx.fx_table") as mock_table, \
+         patch("database.exchange.fx.SOURCE_CURRENCY", "GBP"):
+        with caplog.at_level("WARNING", logger="database.exchange.fx"):
             insert_fx_json(quotes)
-    assert mock_insert.call_count == 1  # only GBPUSD inserted
+    assert mock_table.insert.call_count == 1  # only GBPUSD inserted
     assert "Unexpected source currency" in caplog.text
 
 
 def test_insert_fx_rate_uses_correct_values():
     """Should insert with correct date, currencies, and rate."""
+    from database.exchange.table import FxRateRecord
     quotes = {"2026-02-01": {"GBPUSD": 1.367811}}
-    with patch("database.exchange.util.insert_fx_rate") as mock_insert, \
-         patch("database.exchange.util.SOURCE_CURRENCY", "GBP"):
+    with patch("database.exchange.fx.fx_table") as mock_table, \
+         patch("database.exchange.fx.SOURCE_CURRENCY", "GBP"):
         insert_fx_json(quotes)
-    mock_insert.assert_called_once_with(
+    mock_table.insert.assert_called_once_with(FxRateRecord(
         date="2026-02-01",
         source_currency="GBP",
         target_currency="USD",
         rate=1.367811,
-        ts=pytest.approx(int(datetime.strptime("2026-02-01", "%Y-%m-%d").timestamp()), abs=1)
-    )
+        timestamp=pytest.approx(int(datetime.strptime("2026-02-01", "%Y-%m-%d").timestamp()), abs=1),
+    ))

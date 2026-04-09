@@ -2,7 +2,7 @@ import logging
 
 from config.logging import configure_logging
 from database.connection import get_conn
-from database.location.util import batch_geocode, insert_geocode
+from database.location.geocoding import batch_geocode, insert_geocode
 from notifications import CronJobMailer
 from config.settings import settings
 

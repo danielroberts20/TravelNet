@@ -2,8 +2,10 @@ from datetime import datetime, timedelta, timezone
 import json
 import math
 
-from notifications import journal_notification, send_notification
+from notifications import journal_notification
 from database.connection import get_conn, to_iso_str
+from database.triggers.table import table as trigger_table, TriggerRecord
+
 
 def haversine_m(lat1, lon1, lat2, lon2) -> float:
     """Returns distance in metres between two lat/lon points."""
@@ -13,6 +15,7 @@ def haversine_m(lat1, lon1, lat2, lon2) -> float:
     dlambda = math.radians(lon2 - lon1)
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     return 2 * R * math.asin(math.sqrt(a))
+
 
 def dispatch(trigger: str, payload: dict, cooldown_hours: int = 2, noti_title: str = None, noti_body: str = None) -> bool:
     """Returns True if notification was fired, False if suppressed by cooldown."""
@@ -27,11 +30,12 @@ def dispatch(trigger: str, payload: dict, cooldown_hours: int = 2, noti_title: s
         if recent:
             return False
 
-        journal_notification(title=noti_title, body=noti_body, time_sensitive=False, prefix="📝 TravelNet")
+    journal_notification(title=noti_title, body=noti_body, time_sensitive=False, prefix="📝 TravelNet")
 
-        conn.execute("""
-            INSERT INTO trigger_log (trigger, fired_at, payload)
-            VALUES (?, ?, ?)
-        """, (trigger, to_iso_str(datetime.now(timezone.utc)), json.dumps(payload)))
+    trigger_table.insert(TriggerRecord(
+        trigger=trigger,
+        fired_at=to_iso_str(datetime.now(timezone.utc)),
+        payload=json.dumps(payload),
+    ))
 
     return True

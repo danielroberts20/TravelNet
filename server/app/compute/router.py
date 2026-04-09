@@ -5,9 +5,9 @@ from fastapi import Header, UploadFile, File, Form, HTTPException, APIRouter, Ba
 
 from auth import require_upload_token
 from compute.models import DataMode, Status
-from database.compute.table import get_next_queued_compute, insert_compute, update_compute
+from database.compute.table import table as compute_table
 from compute.storage import store_compute
-from compute.util import get_last_wol, is_pc_active, shutdown_pc, ssh_run, wake_pc
+from compute.ssh import get_last_wol, is_pc_active, shutdown_pc, ssh_run, wake_pc
 
 
 router = APIRouter()
@@ -45,7 +45,7 @@ async def submit_compute(
         timeout=timeout,
     )
 
-    insert_compute(item)
+    compute_table.insert(item)
 
     return {
         "status": "success",
@@ -73,12 +73,6 @@ async def get_next_compute_legacy():
         return {"compute": None}
 
 
-@router.post("/update-status", dependencies=[Depends(require_upload_token)])
-async def update_compute_status(compute_id: str, status: Status):
-    """Update the status of a compute task by ID (placeholder — not yet implemented)."""
-    raise HTTPException(status_code=501, detail="Not implemented")
-
-
 @router.post("/gpu-info", dependencies=[Depends(require_upload_token)])
 async def gpu_info(data: dict[str, Any], background_tasks: BackgroundTasks):
     """Accept a GPU telemetry report from a worker node and log it."""
@@ -91,7 +85,7 @@ async def gpu_info(data: dict[str, Any], background_tasks: BackgroundTasks):
 @router.get("/next", dependencies=[Depends(require_upload_token)])
 async def next_compute():
     """Return the next QUEUED compute task from the DB (DB-backed version of next-legacy)."""
-    item = get_next_queued_compute()
+    item = compute_table.get_next_queued()
     if item:
         return {"compute": vars(item)}
     else:
@@ -101,11 +95,11 @@ async def next_compute():
 @router.get("/start-next", dependencies=[Depends(require_upload_token)])
 async def start_next_compute():
     """Fetch the next QUEUED compute task, mark it RUNNING, persist the status change, and return it."""
-    item = get_next_queued_compute()
+    item = compute_table.get_next_queued()
     if item:
         item.status = Status.RUNNING
         item.started_at = datetime.now()
-        update_compute(item.id, item)
+        compute_table.update(item.id, item)
         return {"compute": vars(item)}
     else:
         return {"compute": None}
