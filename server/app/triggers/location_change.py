@@ -1,9 +1,10 @@
 import logging
 
+from triggers import dispatch
+from util import haversine_m
 from config.general import LOCATION_CHANGE_RADIUS_M, LOCATION_MINIMUM_POINTS, LOCATION_STATIONARITY_RADIUS_M, LOCATION_STAY_DURATION_MINS
 from database.location.geocoding import get_place_id, insert_geocode, reverse_geocode
 from database.location.known_places.table import table as known_places_table, KnownPlaceRecord
-from triggers.dispatch import dispatch, haversine_m
 from database.connection import get_conn, to_iso_str
 from datetime import datetime, timedelta, timezone
 
