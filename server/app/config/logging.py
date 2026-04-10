@@ -54,7 +54,7 @@ class DailyDigestHandler(logging.Handler):
 
     def _init_table(self):
         """Create the log_digest table if it does not already exist."""
-        from database.logging.table import table as log_digest_table
+        from database.logging.digest.table import table as log_digest_table
         log_digest_table.init()
 
     def _start_worker(self):
@@ -64,7 +64,7 @@ class DailyDigestHandler(logging.Handler):
 
     def _worker(self):
         """Continuously consume records from the queue and INSERT them into the DB."""
-        from database.logging.table import table as log_digest_table, LogDigestRecord
+        from database.logging.digest.table import table as log_digest_table, LogDigestRecord
         while True:
             record = self._queue.get()
             if record is None:
@@ -85,7 +85,7 @@ class DailyDigestHandler(logging.Handler):
 
     def flush_and_send(self, smtp_host, smtp_port, sender, password, recipient, username):
         from notifications import send_email
-        from database.logging.table import table as log_digest_table
+        from database.logging.digest.table import table as log_digest_table
         with self._lock:
             rows = log_digest_table.fetch_and_clear()
             if not rows:

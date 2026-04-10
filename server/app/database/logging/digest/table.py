@@ -1,6 +1,6 @@
 """
-database/logging/table.py
-~~~~~~~~~~~~~~~~~~~~~~~~~
+database/logging/digest/table.py
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Persistence layer for the daily log digest.
 
 The DailyDigestHandler (config/logging.py) writes WARNING+ records here via a
@@ -60,9 +60,10 @@ class LogDigestTable(BaseTable[LogDigestRecord]):
             rows = conn.execute(
                 "SELECT ts, level, logger, module, lineno, message FROM log_digest ORDER BY id"
             ).fetchall()
-        if not rows:
-            return []
-        with get_conn() as conn:
+
+            if not rows:
+                return []
+            
             conn.execute("DELETE FROM log_digest")
         return [LogDigestRecord(ts=r[0], level=r[1], logger_name=r[2], module=r[3], lineno=r[4], message=r[5]) for r in rows]
 
