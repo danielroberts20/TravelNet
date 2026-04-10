@@ -16,14 +16,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from database.transition.timezone.table import table as transition_timezone_table, TransitionTimezoneRecord
 from config.logging import configure_logging
+from config.general import PAGE_SIZE
 from database.connection import get_conn
-from notifications import CronJobMailer, DailyCronJobMailer
+from notifications import CronJobMailer
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-# Fetch rows in pages to avoid loading millions of rows into memory at once.
-PAGE_SIZE = 2000
 
 
 # ---------------------------------------------------------------------------

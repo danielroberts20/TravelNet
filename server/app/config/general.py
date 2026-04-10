@@ -61,6 +61,7 @@ if DATA_DIR.exists():
         backup_dir.mkdir(parents=True, exist_ok=True)
 
 STALE_DAYS = editable("STALE_DAYS", "Number of days to consider a backup stale", group="Storage & Backups")(7)
+PAGE_SIZE = editable("PAGE_SIZE", "Number of records to fetch at a time", group="Storage & Backups")(2000)
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +161,10 @@ GAP_ANNOTATION_TOLERANCE_MINUTES = editable(
     "needs to start at most 10 min before the gap and end at most 10 min after it.",
     group="Location"
 )(10)
+
+DWELL_MIN_POINTS = editable(key="DWELL_MIN_POINTS", 
+                            description="Minimum consecutive GPS points in a new country before registering a country transition. " \
+                                        "Higher values filter out more border noise.", group="location")(3)
 
 
 # ---------------------------------------------------------------------------

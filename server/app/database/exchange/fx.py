@@ -120,7 +120,19 @@ def reset_api_usage(name: str = "exchangerate.host"):
         row = conn.execute(
             "SELECT service, count, month FROM api_usage WHERE service = ?", (name,)
         ).fetchone()
-        old_service, old_count, old_month = row
+        if row:
+            old_service = row["service"]
+            old_count = row["count"]
+            old_month = row["month"]
+        else:
+            conn.execute(
+                "INSERT INTO api_usage (service, count, month) VALUES (?, 0, ?)",
+                (name, month)
+            )
+            old_service = name
+            old_count = 0
+            old_month = month
+
         conn.execute("""
             INSERT INTO api_usage (service, count, month)
             VALUES (?, 0, ?)
