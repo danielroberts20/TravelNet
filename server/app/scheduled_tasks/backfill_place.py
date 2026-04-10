@@ -3,7 +3,7 @@ import logging
 from config.logging import configure_logging
 from config.settings import settings
 from database.connection import get_conn, to_iso_str
-from notifications import CronJobMailer
+from notifications import DailyCronJobMailer
 from datetime import datetime, timezone, timedelta
 
 
@@ -184,7 +184,7 @@ def run():
 if __name__ == "__main__":
     configure_logging()
 
-    with CronJobMailer("backfill_place", settings.smtp_config,
+    with DailyCronJobMailer("backfill_place", settings.smtp_config,
                        "Add place IDs to historical data") as job:
         results = run()
 

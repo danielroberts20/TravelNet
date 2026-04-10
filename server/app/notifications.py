@@ -9,11 +9,14 @@ Provides:
                          completion (✅) or failure (❌) email automatically
   - Updated flush logic for DailyDigestHandler (see refactor note at bottom)
 """
+import json
 import logging
 import smtplib
 import traceback
 from contextlib import contextmanager
-from config.general import AVAILABLE_NOTIFICATIONS
+from database.connection import get_conn
+from database.logging.daily.table import table as daily_cron_table, DailyCronRecord
+from config.general import AVAILABLE_NOTIFICATIONS, DAILY_CRON_JOBS
 from config.settings import settings
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -113,7 +116,66 @@ def send_email(
         smtp.login(username, password)
         smtp.send_message(msg)
 
-
+def _flush_and_send(smtp_cfg: dict) -> bool:
+    """Read all pending cron_results, format a digest email, send it.
+ 
+    Returns True on success.  On send failure, restores the records so the
+    safety-net cron can retry.
+    """
+    records = daily_cron_table.fetch_and_clear()
+    if not records:
+        return True
+ 
+    date = records[0].date  # all records share the same local date
+    all_ok = all(r.success for r in records)
+    status_icon = "✅" if all_ok else "❌"
+ 
+    reported_names = {r.job_name for r in records}
+    missing = [j for j in DAILY_CRON_JOBS if j not in reported_names]
+ 
+    # ---- subject ----
+    subject = f"[TravelNet] {status_icon} Daily cron digest — {date}"
+ 
+    # ---- body ----
+    lines = [f"Daily cron digest for {date}\n"]
+ 
+    for r in records:
+        icon = "✅" if r.success else "❌"
+        dur = f"{r.duration_s:.1f}s" if r.duration_s is not None else "—"
+        lines.append(f"{icon}  {r.job_name}  ({dur})  ran at {r.ran_at}")
+ 
+        if r.metrics:
+            try:
+                metrics = json.loads(r.metrics)
+                for k, v in metrics.items():
+                    lines.append(f"      {k}: {v}")
+            except (json.JSONDecodeError, AttributeError):
+                lines.append(f"      metrics: {r.metrics}")
+ 
+        if r.error:
+            lines.append(f"      ERROR:\n{r.error}")
+ 
+        lines.append("")
+ 
+    if missing:
+        lines.append("⚠️  Jobs that did not report:")
+        for name in missing:
+            lines.append(f"   • {name}")
+ 
+    body = "\n".join(lines)
+ 
+    try:
+        send_email(subject=subject, body=body, **smtp_cfg)
+        return True
+    except Exception as mail_err:
+        print(f"[DailyCronJobMailer] Failed to send digest: {mail_err}")
+        # Put the records back so the safety-net cron can retry.
+        try:
+            daily_cron_table.restore(records)
+        except Exception as restore_err:
+            print(f"[DailyCronJobMailer] Failed to restore records: {restore_err}")
+        return False
+    
 # ---------------------------------------------------------------------------
 # CronJobMailer
 # ---------------------------------------------------------------------------
@@ -211,6 +273,62 @@ class CronJobMailer:
 
         return False  # do not suppress the original exception
 
+class DailyCronJobMailer(CronJobMailer):
+    """Like CronJobMailer but writes to cron_results instead of sending an email.
+ 
+    After writing, checks whether all DAILY_CRON_JOBS have reported for today.
+    If so, flushes immediately and sends the digest.  If not, does nothing —
+    the safety-net cron (send_cron_digest.py) will flush at a fixed time.
+ 
+    Usage is identical to CronJobMailer::
+ 
+        with DailyCronJobMailer("geocode_places", settings.smtp_config) as job:
+            result = run()
+            job.add_metric("geocoded", result["count"])
+    """
+ 
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        finished_at = datetime.now(tz=timezone.utc)
+        duration_s = (finished_at - self._started_at).total_seconds()
+ 
+        # Local date: use the timezone from timezone_transitions if available,
+        # otherwise fall back to UTC date.  UTC is fine for the buffer key —
+        # it just needs to be consistent within a single day's run.
+        local_date = finished_at.strftime("%Y-%m-%d")
+ 
+        metrics_json = json.dumps(dict(self._metrics)) if self._metrics else None
+        error_text = traceback.format_exc() if exc_type is not None else None
+ 
+        record = DailyCronRecord(
+            job_name=self.job_name,
+            ran_at=finished_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            date=local_date,
+            success=exc_type is None,
+            duration_s=round(duration_s, 2),
+            metrics=metrics_json,
+            error=error_text,
+        )
+ 
+        try:
+            daily_cron_table.insert(record)
+        except Exception as db_err:
+            print(f"[DailyCronJobMailer] Failed to record result for {self.job_name!r}: {db_err}")
+ 
+        # Check whether all expected daily jobs have now reported for today.
+        try:
+            with get_conn() as conn:
+                reported = {
+                    row[0] for row in conn.execute(
+                        "SELECT job_name FROM cron_results WHERE date = ?",
+                        (local_date,),
+                    ).fetchall()
+                }
+            if set(DAILY_CRON_JOBS).issubset(reported):
+                _flush_and_send(self.smtp_cfg)
+        except Exception as flush_err:
+            print(f"[DailyCronJobMailer] Flush check failed: {flush_err}")
+ 
+        return False  # do not suppress the original exception
 # ---------------------------------------------------------------------------
 # Body builder
 # ---------------------------------------------------------------------------

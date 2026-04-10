@@ -32,7 +32,8 @@ from database.location.gap_annotations.table import table as gap_annotations_tab
 from database.location.known_places.table import table as known_places_table
 from database.location.noise.table import table as noise_table
 from database.weather.table import table as weather_table
-from database.logging.table import table as log_digest_table
+from database.logging.digest.table import table as log_digest_table
+from database.logging.daily.table import table as daily_cron_table
 from database.ml.table import table as ml_table
 
 TABLE_REGISTRY: list[BaseTable] = [
@@ -53,6 +54,7 @@ TABLE_REGISTRY: list[BaseTable] = [
     known_places_table,     # known_places + place_visits (must follow places_table)
     weather_table,
     log_digest_table,
+    daily_cron_table,
     ml_table,
     noise_table,
     transition_timezone_table,

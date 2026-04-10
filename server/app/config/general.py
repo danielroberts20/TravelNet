@@ -73,6 +73,16 @@ LOG_FILE = LOG_DIR / "server.log"
 WARN_FILE = LOG_DIR / "server.warn.log"
 ERROR_FILE = LOG_DIR / "server.error.log"
 
+DAILY_CRON_JOBS = [
+    "geocode_places",
+    "get_fx",
+    "backfill_place",
+    #"detect_timezone_transitions",
+    #"detect_country_transitions",
+    "push_public_stats",
+    #"compute_daily_summary",
+]
+
 
 # ---------------------------------------------------------------------------
 # Runtime Configuration

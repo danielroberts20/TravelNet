@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 import requests
 
 from config.settings import settings
-from notifications import CronJobMailer
+from notifications import DailyCronJobMailer
 from public.stats import build_public_stats
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,11 @@ def push_stats_to_github(payload: dict) -> None:
 
 
 if __name__ == "__main__":
+    with DailyCronJobMailer(
+        "push_public_stats",
+        settings.smtp_config,
+        detail="Push public stats to GitHub",
+    ) as job:
         payload = build_public_stats()
         push_stats_to_github(payload)
         logger.info("public_stats.json pushed to GitHub successfully.")
