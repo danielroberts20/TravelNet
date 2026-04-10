@@ -95,6 +95,12 @@ TRAVEL_YML = Path("/travel.yml")
 
 
 # ---------------------------------------------------------------------------
+# Flight Detection
+# ---------------------------------------------------------------------------
+FLIGHT_GAP_MIN_HOURS = editable("FLIGHT_GAP_MIN_HOURS", description="Minimum gap duration (hours) between location points to be considered a possible flight.", group="Flight Detection")(2)
+FLIGHT_DISTANCE_MIN_KM = editable("FLIGHT_DISTANCE_MIN_KM", description="Minimum great-circle distance (km) across a gap to be considered a possible flight.", group="Flight Detection")(200)
+
+# ---------------------------------------------------------------------------
 # Notifications
 # ---------------------------------------------------------------------------
 
@@ -164,7 +170,7 @@ GAP_ANNOTATION_TOLERANCE_MINUTES = editable(
 
 DWELL_MIN_POINTS = editable(key="DWELL_MIN_POINTS", 
                             description="Minimum consecutive GPS points in a new country before registering a country transition. " \
-                                        "Higher values filter out more border noise.", group="location")(3)
+                                        "Higher values filter out more border noise.", group="Location")(3)
 
 
 # ---------------------------------------------------------------------------

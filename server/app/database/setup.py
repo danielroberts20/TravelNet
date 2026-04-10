@@ -21,6 +21,7 @@ from database.location.table import table as location_table, LocationRecord
 from database.transition.timezone.table import table as transition_timezone_table
 from database.transition.country.table import table as transition_country_table
 from database.health.table import table as health_table
+from database.flights.table import table as flights_table
 from database.health.heart_rate.table import table as heart_rate_table
 from database.health.sleep.table import table as sleep_table
 from database.health.workouts.table import table as workouts_table
@@ -46,6 +47,7 @@ TABLE_REGISTRY: list[BaseTable] = [
     heart_rate_table,
     sleep_table,
     workouts_table,
+    flights_table,
     mood_table,
     transactions_table,
     trigger_table,
