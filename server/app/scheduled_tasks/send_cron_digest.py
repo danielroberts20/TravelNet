@@ -17,7 +17,7 @@ Run via:
 import logging
  
 from config.logging import configure_logging
-from notifications import _flush_and_send
+from notifications import _flush_and_send, _record_cron_run
 from config.settings import settings
  
 logger = logging.getLogger(__name__)
@@ -35,3 +35,8 @@ if __name__ == "__main__":
         logger.info("Digest sent (or nothing pending)")
     else:
         logger.error("Failed to send digest")
+    
+    _record_cron_run(
+        job="send_cron_digest",
+        success=result["sent"],
+    )

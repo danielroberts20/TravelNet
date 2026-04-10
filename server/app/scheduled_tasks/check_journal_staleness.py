@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from config.general import DATA_DIR, JOURNAL_STALENESS_HOURS
 from config.logging import configure_logging
 from config.settings import settings
-from notifications import CronJobMailer, journal_notification, send_notification
+from notifications import CronJobMailer, _record_cron_run, journal_notification, send_notification
 
 logger = logging.getLogger(__name__)
 
@@ -61,4 +61,13 @@ def check_journal_staleness() -> dict:
 if __name__ == "__main__":
     configure_logging()
 
-    check_journal_staleness()
+    resp = check_journal_staleness()
+
+    try:
+        _record_cron_run(
+            job="check_journal_staleness",
+            success=resp.get("stale", False) == True,
+            detail=", ".join(f"{k}: {v}" for k, v in resp.items()) if resp else "",
+        )
+    except Exception as tracker_err:
+        print(f"[CronJobMailer] Failed to record cron run for {"check_journal_staleness"!r}: {tracker_err}")
