@@ -37,6 +37,7 @@ class SleepTable(BaseTable[SleepRecord]):
                     stage       TEXT NOT NULL,
                     duration_hr REAL NOT NULL,
                     source      TEXT,
+                    place_id    INTEGER REFERENCES places(id),
                     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
                     UNIQUE(start_ts, stage, source)
                 );

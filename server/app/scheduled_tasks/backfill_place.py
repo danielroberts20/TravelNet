@@ -2,8 +2,9 @@ import logging
 
 from config.logging import configure_logging
 from config.settings import settings
-from database.connection import get_conn
+from database.connection import get_conn, to_iso_str
 from notifications import CronJobMailer
+from datetime import datetime, timezone, timedelta
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,27 @@ def run():
                 filled_health_heart_rate += 1
         logger.info(f"Backfilled place_id for {filled_health_heart_rate} health heart rate entries")
 
+        # --- Health sleep ---
+        health_sleep_rows = conn.execute("""
+            SELECT id, start_ts, duration_hr FROM health_sleep WHERE place_id IS NULL
+            """).fetchall()
+        logger.info(f"Found {len(health_sleep_rows)} health sleep entries to backfill place_id for")
+
+        filled_health_sleep = 0
+        for health_sleep in health_sleep_rows:
+            start = datetime.fromisoformat(health_sleep["start_ts"].replace("Z", "+00:00"))
+            target_ts = start + timedelta(hours=health_sleep["duration_hr"] / 2)
+            target_ts = to_iso_str(target_ts)
+            place_id = _nearest_place_id(conn, target_ts, 1800)
+            if place_id is not None:
+                conn.execute("""
+                    UPDATE health_sleep SET place_id = :place_id
+                    WHERE id = :id
+                    """, {"place_id": place_id,
+                        "id": health_sleep["id"]})
+                filled_health_sleep += 1
+        logger.info(f"Backfilled place_id for {filled_health_sleep} health sleep entries")
+
         # --- State of mind ---
         state_of_mind_rows = conn.execute("""
             SELECT id, start_ts FROM state_of_mind WHERE place_id IS NULL
@@ -147,6 +169,8 @@ def run():
         "transactions_backfilled": filled_transactions,
         "health_quantity_found": len(health_quantity_rows),
         "health_quantity_backfilled": filled_health_quantity,
+        "health_sleep_found": len(health_sleep_rows),
+        "health_sleep_backfilled": filled_health_sleep,
         "health_heart_rate_found": len(health_heart_rate_rows),
         "health_heart_rate_backfilled": filled_health_heart_rate,
         "state_of_mind_found": len(state_of_mind_rows),
@@ -168,6 +192,8 @@ if __name__ == "__main__":
         job.add_metric("transactions backfilled", results["transactions_backfilled"])
         job.add_metric("health quantity found", results["health_quantity_found"])
         job.add_metric("health quantity backfilled", results["health_quantity_backfilled"])
+        job.add_metric("health sleep found", results["health_sleep_found"])
+        job.add_metric("health sleep backfilled", results["health_sleep_backfilled"])
         job.add_metric("health heart rate found", results["health_heart_rate_found"])
         job.add_metric("health heart rate backfilled", results["health_heart_rate_backfilled"])
         job.add_metric("state of mind found", results["state_of_mind_found"])
