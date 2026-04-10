@@ -5,7 +5,5 @@ if [[ "$1" == "--no-cache" ]]; then
   CACHE_FLAG="--no-cache"
 fi
 
-sudo docker stop travelnet travelnet-dashboard travelnet-nginx
-docker rm travelnet travelnet-dashboard travelnet-nginx
-docker compose build $CACHE_FLAG
-docker compose up -d
+bash "$(dirname "$0")/build-dashboard.sh"
+bash "$(dirname "$0")/build-server.sh" $CACHE_FLAG

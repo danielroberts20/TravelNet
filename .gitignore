@@ -24,3 +24,7 @@ web/_data
 /testing.py
 /client/data/raw/travel.db
 server/schema
+server/build-dashboard.sh
+server/build-server.sh
+server/build.sh
+server/build.sh
