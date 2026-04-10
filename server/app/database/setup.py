@@ -18,6 +18,7 @@ from database.places.table import table as places_table
 from database.cellular.table import table as cellular_table, CellularRecord
 from database.exchange.table import table as fx_table
 from database.location.table import table as location_table, LocationRecord
+from database.transition.timezone.table import table as transition_timezone_table
 from database.health.table import table as health_table
 from database.health.heart_rate.table import table as heart_rate_table
 from database.health.sleep.table import table as sleep_table
@@ -54,6 +55,7 @@ TABLE_REGISTRY: list[BaseTable] = [
     log_digest_table,
     ml_table,
     noise_table,
+    transition_timezone_table,
 ]
 
 
