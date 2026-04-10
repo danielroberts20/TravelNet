@@ -39,7 +39,7 @@ class TransitionTimezoneTable(BaseTable[TransitionTimezoneRecord]):
                 from_offset  TEXT,               -- e.g. "+00:00"
                 to_offset    TEXT NOT NULL,
                 place_id     INTEGER REFERENCES places(id),
-                UNIQUE (from_tz, to_tz, transitioned_at)
+                UNIQUE(transitioned_at, to_tz)
             );""")
 
             conn.execute("""
@@ -65,6 +65,7 @@ class TransitionTimezoneTable(BaseTable[TransitionTimezoneRecord]):
                 """,
                 (record.transitioned_at, record.from_tz, record.to_tz, record.from_offset, record.to_offset),
             )
+            return conn.execute("SELECT changes()").fetchone()[0] > 0
 
 
 table = TransitionTimezoneTable()
