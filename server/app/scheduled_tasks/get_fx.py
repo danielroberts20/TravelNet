@@ -15,7 +15,7 @@ from config.logging import configure_logging
 from config.general import CURRENCIES, FX_BACKUP_DIR, FX_DATE_URL, FX_TIMEFRAME_URL, SOURCE_CURRENCY
 from config.settings import settings
 from database.exchange.fx import insert_fx_json
-from notifications import CronJobMailer
+from notifications import DailyCronJobMailer
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ if __name__ == "__main__":
     target = datetime.now(timezone.utc) - timedelta(days=2)
     logger.info(f"Getting FX rates for {target.strftime('%Y-%m-%d')} (2 days ago)...")
 
-    with CronJobMailer("get_fx", settings.smtp_config,
+    with DailyCronJobMailer("get_fx", settings.smtp_config,
                        detail="Pull FX rates for previous day") as job:
         result = get_fx_for_day()
         job.add_metric("date", result["date_label"])

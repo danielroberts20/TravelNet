@@ -3,7 +3,7 @@ import logging
 from config.logging import configure_logging
 from database.connection import get_conn
 from database.location.geocoding import batch_geocode, insert_geocode
-from notifications import CronJobMailer
+from notifications import DailyCronJobMailer
 from config.settings import settings
 
 
@@ -46,7 +46,7 @@ def run():
 if __name__ == "__main__":
     configure_logging()
 
-    with CronJobMailer("geocode_places", settings.smtp_config,
+    with DailyCronJobMailer("geocode_places", settings.smtp_config,
                        detail="Reverse geocode place locations") as job:
         results = run()
         job.add_metric("geocoded count", results["geocoded_count"])

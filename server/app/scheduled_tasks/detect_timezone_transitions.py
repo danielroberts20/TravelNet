@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from database.transition.timezone.table import table as transition_timezone_table, TransitionTimezoneRecord
 from config.logging import configure_logging
 from database.connection import get_conn
-from notifications import CronJobMailer
+from notifications import CronJobMailer, DailyCronJobMailer
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
