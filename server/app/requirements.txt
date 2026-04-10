@@ -16,3 +16,4 @@ wakeonlan
 paramiko
 timezonefinder
 tzdata>=2024.1
+airportsdata

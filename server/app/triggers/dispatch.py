@@ -6,17 +6,6 @@ from notifications import journal_notification
 from database.connection import get_conn, to_iso_str
 from database.triggers.table import table as trigger_table, TriggerRecord
 
-
-def haversine_m(lat1, lon1, lat2, lon2) -> float:
-    """Returns distance in metres between two lat/lon points."""
-    R = 6_371_000  # Earth radius in metres
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * R * math.asin(math.sqrt(a))
-
-
 def dispatch(trigger: str, payload: dict, cooldown_hours: int = 2, noti_title: str = None, noti_body: str = None) -> bool:
     """Returns True if notification was fired, False if suppressed by cooldown."""
     with get_conn() as conn:
