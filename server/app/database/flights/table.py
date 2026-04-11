@@ -46,21 +46,21 @@ class FlightsTable(BaseTable[FlightRecord]):
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS flights (
                     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                    origin_iata         TEXT NOT NULL,
-                    destination_iata    TEXT NOT NULL,
-                    origin_city         TEXT,
-                    destination_city    TEXT,
-                    origin_country      TEXT,
-                    destination_country TEXT,
-                    departed_at         TEXT NOT NULL,
-                    arrived_at          TEXT NOT NULL,
-                    duration_mins       INTEGER,
-                    distance_km         REAL,
-                    airline             TEXT,
-                    flight_number       TEXT,
-                    seat_class          TEXT,
-                    notes               TEXT,
-                    source              TEXT NOT NULL DEFAULT 'manual',
+                    origin_iata         TEXT NOT NULL, -- ISO 3166-3 airport code, e.g. "LHR"
+                    destination_iata    TEXT NOT NULL, -- ISO 3166-3 airport code, e.g. "JFK"
+                    origin_city         TEXT, -- e.g. "London"
+                    destination_city    TEXT, -- e.g. "New York"
+                    origin_country      TEXT, -- e.g. "United Kingdom"
+                    destination_country TEXT, -- e.g. "United States"
+                    departed_at         TEXT NOT NULL, -- ISO 8601 UTC timestamp of local departure time at the origin airport, e.g. "2024-06-01T14:30:00Z"
+                    arrived_at          TEXT NOT NULL, -- ISO 8601 UTC timestamp of local arrival time at the destination airport, e.g. "2024-06-01T17:30:00Z"
+                    duration_mins       INTEGER, -- total flight duration in minutes, e.g. 420
+                    distance_km         REAL, -- great-circle distance between origin and destination in kilometers, e.g. 5567.0
+                    airline             TEXT, -- IATA airline code or name, e.g. "BA" or "British Airways"
+                    flight_number       TEXT, -- flight number, e.g. "BA117"
+                    seat_class          TEXT, -- 'economy', 'premium_economy', 'business', or NULL if unknown
+                    notes               TEXT, -- optional free-form notes about the flight
+                    source              TEXT NOT NULL DEFAULT 'manual', -- 'manual' for user-entered, 'detected' for auto-detected from location gaps
                     created_at          TEXT NOT NULL
                         DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
                     UNIQUE(origin_iata, destination_iata, departed_at)

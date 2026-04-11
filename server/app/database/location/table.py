@@ -108,12 +108,18 @@ class LocationShortcutsTable(BaseTable[LocationRecord]):
                     NULL                             AS activity,
                     CAST(s.battery AS REAL) / 100.0  AS battery,
                     NULL                             AS speed,
-                    s.device,
+                    s.device                         AS device,
                     NULL                             AS accuracy,
                     s.place_id
                 FROM location_shortcuts s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM location_overland o
+                    WHERE o.timestamp BETWEEN
+                        datetime(s.timestamp, '-3 minutes') AND
+                        datetime(s.timestamp, '+3 minutes')
+                )
 
-                ORDER BY timestamp ASC
+                ORDER BY timestamp ASC;
             """)
 
     def insert(self, record: LocationRecord) -> int:
