@@ -16,10 +16,8 @@ async def parse_wise_upload(contents):
     WISE_SOURCE_MAP).  Processing errors for individual files are logged and
     collected but do not abort the remaining files.
     """
-    received = 0
-    inserted = 0
-    skipped = 0
-    errors = []
+    all_results = []
+    all_errors = []
 
     try:
         zf = zipfile.ZipFile(io.BytesIO(contents))
@@ -38,17 +36,19 @@ async def parse_wise_upload(contents):
             if source not in WISE_SOURCE_MAP.keys():
                 logger.warning(f"No friendly name found for Wise source: {source}")
 
-            file_received, file_inserted, file_skipped, file_errors = insert_wise(zf, filename, source)
-            received += file_received
-            inserted += file_inserted
-            skipped += file_skipped
-            errors.extend(file_errors)
+            file_results, file_errors = insert_wise(zf, filename, source)
+            all_results.extend(file_results)
+            all_errors.extend(file_errors)
 
         except Exception as e:
             logger.error(f"Error while processing Wise transaction ({filename}): {str(e)}")
+
+    received = len(all_results)
+    inserted = sum(r.get("inserted", 0) for r in all_results)
+    skipped = sum(r.get("parsed", 0) - r.get("inserted", 0) for r in all_results if "parsed" in r)
 
     send_notification(title="Wise",
                       body=f"{received} accounts received | {inserted} inserted | {skipped} skipped",
                       time_sensitive=False)
 
-    return received, inserted, skipped, errors
+    return received, inserted, skipped, all_errors

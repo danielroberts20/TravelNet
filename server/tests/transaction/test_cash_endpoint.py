@@ -13,8 +13,8 @@ from conftest import app
 
 @pytest.fixture
 def client(db):
-    with patch("upload.transaction.endpoints.get_conn", return_value=db), \
-         patch("upload.transaction.endpoints.convert_to_gbp", return_value=-15.0):
+    with patch("upload.transaction.router.get_conn", return_value=db), \
+         patch("upload.transaction.router.convert_to_gbp", return_value=-15.0):
         with TestClient(app) as c:
             yield c
 

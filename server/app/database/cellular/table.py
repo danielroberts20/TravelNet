@@ -37,12 +37,12 @@ class CellularTable(BaseTable[CellularRecord]):
             conn.execute("""
             CREATE TABLE IF NOT EXISTS cellular_state (
                 id INTEGER PRIMARY KEY,
-                shortcut_id INTEGER NOT NULL,
-                provider_name TEXT,
-                radio TEXT,
-                code TEXT,
-                is_roaming BOOLEAN,
-                FOREIGN KEY(shortcut_id) REFERENCES location_shortcuts(id) ON DELETE CASCADE,
+                shortcut_id INTEGER NOT NULL, -- foreign key to location_shortcuts
+                provider_name TEXT, -- cellular carrier name, e.g. "T-Mobile", "AT&T", "Verizon". May be null if not available.
+                radio TEXT, -- cellular radio technology, e.g. "LTE", "NR5G". May be null if not available.
+                code TEXT, -- country code or other carrier code. May be null if not available.
+                is_roaming BOOLEAN, -- whether the device is roaming on this carrier. May be null if not available.
+                FOREIGN KEY(shortcut_id) REFERENCES location_shortcuts(id) ON DELETE CASCADE, -- ensure cellular states are deleted when their parent location shortcut is deleted.
                 UNIQUE(shortcut_id, provider_name, radio)
             );""")
 

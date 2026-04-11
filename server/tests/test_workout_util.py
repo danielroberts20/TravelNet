@@ -36,7 +36,7 @@ class TestParseUnix:
 
     def test_invalid_format_raises(self):
         with pytest.raises(ValueError):
-            parse_unix("2024-06-15")  # date-only format not supported here
+            parse_unix("2024/06/15")  # slashes — wrong separator for strptime
 
     def test_invalid_date_raises(self):
         with pytest.raises(ValueError):

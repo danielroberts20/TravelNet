@@ -23,9 +23,10 @@ def suppress_notifications():
         "main.send_notification",
         "database.transaction.ingest.revolut.send_notification",
         "database.transaction.ingest.wise.send_notification",
-        "upload.transaction.endpoints.send_notification",
-        "upload.utils.send_notification",
-        "metadata.endpoints.send_notification",
+        "upload.transaction.router.send_notification",
+        "upload.transaction.wise_upload.send_notification",
+        "upload.location.shortcuts.send_notification",
+        "metadata.router.send_notification",
     ]
     patches = [patch(t) for t in targets]
     for p in patches:

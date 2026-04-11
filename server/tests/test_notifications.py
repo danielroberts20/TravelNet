@@ -34,6 +34,7 @@ SMTP_CFG = {
 MAILER_SMTP_CFG = {
     "smtp_host": "smtp.example.com",
     "smtp_port": 587,
+    "username": "travelnet@example.com",
     "sender": "travelnet@example.com",
     "password": "secret",
     "recipient": "dan@example.com",
@@ -56,11 +57,12 @@ class TestSendEmail:
                 subject="Test subject",
                 body="Test body",
                 **SMTP_CFG,
+                username="secret_username",
             )
 
         mock_smtp_cls.assert_called_once_with("smtp.example.com", 587)
         mock_smtp.starttls.assert_called_once()
-        mock_smtp.login.assert_called_once_with("travelnet@example.com", "secret")
+        mock_smtp.login.assert_called_once_with("secret_username", "secret")
         mock_smtp.send_message.assert_called_once()
 
     def test_sent_message_has_correct_headers(self):
@@ -73,6 +75,7 @@ class TestSendEmail:
                 subject="Hello TravelNet",
                 body="Body text",
                 **SMTP_CFG,
+                username="user",
             )
 
         sent_msg = mock_smtp.send_message.call_args[0][0]
@@ -86,7 +89,7 @@ class TestSendEmail:
             mock_smtp_cls.side_effect = smtplib.SMTPException("connection refused")
 
             with pytest.raises(smtplib.SMTPException, match="connection refused"):
-                send_email(subject="x", body="y", **SMTP_CFG)
+                send_email(subject="x", body="y", **SMTP_CFG, username="user")
 
 
 # ---------------------------------------------------------------------------

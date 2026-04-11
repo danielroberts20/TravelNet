@@ -20,7 +20,8 @@ def make_zf(csv_rows: list[dict], filename: str = "statement_137103719_GBP.csv")
 def run_insert(db, csv_rows, filename="statement_137103719_GBP.csv", source="137103719_GBP"):
     zf, fname = make_zf(csv_rows, filename)
     with patch("database.transaction.ingest.wise.get_conn", return_value=db), \
-         patch("database.transaction.ingest.wise.convert_to_gbp", return_value=-8.0):
+         patch("database.transaction.ingest.wise.convert_to_gbp", return_value=-8.0), \
+         patch("database.transaction.ingest.wise.get_closest_lat_lon_by_timestamp", return_value=(None, None)):
         from database.transaction.ingest.wise import insert
         return insert(zf, fname, source)
 

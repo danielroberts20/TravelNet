@@ -26,19 +26,19 @@ class ComputeTable(BaseTable[Compute]):
             conn.execute("""
             CREATE TABLE IF NOT EXISTS compute (
                 id                  TEXT PRIMARY KEY,
-                status              TEXT NOT NULL,
-                created_at          TEXT NOT NULL,
-                started_at          TEXT,
-                finished_at         TEXT,
-                code_path           TEXT NOT NULL,
-                requirements_path   TEXT NOT NULL,
-                data_mode           TEXT NOT NULL,
-                data_path           TEXT,
-                sql_query           TEXT,
-                entry_point         TEXT NOT NULL,
-                timeout_s           INTEGER NOT NULL,
-                worker_id           TEXT,
-                error_message       TEXT
+                status              TEXT NOT NULL, -- one of "QUEUED", "RUNNING", "COMPLETED", "FAILED"
+                created_at          TEXT NOT NULL, -- ISO timestamp of when the task was created
+                started_at          TEXT, -- ISO timestamp of when the task was picked up by a worker
+                finished_at         TEXT, -- ISO timestamp of when the task was marked COMPLETED or FAILED
+                code_path           TEXT NOT NULL, 
+                requirements_path   TEXT NOT NULL, -- path to a requirements.txt file for the task's code dependencies
+                data_mode           TEXT NOT NULL, -- one of "FILE" (data_path is a file path) or "SQL" (data_path is a database connection string and sql_query is the query to run)
+                data_path           TEXT, -- meaning depends on data_mode: either a file path or a database connection string
+                sql_query           TEXT, -- only used if data_mode is "SQL": the query to run on the database specified by data_path
+                entry_point         TEXT NOT NULL, -- the function to call to run the task, e.g. "main.py:run"
+                timeout_s           INTEGER NOT NULL, -- max allowed runtime for the task in seconds
+                worker_id           TEXT, -- the ID of the worker that picked up the task, if any
+                error_message       TEXT -- optional error message if the task failed
             );
             """)
 

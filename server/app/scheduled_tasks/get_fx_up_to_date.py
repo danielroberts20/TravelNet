@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 
 import requests
 from config.editable import load_overrides
-from config.general import CURRENCIES, FX_BACKUP_DIR, FX_URL, SOURCE_CURRENCY
+from config.general import CURRENCIES, FX_BACKUP_DIR, FX_TIMEFRAME_URL, SOURCE_CURRENCY
 from config.settings import settings
 from config.logging import configure_logging
 from database.exchange.fx import get_api_usage, insert_fx_json
@@ -97,7 +97,7 @@ def get_fx_up_to_date(target_date: date = None):
         "currencies": ",".join(CURRENCIES),
     }
 
-    resp = requests.get(FX_URL, params=params, timeout=30)
+    resp = requests.get(str(FX_TIMEFRAME_URL), params=params, timeout=30)
     resp.raise_for_status()
     response = resp.json()
     increment_api_usage("exchangerate.host")

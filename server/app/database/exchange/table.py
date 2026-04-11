@@ -36,11 +36,11 @@ class FxRatesTable(BaseTable[FxRateRecord]):
             conn.execute("""
             CREATE TABLE IF NOT EXISTS fx_rates (
                 id              INTEGER PRIMARY KEY,
-                date            TEXT NOT NULL,
-                source_currency TEXT NOT NULL,
-                target_currency TEXT NOT NULL,
-                rate            REAL NOT NULL,
-                timestamp       TEXT NOT NULL,
+                date            TEXT NOT NULL, -- YYYY-MM-DD, the date the rate applies to (not when it was fetched)
+                source_currency TEXT NOT NULL, -- ISO currency code, e.g. "GBP"
+                target_currency TEXT NOT NULL, -- ISO currency code, e.g. "USD"
+                rate            REAL NOT NULL, -- the exchange rate from source_currency to target_currency for the given date
+                timestamp       TEXT NOT NULL, -- ISO timestamp of when this rate was retrieved from the API (not necessarily the same as 'created_at')
                 created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
                 UNIQUE(date, source_currency, target_currency)
             )
@@ -48,9 +48,9 @@ class FxRatesTable(BaseTable[FxRateRecord]):
 
             conn.execute("""
             CREATE TABLE IF NOT EXISTS api_usage (
-                service     TEXT PRIMARY KEY,
-                count       INTEGER NOT NULL DEFAULT 0,
-                month       TEXT NOT NULL  -- YYYY-MM, to detect stale data
+                service     TEXT PRIMARY KEY, -- e.g. "exchange_api"
+                count       INTEGER NOT NULL DEFAULT 0, -- number of API calls made in the current month
+                month       TEXT NOT NULL  -- YYYY-MM, -- the month this count applies to, e.g. "2024-06", used to detect stale data
             )
             """)
 
