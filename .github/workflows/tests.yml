@@ -27,5 +27,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r server/app/requirements.txt
 
+      - name: Create test .env
+        run: cp server/.env.example server/.env
+
       - name: Run tests
         run: pytest
