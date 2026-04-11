@@ -143,7 +143,7 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
             if not rows:
                 results.append({"file": csv_filename, "inserted": 0, "skipped": "empty or all filtered"})
                 logger.info(f"No transactions found for Wise-{source} ({WISE_SOURCE_MAP.get(source, "Unknown Source")})")
-                return len(results), 0, 0, errors
+                return results, errors
 
             inserted = 0
 
@@ -176,11 +176,4 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
     except Exception as e:
         errors.append({"file": csv_filename, "error": str(e)})
     
-    total_inserted = 0
-    total_skipped = 0
-    for result in results:
-        inserted = result["inserted"]
-        total_inserted += inserted
-        total_skipped += result["parsed"] - inserted
-    
-    return len(results), total_inserted, total_skipped, errors
+    return results, errors
