@@ -46,7 +46,7 @@ class TestInferType:
         assert _infer_type(datetime(2026, 1, 1)) == "datetime"
 
     def test_dict(self):
-        assert _infer_type({"key": "val"}) == "dict"
+        assert _infer_type({"key": "val"}) == "dict[str,str]"
 
     def test_unknown_type_falls_back_to_str(self):
         class Exotic:

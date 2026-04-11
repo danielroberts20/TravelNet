@@ -9,8 +9,8 @@ from database.transaction.ingest.revolut import (
     _map_detail_type,
     _generate_id,
     _parse_timestamp,
-    _safe_float,
 )
+from database.transaction.ingest.util import safe_float as _safe_float
 
 
 class TestIsInternal:

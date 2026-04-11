@@ -18,7 +18,7 @@ with patch("config.logging.configure_logging"):
 @pytest.fixture(autouse=True)
 def _mock_lifespan_deps():
     """Suppress all lifespan startup side effects (DB init, notifications, backups)."""
-    with patch("database.setup.init_db"), \
+    with patch("main.init_db"), \
          patch("notifications.send_notification"), \
          patch("scheduled_tasks.departure_backup.schedule_departure_backups"):
         yield

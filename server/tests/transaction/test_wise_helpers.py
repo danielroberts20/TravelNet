@@ -11,9 +11,9 @@ from database.transaction.ingest.wise import (
     _is_internal,
     _is_interest,
     _parse_timestamp,
-    _safe_float,
     parse_wise_csv,
 )
+from database.transaction.ingest.util import safe_float as _safe_float
 
 from conftest import make_wise_csv
 

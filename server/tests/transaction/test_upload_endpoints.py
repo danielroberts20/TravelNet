@@ -24,9 +24,9 @@ from conftest import db, make_revolut_csv, make_wise_csv, make_wise_zip, app
 def revolut_client(db, tmp_path):
     # Bypass token auth for the duration of the test
     app.dependency_overrides[require_upload_token] = lambda: None
-    with patch("upload.transaction.endpoints.insert_revolut") as mock_insert, \
-         patch("upload.transaction.endpoints.convert_to_gbp", return_value=-8.0), \
-         patch("upload.transaction.endpoints.REVOLUT_BACKUP_DIR", tmp_path):
+    with patch("upload.transaction.router.insert_revolut") as mock_insert, \
+         patch("upload.transaction.router.convert_to_gbp", return_value=-8.0), \
+         patch("upload.transaction.router.REVOLUT_BACKUP_DIR", tmp_path):
         mock_insert.return_value = (1, 0, 0)
         with TestClient(app) as c:
             yield c, mock_insert
@@ -76,7 +76,7 @@ def test_revolut_non_csv_rejected(revolut_client):
 def test_revolut_missing_auth_rejected(tmp_path):
     # Do NOT override auth — patch settings so a token is required
     with patch("auth.settings") as mock_settings, \
-         patch("upload.transaction.endpoints.REVOLUT_BACKUP_DIR", tmp_path):
+         patch("upload.transaction.router.REVOLUT_BACKUP_DIR", tmp_path):
         mock_settings.upload_token = "secret"
         with TestClient(app) as c:
             csv_content = make_revolut_csv([])
@@ -108,14 +108,10 @@ def test_revolut_insert_called_with_csv_text(revolut_client):
 def wise_client(db, tmp_path):
     # Bypass token auth for the duration of the test
     app.dependency_overrides[require_upload_token] = lambda: None
-    with patch("upload.transaction.endpoints.insert_wise") as mock_insert, \
-         patch("upload.transaction.endpoints.WISE_BACKUP_DIR", tmp_path):
-        mock_insert.return_value = (
-            [{"file": "statement_137103719_GBP.csv", "inserted": 2, "parsed": 2}],
-            [],
-        )
+    with patch("upload.transaction.router.parse_wise_upload") as mock_upload, \
+         patch("upload.transaction.router.WISE_BACKUP_DIR", tmp_path):
         with TestClient(app) as c:
-            yield c, mock_insert
+            yield c, mock_upload
     app.dependency_overrides.clear()
 
 
@@ -186,7 +182,7 @@ def test_wise_zip_with_no_csv_rejected(wise_client):
 def test_wise_missing_auth_rejected(tmp_path):
     # Do NOT override auth — patch settings so a token is required
     with patch("auth.settings") as mock_settings, \
-         patch("upload.transaction.endpoints.WISE_BACKUP_DIR", tmp_path):
+         patch("upload.transaction.router.WISE_BACKUP_DIR", tmp_path):
         mock_settings.upload_token = "secret"
         with TestClient(app) as c:
             resp = c.post(
@@ -196,9 +192,9 @@ def test_wise_missing_auth_rejected(tmp_path):
     assert resp.status_code == 401
 
 
-def test_wise_insert_called_for_each_csv_in_zip(wise_client):
-    c, mock_insert = wise_client
-    # Zip with two CSVs
+def test_wise_upload_queued_for_zip(wise_client):
+    c, mock_upload = wise_client
+    # Zip with two CSVs — parse_wise_upload is called once with the raw zip bytes
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         for fname in [
@@ -211,4 +207,4 @@ def test_wise_insert_called_for_each_csv_in_zip(wise_client):
         files={"file": ("export.zip", buf.getvalue(), "application/zip")},
         headers={"authorization": "Bearer testtoken"},
     )
-    assert mock_insert.call_count == 2
+    assert mock_upload.call_count == 1

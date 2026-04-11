@@ -13,7 +13,8 @@ from conftest import db, row_count, make_revolut_csv
 def run_insert(db, csv_content: str):
     """Call insert() with CSV text, patching get_conn and convert_to_gbp."""
     with patch("database.transaction.ingest.revolut.get_conn", return_value=db), \
-         patch("database.transaction.ingest.revolut.convert_to_gbp", return_value=-8.0):
+         patch("database.transaction.ingest.revolut.convert_to_gbp", return_value=-8.0), \
+         patch("database.transaction.ingest.revolut.get_closest_lat_lon_by_timestamp", return_value=(None, None)):
         from database.transaction.ingest.revolut import insert
         return insert(csv_content)
 
