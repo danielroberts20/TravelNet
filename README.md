@@ -1,9 +1,8 @@
 # TravelNet &mdash; Cost of Time & Space
 
-![Pixel art zoomed in view of Earth with a map pin and wire traces](/assets/icon.jpg)
-
 > *A personal data platform built across 2–3 years of travel through the USA, Australia, New Zealand, South-East Asia, and Canada.*
 
+![Tests](https://github.com/danielroberts20/TravelNet/actions/workflows/tests.yml/badge.svg)
 [![Licence: CC BY-NC 4.0](https://img.shields.io/badge/Licence-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
 ## 🌟 Highlights
