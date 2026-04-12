@@ -96,12 +96,14 @@ def _run(db):
     """Run _detect_transitions with patched config constants and table."""
     with patch("scheduled_tasks.detect_country_transitions.DWELL_MIN_POINTS", DWELL), \
          patch("scheduled_tasks.detect_country_transitions.PAGE_SIZE", PAGE), \
-         patch("scheduled_tasks.detect_country_transitions.country_transition_table") as mock_tbl:
+         patch("scheduled_tasks.detect_country_transitions.country_transition_table") as mock_tbl, \
+         patch("prefect.logging.get_run_logger") as mock_get_logger:
 
+        mock_logger = mock_get_logger()
         # Make insert() always return True (new row)
         mock_tbl.insert.return_value = True
 
-        result = _detect_transitions(db)
+        result = _detect_transitions(db, mock_logger)
 
     return result, mock_tbl
 
