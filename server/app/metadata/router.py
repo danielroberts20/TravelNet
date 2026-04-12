@@ -7,7 +7,6 @@ from fastapi import APIRouter, Query, HTTPException, Body, Depends  # type: igno
 from fastapi.responses import Response  # type: ignore
 
 from auth import require_upload_token
-from metadata.crontab_tz import reset_crontab_timezone, update_crontab_timezone
 from database.exchange.fx import get_api_usage
 from database.location.gap_annotations.table import table as gap_annotations_table, GapAnnotationRecord
 from metadata.system import get_db_stats, get_pending_digest_count, get_uptime, read_last_lines_efficient
@@ -18,6 +17,7 @@ from notifications import send_notification
 from pydantic import BaseModel  # type: ignore
 
 from triggers.location_change import label_place  # type: ignore
+from scheduled_tasks.update_timezone import update_timezones_flow
 
 
 router = APIRouter()
@@ -191,72 +191,28 @@ async def get_annotations():
 
 
 # ---------------------------------------------------------------------------
-# Crontab timezone conversion
+# Deployment timezone conversion
 # ---------------------------------------------------------------------------
 
-class CrontabTzRequest(BaseModel):
-    """Request body for re-timing the crontab to a new local timezone."""
+class DeploymentTzRequest(BaseModel):
+    """Request body for re-timing all Prefect deployment schedules to a new local timezone."""
 
     timezone: str
 
 
-@router.post("/crontab_tz", dependencies=[Depends(require_upload_token)])
-async def update_crontab_tz(body: CrontabTzRequest):
-    """Re-time all cron jobs so they fire at the same wall-clock time in the given timezone."""
-    try:
-        result = update_crontab_timezone(body.timezone)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/deployment_tz", dependencies=[Depends(require_upload_token)])
+async def update_deployment_tz(body: DeploymentTzRequest):
+    """Update all Prefect deployment cron schedules to fire at the same wall-clock time in the given timezone."""
+    await update_timezones_flow(timezone=body.timezone)
 
-    if result['skipped']:
-        logger.info("Crontab timezone unchanged (%s) — skipped", result['timezone_label'])
-        return {
-            "timezone":     result['timezone_label'],
-            "jobs_changed": 0,
-            "details":      [],
-            "skipped":      True,
-        }
-
-    changed_count = sum(1 for c in result['changes'] if c['changed'])
     send_notification(
-        title="Cron Updated",
-        body=f"Schedule adjusted to {result['timezone_label']} ({changed_count} job(s) re-timed)",
+        title="Schedule Updated",
+        body=f"Deployment schedules adjusted to {body.timezone}",
         time_sensitive=False,
     )
-    logger.info(
-        "Crontab timezone updated to %s (pi_offset=%+d min, user_offset=%+d min, %d changed)",
-        result['timezone_label'],
-        result['pi_offset_min'],
-        result['user_offset_min'],
-        changed_count,
-    )
+    logger.info("Deployment schedules updated to timezone: %s", body.timezone)
 
-    return {
-        "timezone":     result['timezone_label'],
-        "jobs_changed": changed_count,
-        "details":      result['changes'],
-        "skipped":      False,
-    }
-
-
-@router.delete("/crontab_tz", dependencies=[Depends(require_upload_token)])
-async def reset_crontab_tz():
-    """Restore the crontab to the state it was in before the last timezone conversion."""
-    try:
-        content = reset_crontab_timezone()
-    except RuntimeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    line_count = sum(1 for l in content.splitlines() if l.strip() and not l.startswith('#'))
-    send_notification(
-        title="Cron Reset",
-        body=f"Crontab restored to pre-conversion backup ({line_count} job(s))",
-        time_sensitive=False,
-    )
-    logger.info("Crontab reset to pre-conversion backup")
-    return {"message": "Crontab restored from backup."}
+    return {"timezone": body.timezone}
 
 @router.get("/widget_status")
 async def widget_status():

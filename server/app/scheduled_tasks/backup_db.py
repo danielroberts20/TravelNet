@@ -4,26 +4,33 @@ Weekly local DB backup with 4-week retention.
 Scheduled: Every Sunday at 01:00.
   - Creates a timestamped .db snapshot in backups/db/
   - Deletes backups older than 28 days
-
-Can also be triggered manually:
-  docker exec travelnet python -m scheduled_tasks.backup_db
 """
-
 from config.editable import load_overrides
 load_overrides()
 
-import logging
+from datetime import datetime, timedelta
+
+from prefect import task, flow
+from prefect.logging import get_run_logger
+
 from database.connection import backup_db
 from config.general import DATABASE_BACKUP_DIR
-from datetime import datetime, timedelta
-from config.logging import configure_logging
-from config.settings import settings
-from notifications import CronJobMailer
+from notifications import notify_on_completion
 
-logger = logging.getLogger(__name__)
 
-def prune_old_backups(days: int = 28) -> int:
-    """Delete backups older than `days` days. Returns count deleted."""
+
+@task
+def create_db_snapshot() -> dict:
+    logger = get_run_logger()
+    backup_path = backup_db()
+    size_mb = round(backup_path.stat().st_size / (1024 * 1024), 2)
+    logger.info("DB snapshot created: %s (%.2f MB)", backup_path, size_mb)
+    return {"backup_path": str(backup_path), "size_mb": size_mb}
+
+
+@task
+def prune_old_db_backups(days: int = 28) -> int:
+    logger = get_run_logger()
     cutoff = datetime.now() - timedelta(days=days)
     deleted = 0
     for f in DATABASE_BACKUP_DIR.glob("*.db"):
@@ -31,30 +38,19 @@ def prune_old_backups(days: int = 28) -> int:
             mtime = datetime.fromtimestamp(f.stat().st_mtime)
             if mtime < cutoff:
                 f.unlink()
-                logger.info(f"Pruned old backup: {f.name}")
+                logger.info("Pruned old backup: %s", f.name)
                 deleted += 1
         except Exception as e:
-            logger.warning(f"Failed to prune {f.name}: {e}")
+            logger.warning("Failed to prune %s: %s", f.name, e)
     return deleted
 
 
-def run(prefix: str = None, suffix: str = None):
-    """Create a timestamped DB snapshot and prune backups older than 28 days."""
-    backup_path = backup_db(prefix, suffix)
-    size_mb     = round(backup_path.stat().st_size / (1024 * 1024), 2)
-    deleted     = prune_old_backups(days=28)
+@flow(name="Backup DB", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+def backup_db_flow():
+    snapshot = create_db_snapshot()
+    pruned = prune_old_db_backups(28)
     return {
-        "backup_path": str(backup_path),
-        "size_mb":     size_mb,
-        "pruned":      deleted,
+        "backup_path": snapshot["backup_path"],
+        "size_mb": snapshot["size_mb"],
+        "pruned": pruned,
     }
-
-
-if __name__ == "__main__":
-    configure_logging()
-    with CronJobMailer("backup_db", settings.smtp_config,
-                       detail="Backup full DB to local storage, keep only last 4 weeks") as job:
-        result = run()
-        job.add_metric("backup", result["backup_path"])
-        job.add_metric("size_mb", result["size_mb"])
-        job.add_metric("pruned", result["pruned"])

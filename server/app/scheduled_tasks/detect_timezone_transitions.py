@@ -5,30 +5,22 @@ Scans location_unified (joined to places) in chronological order and records
 rows into timezone_transitions whenever the IANA timezone changes.
 
 Safe to re-run — uses INSERT OR IGNORE on (transitioned_at, to_tz).
-
-Run via:
-    cd server && ./runcron.sh scheduled_tasks.detect_timezone_transitions
 """
+from config.editable import load_overrides
+load_overrides()
 
-import logging
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from prefect import task, flow
+from prefect.logging import get_run_logger
+
 from database.transition.timezone.table import table as transition_timezone_table, TransitionTimezoneRecord
-from config.logging import configure_logging
 from config.general import PAGE_SIZE
 from database.connection import get_conn
-from notifications import CronJobMailer
-from config.settings import settings
-
-logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# UTC offset helper
-# ---------------------------------------------------------------------------
-
-def _utc_offset_str(iana_tz: str, at_utc_iso: str) -> str | None:
+def _utc_offset_str(iana_tz: str, at_utc_iso: str, logger) -> str | None:
     """
     Return the UTC offset for *iana_tz* at the moment *at_utc_iso* as a
     string like "+11:00" or "-05:30".
@@ -57,11 +49,7 @@ def _utc_offset_str(iana_tz: str, at_utc_iso: str) -> str | None:
     return f"{sign}{h:02d}:{m:02d}"
 
 
-# ---------------------------------------------------------------------------
-# Core detection logic
-# ---------------------------------------------------------------------------
-
-def _detect_transitions(conn) -> dict:
+def _detect_transitions(conn, logger) -> dict:
     """
     Walk location_unified joined to places in chronological order.
     Insert a timezone_transitions row each time places.timezone changes.
@@ -75,8 +63,6 @@ def _detect_transitions(conn) -> dict:
     current_tz: str | None = None
     current_offset: str | None = None
 
-    # Use an offset-based page cursor so we don't hold a giant result set.
-    # We ORDER BY timestamp ASC consistently across pages.
     offset = 0
 
     while True:
@@ -105,7 +91,7 @@ def _detect_transitions(conn) -> dict:
 
             # Timezone changed (or this is the very first geocoded point).
             ts = row["timestamp"]
-            to_offset = _utc_offset_str(row_tz, ts)
+            to_offset = _utc_offset_str(row_tz, ts, logger)
 
             if to_offset is None:
                 # Unresolvable timezone — skip without updating current_tz so
@@ -151,13 +137,11 @@ def _detect_transitions(conn) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
-
-def run() -> dict:
+@task
+def run_timezone_transition_detection() -> dict:
+    logger = get_run_logger()
     with get_conn() as conn:
-        results = _detect_transitions(conn)
+        results = _detect_transitions(conn, logger)
 
     logger.info(
         "timezone_transitions complete — inserted=%d, skipped=%d, null_tz=%d",
@@ -168,14 +152,6 @@ def run() -> dict:
     return results
 
 
-if __name__ == "__main__":
-    configure_logging()
-    with CronJobMailer(
-        "detect_timezone_transitions",
-        settings.smtp_config,
-        detail="Detect IANA timezone changes from location history",
-    ) as job:
-        results = run()
-        job.add_metric("transitions inserted", results["inserted"])
-        job.add_metric("already recorded (skipped)", results["already_recorded"])
-        job.add_metric("unresolvable tz skipped", results["null_tz_skipped"])
+@flow(name="Detect Timezone Transitions")
+def detect_timezone_transitions_flow():
+    return run_timezone_transition_detection()

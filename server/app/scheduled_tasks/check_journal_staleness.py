@@ -2,26 +2,27 @@ from config.editable import load_overrides
 load_overrides()
 
 import json
-import logging
 from datetime import datetime, timezone
 
-from config.general import DATA_DIR, JOURNAL_STALENESS_HOURS
-from config.logging import configure_logging
-from config.settings import settings
-from notifications import CronJobMailer, _record_cron_run, journal_notification, send_notification
+from prefect import task, flow
+from prefect.logging import get_run_logger
 
-logger = logging.getLogger(__name__)
+from config.general import DATA_DIR, JOURNAL_STALENESS_HOURS
+from notifications import journal_notification
 
 JOURNAL_LATEST_FILE = DATA_DIR / "journal_latest.json"
 
 
-def check_journal_staleness() -> dict:
+@task
+def check_and_notify_journal_staleness() -> dict:
     """Check whether the latest journal entry is older than JOURNAL_STALENESS_HOURS.
 
     Returns a dict with keys: last_entry_ts, hours_since, stale.
     Sends a push notification if stale.
     Raises RuntimeError if the file is missing or unreadable.
     """
+    logger = get_run_logger()
+
     if not JOURNAL_LATEST_FILE.exists():
         raise RuntimeError(f"Journal latest file not found: {JOURNAL_LATEST_FILE}")
 
@@ -58,16 +59,6 @@ def check_journal_staleness() -> dict:
     }
 
 
-if __name__ == "__main__":
-    configure_logging()
-
-    resp = check_journal_staleness()
-
-    try:
-        _record_cron_run(
-            job="check_journal_staleness",
-            success=resp.get("stale", False) == True,
-            detail=", ".join(f"{k}: {v}" for k, v in resp.items()) if resp else "",
-        )
-    except Exception as tracker_err:
-        print(f"[CronJobMailer] Failed to record cron run for {"check_journal_staleness"!r}: {tracker_err}")
+@flow(name="Check Journal Staleness")
+def check_journal_staleness_flow():
+    return check_and_notify_journal_staleness()

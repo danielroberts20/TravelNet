@@ -15,42 +15,21 @@ Daily endpoint:  https://archive-api.open-meteo.com/v1/archive (same, different 
 from config.editable import load_overrides
 load_overrides()
 
-import logging
 import time
 from datetime import date, timedelta
+
 import requests
+
+from prefect import task, flow
+from prefect.logging import get_run_logger
+
 from config.general import COORD_PRECISION, DAILY_VARS, HOURLY_VARS, OPEN_METEO_URL, REQUEST_DELAY
-from config.logging import configure_logging
-from config.settings import settings
 from database.connection import get_conn, increment_api_usage
 from database.weather.table import table as weather_table
-from notifications import CronJobMailer
-
-logger = logging.getLogger(__name__)
+from notifications import notify_on_completion
 
 
-
-def _get_distinct_locations(start_date: date, end_date: date) -> list[tuple[float, float]]:
-    """Return distinct (rounded_lat, rounded_lon) pairs from location_unified in the window."""
-    sql = """
-        SELECT DISTINCT
-            ROUND(latitude, :p) AS latitude,
-            ROUND(longitude, :p) AS longitude
-        FROM location_unified
-        WHERE DATE(timestamp) BETWEEN :start AND :end
-          AND latitude IS NOT NULL
-          AND longitude IS NOT NULL
-    """
-    with get_conn(read_only=True) as conn:
-        rows = conn.execute(sql, {
-            "p": COORD_PRECISION,
-            "start": start_date.isoformat(),
-            "end": end_date.isoformat(),
-        }).fetchall()
-    return [(row["latitude"], row["longitude"]) for row in rows]
-
-
-def _fetch_hourly(lat: float, lon: float, start_date: date, end_date: date) -> dict | None:
+def _fetch_hourly(lat: float, lon: float, start_date: date, end_date: date, logger) -> dict | None:
     """Fetch hourly weather data from Open-Meteo for a single cell."""
     params = {
         "latitude":   lat,
@@ -70,7 +49,7 @@ def _fetch_hourly(lat: float, lon: float, start_date: date, end_date: date) -> d
         return None
 
 
-def _fetch_daily(lat: float, lon: float, start_date: date, end_date: date) -> dict | None:
+def _fetch_daily(lat: float, lon: float, start_date: date, end_date: date, logger) -> dict | None:
     """Fetch daily weather data from Open-Meteo for a single cell."""
     params = {
         "latitude":   lat,
@@ -90,30 +69,36 @@ def _fetch_daily(lat: float, lon: float, start_date: date, end_date: date) -> di
         return None
 
 
-
-def run() -> dict:
-    """Fetch and store retroactive weather data for all distinct location cells.
-
-    Covers the window (today - 47 days) → (today - 7 days).  The 7-day lag
-    gives Open-Meteo time to finalise archive data.  Returns a summary dict
-    with counts of cells processed and rows inserted/failed.
+@task
+def fetch_weather_locations(start_date: date, end_date: date) -> list[tuple[float, float]]:
+    logger = get_run_logger()
+    sql = """
+        SELECT DISTINCT
+            ROUND(latitude, :p) AS latitude,
+            ROUND(longitude, :p) AS longitude
+        FROM location_unified
+        WHERE DATE(timestamp) BETWEEN :start AND :end
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
     """
-    today      = date.today()
-    end_date   = today - timedelta(days=7)
-    start_date = end_date - timedelta(days=40)
-
-    logger.info(
-        "Weather fetch starting. Window: %s → %s",
-        start_date.isoformat(), end_date.isoformat(),
-    )
-
-    locations = _get_distinct_locations(start_date, end_date)
+    with get_conn(read_only=True) as conn:
+        rows = conn.execute(sql, {
+            "p": COORD_PRECISION,
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+        }).fetchall()
+    locations = [(row["latitude"], row["longitude"]) for row in rows]
     logger.info("Distinct location cells to fetch: %d", len(locations))
+    return locations
 
-    if not locations:
-        logger.info("No location data in window — nothing to fetch.")
-        return
 
+@task
+def fetch_and_store_all_weather(
+    locations: list[tuple[float, float]],
+    start_date: date,
+    end_date: date,
+) -> dict:
+    logger = get_run_logger()
     hourly_inserted = 0
     daily_inserted  = 0
     hourly_failed   = 0
@@ -121,7 +106,7 @@ def run() -> dict:
 
     for lat, lon in locations:
         # Hourly
-        hourly_data = _fetch_hourly(lat, lon, start_date, end_date)
+        hourly_data = _fetch_hourly(lat, lon, start_date, end_date, logger)
         if hourly_data is None:
             hourly_failed += 1
         else:
@@ -129,7 +114,7 @@ def run() -> dict:
         time.sleep(REQUEST_DELAY)
 
         # Daily
-        daily_data = _fetch_daily(lat, lon, start_date, end_date)
+        daily_data = _fetch_daily(lat, lon, start_date, end_date, logger)
         if daily_data is None:
             daily_failed += 1
         else:
@@ -138,7 +123,7 @@ def run() -> dict:
 
         logger.debug("(%.2f, %.2f): done.", lat, lon)
 
-    logger.important(
+    logger.info(
         "Weather fetch complete. Cells: %d | "
         "Hourly: %d inserted, %d failed | "
         "Daily: %d inserted, %d failed.",
@@ -157,17 +142,27 @@ def run() -> dict:
         "hourly_inserted": hourly_inserted,
         "daily_inserted": daily_inserted,
         "hourly_failed": hourly_failed,
-        "daily_failed": daily_failed
+        "daily_failed": daily_failed,
     }
 
-if __name__ == "__main__":
-    configure_logging()
 
-    with CronJobMailer("get_weather", settings.smtp_config,
-                       detail="Get weather day for previous 40 days, starting from the 7th") as job:
-        result = run()
-        job.add_metric("num locations", result["num_locations"])
-        job.add_metric("hourly inserted", result["hourly_inserted"])
-        job.add_metric("daily inserted", result["daily_inserted"])
-        job.add_metric("hourly failed", result["hourly_failed"])
-        job.add_metric("daily failed", result["daily_failed"])
+@flow(name="Get Weather", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+def get_weather_flow():
+    logger = get_run_logger()
+    today      = date.today()
+    end_date   = today - timedelta(days=7)
+    start_date = end_date - timedelta(days=40)
+
+    logger.info(
+        "Weather fetch starting. Window: %s → %s",
+        start_date.isoformat(), end_date.isoformat(),
+    )
+
+    locations = fetch_weather_locations(start_date, end_date)
+
+    if not locations:
+        logger.info("No location data in window — nothing to fetch.")
+        return {"num_locations": 0, "hourly_inserted": 0, "daily_inserted": 0,
+                "hourly_failed": 0, "daily_failed": 0}
+
+    return fetch_and_store_all_weather(locations, start_date, end_date)

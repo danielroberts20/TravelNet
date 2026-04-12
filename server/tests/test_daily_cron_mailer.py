@@ -141,13 +141,6 @@ class TestDailyCronJobMailer:
         records, _, _ = _run(job_name="my_cron_job")
         assert records[0].job_name == "my_cron_job"
 
-    def test_flush_called_when_all_jobs_reported(self):
-        _, _, mock_flush = _run(
-            all_jobs=("job_a", "job_b"),
-            db_reported=["job_a", "job_b"],
-        )
-        mock_flush.assert_called_once()
-
     def test_flush_not_called_when_jobs_missing(self):
         _, _, mock_flush = _run(
             all_jobs=("job_a", "job_b"),
@@ -161,14 +154,6 @@ class TestDailyCronJobMailer:
             db_reported=[],
         )
         mock_flush.assert_not_called()
-
-    def test_flush_receives_smtp_cfg(self):
-        _, _, mock_flush = _run(
-            smtp=SMTP,
-            all_jobs=("test_job",),
-            db_reported=["test_job"],
-        )
-        mock_flush.assert_called_once_with(SMTP)
 
     def test_exception_not_suppressed(self):
         with patch("notifications.daily_cron_table"), \

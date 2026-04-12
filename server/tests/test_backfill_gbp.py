@@ -2,7 +2,7 @@ import logging
 import sqlite3
 import pytest
 from unittest.mock import patch, MagicMock
-from scheduled_tasks.backfill_gbp import backfill_gbp
+from scheduled_tasks.backfill_gbp import backfill_gbp_flow
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def test_backfills_foreign_currency(db):
     db.commit()
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
-        backfill_gbp()
+        backfill_gbp_flow()
 
     row = db.execute("SELECT amount_gbp FROM transactions WHERE id = 'tx1'").fetchone()
     assert row["amount_gbp"] == pytest.approx(-40.0, rel=1e-4)  # -50 / 1.25
@@ -73,7 +73,7 @@ def test_backfills_gbp_transaction(db):
     db.commit()
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
-        backfill_gbp()
+        backfill_gbp_flow()
 
     row = db.execute("SELECT amount_gbp FROM transactions WHERE id = 'tx2'").fetchone()
     assert row["amount_gbp"] == pytest.approx(-20.0)
@@ -86,7 +86,7 @@ def test_logs_warning_when_fx_missing(db, caplog):
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
         with caplog.at_level(logging.WARNING, logger="scheduled_tasks.backfill_gbp"):
-            backfill_gbp()
+            backfill_gbp_flow()
 
     row = db.execute("SELECT amount_gbp FROM transactions WHERE id = 'tx3'").fetchone()
     assert row["amount_gbp"] is None
@@ -101,7 +101,7 @@ def test_no_nulls_does_nothing(db, caplog):
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
         with caplog.at_level(logging.INFO, logger="scheduled_tasks.backfill_gbp"):
-            backfill_gbp()
+            backfill_gbp_flow()
 
     assert "No NULL amount_gbp transactions found." in caplog.text
 
@@ -112,7 +112,7 @@ def test_does_not_overwrite_existing_amount_gbp(db):
     db.commit()
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
-        backfill_gbp()
+        backfill_gbp_flow()
 
     row = db.execute("SELECT amount_gbp FROM transactions WHERE id = 'tx5'").fetchone()
     assert row["amount_gbp"] == pytest.approx(-99.0)  # unchanged

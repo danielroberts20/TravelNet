@@ -1,13 +1,15 @@
-import logging
+from config.editable import load_overrides
+load_overrides()
 
-from config.logging import configure_logging
-from config.settings import settings
-from database.connection import get_conn, to_iso_str
-from notifications import DailyCronJobMailer
 from datetime import datetime, timezone, timedelta
+from notifications import notify_on_completion
+from prefect import task, flow
+from prefect.logging import get_run_logger
+
+from database.connection import get_conn, to_iso_str
+from notifications import notify_on_completion
 
 
-logger = logging.getLogger(__name__)
 
 _NEAREST_PLACE_SQL = """
     SELECT lu.place_id FROM location_unified lu
@@ -21,6 +23,7 @@ _NEAREST_PLACE_SQL = """
     LIMIT 1
 """
 
+
 def _nearest_place_id(conn, ts: str, window_s: int) -> int | None:
     """Return the place_id of the nearest location to ts within window_s seconds.
 
@@ -30,7 +33,10 @@ def _nearest_place_id(conn, ts: str, window_s: int) -> int | None:
     return row["place_id"] if row else None
 
 
-def run():
+@task
+def backfill_all_places() -> dict:
+    logger = get_run_logger()
+
     with get_conn() as conn:
 
         # --- Transactions ---
@@ -178,27 +184,10 @@ def run():
         "workouts_found": len(workout_rows),
         "workouts_backfilled": filled_workouts,
         "trigger_log_found": len(trigger_row),
-        "trigger_log_backfilled": filled_trigger_log
+        "trigger_log_backfilled": filled_trigger_log,
     }
 
-if __name__ == "__main__":
-    configure_logging()
 
-    with DailyCronJobMailer("backfill_place", settings.smtp_config,
-                       "Add place IDs to historical data") as job:
-        results = run()
-
-        job.add_metric("transactions found", results["transactions_found"])
-        job.add_metric("transactions backfilled", results["transactions_backfilled"])
-        job.add_metric("health quantity found", results["health_quantity_found"])
-        job.add_metric("health quantity backfilled", results["health_quantity_backfilled"])
-        job.add_metric("health sleep found", results["health_sleep_found"])
-        job.add_metric("health sleep backfilled", results["health_sleep_backfilled"])
-        job.add_metric("health heart rate found", results["health_heart_rate_found"])
-        job.add_metric("health heart rate backfilled", results["health_heart_rate_backfilled"])
-        job.add_metric("state of mind found", results["state_of_mind_found"])
-        job.add_metric("state of mind backfilled", results["state_of_mind_backfilled"])
-        job.add_metric("workouts found", results["workouts_found"])
-        job.add_metric("workouts backfilled", results["workouts_backfilled"])
-        job.add_metric("trigger log found", results["trigger_log_found"])
-        job.add_metric("trigger log backfilled", results["trigger_log_backfilled"])
+@flow(name="Backfill Place", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+def backfill_place_flow():
+    return backfill_all_places()

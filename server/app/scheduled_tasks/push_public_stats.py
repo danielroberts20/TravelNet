@@ -6,29 +6,27 @@ and pushes docs/public_stats.json to the TravelNet GitHub repo.
 
 The committed JSON acts as a warm cache for the docs site — it falls
 back to this file if the live endpoint is unreachable.
-
-Run via:
-    cd server && ./runcron.sh scheduled_tasks.push_public_stats
 """
+from config.editable import load_overrides
+load_overrides()
 
 import base64
 import json
-import logging
 from datetime import datetime, timezone
 
 import requests
 
-from config.settings import settings
-from notifications import DailyCronJobMailer
-from public.stats import build_public_stats
+from prefect import task, flow
+from prefect.logging import get_run_logger
 
-logger = logging.getLogger(__name__)
+from config.settings import settings
+from public.stats import build_public_stats
 
 GITHUB_API = "https://api.github.com"
 TARGET_PATH = "docs/public_stats.json"
 
 
-def get_current_sha(headers: dict) -> str | None:
+def _get_current_sha(headers: dict, logger) -> str | None:
     """
     Get the current blob SHA of docs/public_stats.json from GitHub.
     Required by the GitHub Contents API to update an existing file.
@@ -43,11 +41,18 @@ def get_current_sha(headers: dict) -> str | None:
     resp.raise_for_status()
 
 
-def push_stats_to_github(payload: dict) -> None:
-    """
-    Commit docs/public_stats.json to the repo via the GitHub Contents API.
-    Creates the file on first run, updates it on subsequent runs.
-    """
+@task
+def build_stats_payload() -> dict:
+    logger = get_run_logger()
+    logger.info("Building public stats payload...")
+    payload = build_public_stats()
+    logger.info("Public stats payload built.")
+    return payload
+
+
+@task(retries=2, retry_delay_seconds=10)
+def push_stats_to_github(payload: dict) -> str:
+    logger = get_run_logger()
     headers = {
         "Authorization": f"Bearer {settings.github_public_stats_token}",
         "Accept": "application/vnd.github+json",
@@ -57,7 +62,7 @@ def push_stats_to_github(payload: dict) -> None:
     content = json.dumps(payload, indent=2, ensure_ascii=False)
     encoded = base64.b64encode(content.encode()).decode()
 
-    sha = get_current_sha(headers)
+    sha = _get_current_sha(headers, logger)
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     body = {
@@ -74,14 +79,13 @@ def push_stats_to_github(payload: dict) -> None:
 
     action = "Updated" if sha else "Created"
     logger.info(f"{action} {TARGET_PATH} in {settings.github_repo}")
+    return f"{action} {TARGET_PATH}"
 
 
-if __name__ == "__main__":
-    with DailyCronJobMailer(
-        "push_public_stats",
-        settings.smtp_config,
-        detail="Push public stats to GitHub",
-    ) as job:
-        payload = build_public_stats()
-        push_stats_to_github(payload)
-        logger.info("public_stats.json pushed to GitHub successfully.")
+@flow(name="Push Public Stats")
+def push_public_stats_flow():
+    logger = get_run_logger()
+    payload = build_stats_payload()
+    result = push_stats_to_github(payload)
+    logger.info("public_stats.json pushed to GitHub successfully.")
+    return {"result": result}

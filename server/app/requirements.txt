@@ -17,4 +17,5 @@ paramiko
 timezonefinder
 tzdata>=2024.1
 airportsdata
-prefect
+prefect==3.6.25
+prefect-shell>=0.3.5

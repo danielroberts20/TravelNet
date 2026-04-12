@@ -1,16 +1,24 @@
-from notifications import _record_cron_run, send_notification
+from config.editable import load_overrides
+load_overrides()
+
+from prefect import task, flow
+from prefect.logging import get_run_logger
+
+from notifications import send_notification
 
 
-if __name__ == "__main__":
+@task
+def send_transaction_reminder_task() -> dict:
+    logger = get_run_logger()
+    logger.info("Sending transaction upload reminder notification...")
     resp = send_notification(
         title="Upload Transactions 💰",
         body="Don't forget to upload your transactions for this month!"
     )
+    logger.info("Notification response: %s", resp)
+    return resp
 
-    try:
-        _record_cron_run(
-            job="send_transaction_reminder",
-            success=resp.get("message", '') == "Success!",
-        )
-    except Exception as tracker_err:
-        print(f"[CronJobMailer] Failed to record cron run for {"send_transaction_reminder"!r}: {tracker_err}")
+
+@flow(name="Send Transaction Reminder")
+def send_transaction_reminder_flow():
+    return send_transaction_reminder_task()
