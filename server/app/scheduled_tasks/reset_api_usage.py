@@ -9,27 +9,28 @@ Scheduled to run on the 1st of each month.
 from config.editable import load_overrides
 load_overrides()
 
-import logging
+from prefect import task, flow
+from prefect.logging import get_run_logger
 
-from config.logging import configure_logging
-from config.settings import settings
 from database.exchange.fx import reset_api_usage
-from notifications import CronJobMailer
-from config.editable import load_overrides
+from notifications import notify_on_completion
 
-
-logger = logging.getLogger(__name__)
-
-
-if __name__ == "__main__":
-    configure_logging()
-    logger.important("Resetting FX API usage counter...")
+@task
+def reset_all_api_counters() -> list[dict]:
+    logger = get_run_logger()
     services = ["exchangerate.host", "open-meteo"]
+    results = []
+    for name in services:
+        result = reset_api_usage(name)
+        logger.info(
+            "Reset %s: old_count=%s, old_month=%s",
+            result["service"], result["old_count"], result["old_month"],
+        )
+        results.append(result)
+    return results
 
-    with CronJobMailer("reset_api_usage", settings.smtp_config,
-                       detail="Reset monthly API call counters") as job:
-        for name in services:
-            result = reset_api_usage(name)
-            job.add_metric("service", result["service"])
-            job.add_metric(f"{name} old count", result["old_count"])
-            job.add_metric(f"{name} old month", result["old_month"])
+
+@flow(name="Reset API Usage", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+def reset_api_usage_flow():
+    results = reset_all_api_counters()
+    return {r["service"]: {"old_count": r["old_count"], "old_month": r["old_month"]} for r in results}

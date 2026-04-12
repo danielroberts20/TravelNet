@@ -10,15 +10,14 @@ summary dict with gap and partial counts so CronJobMailer can report them.
 from config.editable import load_overrides
 load_overrides()
 
-import logging
 from datetime import date, timedelta
-from config.editable import load_overrides
-from config.logging import configure_logging
-from database.connection import get_conn
-from notifications import CronJobMailer
-from config.settings import settings
 
-logger = logging.getLogger(__name__)
+from prefect import task, flow
+from prefect.logging import get_run_logger
+
+from database.connection import get_conn
+from notifications import notify_on_completion
+
 
 EXPECTED_METRICS = {
     "Active Energy",
@@ -44,12 +43,15 @@ EXPECTED_METRICS = {
 }
 
 
-def check_health_gaps() -> dict:
+@task
+def check_health_gaps_task() -> dict:
     """Check for missing or incomplete health data days since collection began.
 
     Returns a dict with 'gaps' (days with zero data) and 'partial' (days
     missing at least one of the EXPECTED_METRICS).
     """
+    logger = get_run_logger()
+
     with get_conn() as conn:
         # Earliest date in the table — use as floor so we don't warn before data collection began
         row = conn.execute(
@@ -113,11 +115,6 @@ def check_health_gaps() -> dict:
     return {"gaps": gap_count, "partial": partial_count}
 
 
-if __name__ == "__main__":
-    configure_logging()
-
-    with CronJobMailer("check_health_gaps", settings.smtp_config,
-                       detail="Look for missing expected metrics in last week of health data") as job:
-        metrics = check_health_gaps()
-        job.add_metric("gaps", metrics["gaps"])
-        job.add_metric("partial", metrics["partial"])
+@flow(name="Check Health Gaps", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+def check_health_gaps_flow():
+    return check_health_gaps_task()

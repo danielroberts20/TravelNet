@@ -1,11 +1,18 @@
+from config.editable import load_overrides
+load_overrides()
+
+from prefect import task, flow
+from prefect.logging import get_run_logger
+
 from config.general import LOCATION_NOISE_ACCURACY_THRESHOLD
 from database.connection import get_conn
 from database.location.noise.table import table as noise_table, LocationNoiseRecord
 
 
-def flag_tier1() -> int:
+@task
+def flag_tier1_noise() -> int:
+    logger = get_run_logger()
     with get_conn() as conn:
-        """Flag unflagged points where horizontal_accuracy > threshold."""
         rows = conn.execute("""
             SELECT o.id, o.horizontal_accuracy
             FROM location_overland o
@@ -22,7 +29,11 @@ def flag_tier1() -> int:
                 reason="accuracy_threshold",
             ))
 
-        return len(rows)
+    logger.info("Flagged %d location point(s) as tier-1 noise", len(rows))
+    return len(rows)
 
-if __name__ == "__main__":
-    flag_tier1()
+
+@flow(name="flag-location-noise")
+def flag_location_noise_flow():
+    flagged = flag_tier1_noise()
+    return {"flagged": flagged}

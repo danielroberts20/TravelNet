@@ -1,46 +1,44 @@
 """
 scheduled_tasks/run_tests.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Run the full pytest suite and report results via CronJobMailer email.
+Run the full pytest suite and report results via email.
 
 NOTE: Unlike other scheduled tasks, this one runs on the HOST (not inside
 Docker) because the test suite uses in-memory SQLite and mocks that require
-the host Python environment. Do NOT run it via runcron.sh.
+the host Python environment. It is NOT registered in deployments.py and must
+not be run via runcron.sh. It is scheduled by a system cron on the host:
 
-Scheduled: daily (e.g. 06:00)
-  0 6 * * * cd /home/dan/services/TravelNet && python server/app/scheduled_tasks/run_tests.py
+  0 6 1,15 * * /home/dan/services/TravelNet/.venv/bin/python \
+      /home/dan/services/TravelNet/server/app/scheduled_tasks/run_tests.py
 
 On success → ✅ email with passed/failed/error counts.
 On failure → ❌ email with counts and full pytest output.
 """
+from config.editable import load_overrides
+load_overrides()
 
-import logging
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-# Add server/app to sys.path so TravelNet modules are importable on the host
-REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT / "server" / "app"))
-
-from config.editable import load_overrides
-load_overrides()
-
-from config.settings import settings
-from notifications import CronJobMailer
-
-logger = logging.getLogger(__name__)
+from prefect import task, flow
+from prefect.logging import get_run_logger
 
 
-def run_tests() -> dict:
-    """Run pytest against the full test suite and return a summary dict.
+@task
+def run_pytest_suite() -> dict:
+    logger = get_run_logger()
 
-    :returns: dict with keys passed, failed, errors, exit_code, output.
-    """
+    # Resolve REPO_ROOT here so this module is safe to import inside Docker
+    repo_root = Path(__file__).resolve().parents[3]
+    if str(repo_root / "server" / "app") not in sys.path:
+        sys.path.insert(0, str(repo_root / "server" / "app"))
+
+    logger.info("Running pytest suite from %s...", repo_root)
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "server/tests/", "-q", "--tb=short"],
-        cwd=REPO_ROOT,
+        cwd=repo_root,
         capture_output=True,
         text=True,
     )
@@ -58,6 +56,10 @@ def run_tests() -> dict:
             elif label == "error":
                 errors = count
 
+    logger.info(
+        "pytest complete: %d passed, %d failed, %d errors (exit %d)",
+        passed, failed, errors, result.returncode,
+    )
     return {
         "passed": passed,
         "failed": failed,
@@ -67,17 +69,19 @@ def run_tests() -> dict:
     }
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+@flow(name="run-tests")
+def run_tests_flow():
+    logger = get_run_logger()
+    results = run_pytest_suite()
 
-    with CronJobMailer("run_tests", settings.smtp_config,
-                       detail="Full pytest suite on host") as job:
-        results = run_tests()
-        job.add_metric("passed", results["passed"])
-        job.add_metric("failed", results["failed"])
-        job.add_metric("errors", results["errors"])
+    if results["exit_code"] != 0:
+        raise RuntimeError(
+            f"Test suite failed (exit {results['exit_code']}):\n\n{results['output']}"
+        )
 
-        if results["exit_code"] != 0:
-            raise RuntimeError(
-                f"Test suite failed (exit {results['exit_code']}):\n\n{results['output']}"
-            )
+    logger.info("All tests passed.")
+    return {
+        "passed": results["passed"],
+        "failed": results["failed"],
+        "errors": results["errors"],
+    }
