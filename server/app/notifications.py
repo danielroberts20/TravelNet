@@ -14,6 +14,8 @@ import logging
 import smtplib
 import traceback
 from contextlib import contextmanager
+
+from prefect import State
 from database.connection import get_conn
 from database.logging.daily.table import table as daily_cron_table, DailyCronRecord
 from config.general import AVAILABLE_NOTIFICATIONS, DAILY_CRON_JOBS
@@ -30,6 +32,17 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # PushCut
 # ---------------------------------------------------------------------------
+
+def notify_on_completion(flow, flow_run, state: State):
+    from notifications import send_notification
+
+    send_notification(
+        title=f"⏳ {flow.name}",
+        body=state.message or (f"✅ Completed successfully" if state.is_completed() else "❌ Failed"),
+        time_sensitive=state.is_failed()
+    )
+
+    
 def trigger_notification(notification_name):
     """Fire a named Pushcut notification by looking up its URL from AVAILABLE_NOTIFICATIONS."""
     noti_url = AVAILABLE_NOTIFICATIONS.get(notification_name)
