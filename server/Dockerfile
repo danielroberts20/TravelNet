@@ -5,7 +5,7 @@ WORKDIR /app
 COPY app/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
-RUN apt-get update && apt-get install -y --no-install-recommends rclone && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends rclone age sqlite3 && rm -rf /var/lib/apt/lists/*
 
 COPY app/ .
 

@@ -5,6 +5,7 @@ services:
     env_file: .env
     environment:
       CRONTAB_FILE: "/var/spool/cron/crontabs/dan"
+      PREFECT_API_URL: "http://pi-server.tail186ff8.ts.net:4200/api"
     volumes:
       - /mnt/linux/docker/services/travelnet/data:/data
       - ./app:/app
@@ -56,6 +57,22 @@ services:
       - dashboard
     networks:
       - travelnet
+  
+  prefect-worker:
+    build: .
+    command: python -m deployments
+    env_file: .env
+    environment:
+      - PREFECT_API_URL=http://pi-server.tail186ff8.ts.net:4200/api
+    volumes:
+      - /mnt/linux/docker/services/travelnet/data:/data
+      - ./app:/app
+      - /mnt/linux/docker/services/travelnet/data/backup_db_to_cloudflare.sh:/backup_db_to_cloudflare.sh:ro
+      - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/mnt/linux/docker/services/travelnet/.travelnet_backup_key:ro
+      - /home/dan/.config/rclone:/root/.config/rclone:ro
+    restart: unless-stopped
+    depends_on:
+      - ingest
 
 networks:
   travelnet:
