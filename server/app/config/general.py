@@ -143,7 +143,8 @@ def _refresh_derived():
 # ---------------------------------------------------------------------------
 
 LOCATION_CHANGE_RADIUS_M = editable("LOCATION_CHANGE_RADIUS_M", "Distance in meters to consider a location change", group="Location")(500)
-LOCATION_STAY_DURATION_MINS = editable("LOCATION_STAY_DURATION_MINS", "Duration in minutes to consider a stay at a location", group="Location")(30)
+LOCATION_STAY_DURATION_MINS = editable("LOCATION_STAY_DURATION_MINS", "Duration in minutes of stationary GPS required to confirm a new (previously unseen) location", group="Location")(30)
+LOCATION_REVISIT_DURATION_MINS = editable("LOCATION_REVISIT_DURATION_MINS", "Duration in minutes of stationary GPS required to confirm a return visit to a known location (shorter than LOCATION_STAY_DURATION_MINS)", group="Location")(5)
 LOCATION_MINIMUM_POINTS = editable("LOCATION_MINIMUM_POINTS", "Minimum number of location points within the stay duration to consider it a valid stay", group="Location")(5)
 LOCATION_STATIONARITY_RADIUS_M = editable("LOCATION_STATIONARITY_RADIUS_M", "Distance in meters that location points must be within to be considered stationary rather than in transit", group="Location")(150)
 LOCATION_NOISE_ACCURACY_THRESHOLD = editable("LOCATION_NOISE_ACCURACY_THRESHOLD", "Threshold for horizontal accuracy to consider a location point as tier 1 noise", group="Location")(100)

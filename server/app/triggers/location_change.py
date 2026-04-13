@@ -2,7 +2,13 @@ import logging
 
 from triggers.dispatch import dispatch
 from util import haversine_m
-from config.general import LOCATION_CHANGE_RADIUS_M, LOCATION_MINIMUM_POINTS, LOCATION_STATIONARITY_RADIUS_M, LOCATION_STAY_DURATION_MINS
+from config.general import (
+    LOCATION_CHANGE_RADIUS_M,
+    LOCATION_MINIMUM_POINTS,
+    LOCATION_STATIONARITY_RADIUS_M,
+    LOCATION_STAY_DURATION_MINS,
+    LOCATION_REVISIT_DURATION_MINS,
+)
 from database.location.geocoding import get_place_id, insert_geocode, reverse_geocode
 from database.location.known_places.table import table as known_places_table, KnownPlaceRecord
 from database.connection import get_conn, to_iso_str
@@ -14,9 +20,10 @@ logger = logging.getLogger(__name__)
 def label_place(place_id: int, label: str) -> bool:
     return known_places_table.label_place(place_id, label)
 
-def get_most_recent_points():
+def get_recent_points(duration_mins: int):
+    """Return all location_unified rows from the last `duration_mins` minutes."""
     now = datetime.now(timezone.utc)
-    cutoff = to_iso_str(now - timedelta(minutes=LOCATION_STAY_DURATION_MINS))
+    cutoff = to_iso_str(now - timedelta(minutes=duration_mins))
 
     with get_conn(read_only=True) as conn:
         return conn.execute("""
@@ -70,50 +77,75 @@ def get_address(lat, lon):
             "display_name": geocode.get("display_name")
         }
 
-def run():
-    check_departure() 
+def _handle_known_place(nearest, arrived_at: str) -> None:
+    """Record a visit (or note an ongoing one) for a known place."""
+    place_id = nearest['id']
+    with get_conn(read_only=True) as conn:
+        row = conn.execute(
+            "SELECT current_visit_id, label FROM known_places WHERE id = ?",
+            (place_id,),
+        ).fetchone()
 
-    centroid = compute_centroid(get_most_recent_points())
-    if centroid is None:
+    name = row['label'] if row['label'] else f"known place {place_id}"
+
+    if row['current_visit_id'] is not None:
+        logger.info(f"Still at {name}, no action needed")
         return
-    
-    lat, lon, arrived_at = centroid
+
+    visit_id = known_places_table.insert_visit(place_id, arrived_at)
+    logger.important(f"Return visit to {name}")
+    known_places_table.increment_visit_count(place_id, arrived_at, visit_id)
+
+
+def _handle_new_place(lat: float, lon: float, arrived_at: str) -> None:
+    """Create a new known place and its first visit, then fire the discovery notification."""
+    place_id = known_places_table.insert(KnownPlaceRecord(
+        latitude=lat, longitude=lon, first_seen=arrived_at,
+    ))
+    visit_id = known_places_table.insert_visit(place_id, arrived_at)
+    known_places_table.set_current_visit(place_id, visit_id)
+
+    logger.important("New location detected at %.5f, %.5f", lat, lon)
+
+    address = get_address(lat, lon)
+    name = (address.get("city") or address.get("suburb") or address.get("road")
+            or address.get("region") or f"{lat:.3f}, {lon:.3f}")
     now = to_iso_str(datetime.now(timezone.utc))
-    nearest = get_nearest_known_place(lat, lon)
 
-    if nearest is None:
-        place_id = known_places_table.insert(KnownPlaceRecord(
-            latitude=lat, longitude=lon, first_seen=arrived_at,
-        ))
-        visit_id = known_places_table.insert_visit(place_id, arrived_at)
-        known_places_table.set_current_visit(place_id, visit_id)
+    dispatch(trigger="location_change",
+             payload={"lat": lat, "lon": lon, "first_seen": now},
+             cooldown_hours=1,
+             noti_title="📍 New Location Discovered",
+             noti_body=f"Discovered near {name}. Tap here to add a label.")
 
-        logger.important("New location detected at %.5f, %.5f", lat, lon)
 
-        address = get_address(lat, lon)
-        name = address.get("city") or address.get("suburb") or address.get("road") or address.get("region") or f"{lat:.3f}, {lon:.3f}"
+def run():
+    check_departure()
 
-        dispatch(trigger="location_change",
-                 payload={"lat": lat, "lon": lon, "first_seen": now},
-                 cooldown_hours=1,
-                 noti_title="📍 New Location Discovered",
-                 noti_body=f"Discovered near {name}. Tap here to add a label.")
-    else:
-        place_id = nearest['id']
-        with get_conn(read_only=True) as conn:
-            row = conn.execute("""
-                SELECT current_visit_id, label FROM known_places WHERE id = ?
-            """, (place_id,)).fetchone()
-
-        name = row['label'] if row['label'] else f"known place {place_id}"
-
-        if row['current_visit_id'] is not None:
-            logger.info(f"Still at {name}, no action needed")
+    # Fast path — revisit detection.
+    # If the device has been stationary for the shorter revisit window and the
+    # centroid matches a known place, record the visit immediately without
+    # waiting for the full LOCATION_STAY_DURATION_MINS window.
+    short_centroid = compute_centroid(get_recent_points(LOCATION_REVISIT_DURATION_MINS))
+    if short_centroid is not None:
+        lat, lon, arrived_at = short_centroid
+        nearest = get_nearest_known_place(lat, lon)
+        if nearest is not None:
+            _handle_known_place(nearest, arrived_at)
             return
 
-        visit_id = known_places_table.insert_visit(place_id, arrived_at)
-        logger.important(f"Return visit to {name}")
-        known_places_table.increment_visit_count(place_id, arrived_at, visit_id)
+    # Slow path — new location discovery (and revisit fallback when the short
+    # window had too few points, e.g. sparse tracking).
+    long_centroid = compute_centroid(get_recent_points(LOCATION_STAY_DURATION_MINS))
+    if long_centroid is None:
+        return
+
+    lat, lon, arrived_at = long_centroid
+    nearest = get_nearest_known_place(lat, lon)
+    if nearest is None:
+        _handle_new_place(lat, lon, arrived_at)
+    else:
+        _handle_known_place(nearest, arrived_at)
 
 def get_current_visit():
     """Returns (visit_id, place_id, lat, lon, arrived_at) for the open visit, or None."""
@@ -134,7 +166,7 @@ def check_departure():
 
     visit_id, place_id, kp_lat, kp_lon, arrived_at = visit
 
-    points = get_most_recent_points()
+    points = get_recent_points(LOCATION_STAY_DURATION_MINS)
     if not points:
         return
 
