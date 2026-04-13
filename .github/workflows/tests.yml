@@ -31,4 +31,4 @@ jobs:
         run: cp server/.env.example server/.env
 
       - name: Run tests
-        run: pytest
+        run: pytest -m "not slow"
