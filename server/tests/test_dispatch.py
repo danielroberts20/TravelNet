@@ -41,7 +41,7 @@ def _run_dispatch(db, trigger="location_change", payload=None, cooldown_hours=1)
     payload = payload or {"lat": 1.0, "lon": 2.0}
     with patch("triggers.dispatch.get_conn", return_value=db), \
          patch("triggers.dispatch.trigger_table") as mock_trigger_table, \
-         patch("triggers.dispatch.journal_notification") as mock_notif:
+         patch("triggers.dispatch.label_known_place_notification") as mock_notif:
         result = dispatch(
             trigger=trigger,
             payload=payload,
