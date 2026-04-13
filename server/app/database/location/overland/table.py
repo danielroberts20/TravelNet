@@ -141,9 +141,15 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
         Unpacks each GeoJSON feature, resolves a place_id via the places table,
         and inserts into location_overland. Returns (inserted, skipped) counts.
         The caller is responsible for firing location triggers after this returns.
+
+        Noise-flagging (location_noise inserts) is deferred until after the main
+        transaction commits.  Calling noise_table.insert() inside the outer
+        `with get_conn()` block would open a second write connection while the
+        first still holds the WAL write lock, causing "database is locked".
         """
         inserted = 0
         skipped = 0
+        pending_noise: list[tuple[int, float, float, str, str]] = []  # (overland_id, h_acc, lat, lon, ts)
 
         with get_conn() as conn:
             for feature in payload.locations:
@@ -211,23 +217,28 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
                             (device_id, ts),
                         ).fetchone()
                         overland_id = row[0] if row else None
-                    
+
                     if overland_id and props.horizontal_accuracy and props.horizontal_accuracy > LOCATION_NOISE_ACCURACY_THRESHOLD:
-                        noise_table.insert(LocationNoiseRecord(overland_id, tier=1, reason='accuracy_threshold'))
-                        logger.important(
-                            f"High accuracy value ({props.horizontal_accuracy}m) for point at "
-                            f"{ts} ({lat}, {lon}). Inserted to noise table as tier 1 noise."
-                        )
+                        pending_noise.append((overland_id, props.horizontal_accuracy, lat, lon, ts))
+
                 except Exception as e:
                     logger.error(f"Failed to insert Overland point {props.timestamp}: {e}")
 
             conn.commit()
 
+        # Outer transaction committed — write lock released.  Now safe to open a
+        # second connection for noise inserts.
+        for overland_id, h_acc, lat, lon, ts in pending_noise:
+            noise_table.insert(LocationNoiseRecord(overland_id, tier=1, reason='accuracy_threshold'))
+            logger.important(
+                f"High accuracy value ({h_acc}m) for point at "
+                f"{ts} ({lat}, {lon}). Inserted to noise table as tier 1 noise."
+            )
+
         logger.info(
             f"Overland batch: {len(payload.locations)} received, "
             f"{inserted} inserted, {skipped} skipped (duplicates/errors)"
         )
-
 
         return inserted, skipped
 

@@ -14,17 +14,16 @@ logger = logging.getLogger(__name__)
 def label_place(place_id: int, label: str) -> bool:
     return known_places_table.label_place(place_id, label)
 
-def get_most_recent_points():    
+def get_most_recent_points():
     now = datetime.now(timezone.utc)
     cutoff = to_iso_str(now - timedelta(minutes=LOCATION_STAY_DURATION_MINS))
 
-    with get_conn() as conn:
-        rows = conn.execute("""
+    with get_conn(read_only=True) as conn:
+        return conn.execute("""
         SELECT * FROM location_unified
-        WHERE timestamp >= ?                    
+        WHERE timestamp >= ?
         ORDER BY timestamp DESC
-        """, (cutoff,))
-    return rows.fetchall()
+        """, (cutoff,)).fetchall()
 
 def compute_centroid(points):
     if len(points) < LOCATION_MINIMUM_POINTS:
@@ -42,7 +41,7 @@ def compute_centroid(points):
     return avg_lat, avg_lon, earliest
 
 def get_address(lat, lon):
-    with get_conn() as conn:
+    with get_conn(read_only=True) as conn:
         row = conn.execute("""
         SELECT country_code, country, region,
                city, suburb, road, display_name, geocoded_at FROM places
@@ -101,7 +100,7 @@ def run():
                  noti_body=f"Discovered near {name}. Tap here to add a label.")
     else:
         place_id = nearest['id']
-        with get_conn() as conn:
+        with get_conn(read_only=True) as conn:
             row = conn.execute("""
                 SELECT current_visit_id, label FROM known_places WHERE id = ?
             """, (place_id,)).fetchone()
@@ -118,8 +117,8 @@ def run():
 
 def get_current_visit():
     """Returns (visit_id, place_id, lat, lon, arrived_at) for the open visit, or None."""
-    with get_conn() as conn:
-        row = conn.execute("""
+    with get_conn(read_only=True) as conn:
+        return conn.execute("""
             SELECT pv.id, pv.place_id, kp.latitude, kp.longitude, pv.arrived_at
             FROM place_visits pv
             JOIN known_places kp ON kp.id = pv.place_id
@@ -127,7 +126,6 @@ def get_current_visit():
             ORDER BY pv.arrived_at DESC
             LIMIT 1
         """).fetchone()
-    return row
 
 def check_departure():
     visit = get_current_visit()
@@ -161,7 +159,7 @@ def check_departure():
 
     known_places_table.close_visit(visit_id, place_id, departed_at, duration_mins)
 
-    with get_conn() as conn:
+    with get_conn(read_only=True) as conn:
         row = conn.execute("SELECT label FROM known_places WHERE id = ?", (place_id,)).fetchone()
     name = row['label'] if row['label'] else f"known place {place_id}"
 
@@ -169,7 +167,7 @@ def check_departure():
 
 def get_nearest_known_place(lat, lon):
     """Returns the nearest known place row if within radius, else None."""
-    with get_conn() as conn:
+    with get_conn(read_only=True) as conn:
         rows = conn.execute("SELECT id, latitude, longitude FROM known_places").fetchall()
     closest = None
     closest_dist = float('inf')
@@ -182,7 +180,7 @@ def get_nearest_known_place(lat, lon):
 
 def get_last_in_radius_timestamp(kp_lat, kp_lon, arrived_at: str):
     """Find the most recent location point within radius since the visit started."""
-    with get_conn() as conn:
+    with get_conn(read_only=True) as conn:
         rows = conn.execute("""
             SELECT timestamp, latitude, longitude FROM location_unified
             WHERE timestamp >= ?
