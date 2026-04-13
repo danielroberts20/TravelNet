@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import math
 
-from notifications import journal_notification
+from notifications import label_known_place_notification
 from database.connection import get_conn, to_iso_str
 from database.triggers.table import table as trigger_table, TriggerRecord
 
@@ -19,7 +19,7 @@ def dispatch(trigger: str, payload: dict, cooldown_hours: int = 2, noti_title: s
         if recent:
             return False
 
-    journal_notification(title=noti_title, body=noti_body, time_sensitive=False, prefix="📝 TravelNet")
+    label_known_place_notification(title=noti_title, body=noti_body, time_sensitive=False)
 
     trigger_table.insert(TriggerRecord(
         trigger=trigger,

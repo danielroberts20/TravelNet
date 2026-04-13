@@ -62,8 +62,12 @@ def send_notification(title: str = "Title", body: str = "Body", time_sensitive: 
     url = settings.custom_notification_time_sensitive if time_sensitive else settings.custom_notification_not_time_sensitive
     return _trigger_notification(url, title, body, use_prefix, prefix)
 
-def journal_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True, prefix: str = None):
+def journal_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = False, use_prefix: bool = True, prefix: str = None):
     url = settings.journal_notification
+    return _trigger_notification(url, title, body, use_prefix, prefix)
+
+def label_known_place_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True, prefix: str = None):
+    url = settings.label_known_place_notification
     return _trigger_notification(url, title, body, use_prefix, prefix)
 
 def _trigger_notification(url, title: str = "Title", body: str = "Body", use_prefix: bool = True, prefix: str = None):

@@ -1,6 +1,6 @@
 import logging
 
-from triggers import dispatch
+from triggers.dispatch import dispatch
 from util import haversine_m
 from config.general import LOCATION_CHANGE_RADIUS_M, LOCATION_MINIMUM_POINTS, LOCATION_STATIONARITY_RADIUS_M, LOCATION_STAY_DURATION_MINS
 from database.location.geocoding import get_place_id, insert_geocode, reverse_geocode
@@ -98,7 +98,7 @@ def run():
                  payload={"lat": lat, "lon": lon, "first_seen": now},
                  cooldown_hours=1,
                  noti_title="📍 New Location Discovered",
-                 noti_body=f"Discovered near {name}. Tap here to add a Journal entry.")
+                 noti_body=f"Discovered near {name}. Tap here to add a label.")
     else:
         place_id = nearest['id']
         with get_conn() as conn:
