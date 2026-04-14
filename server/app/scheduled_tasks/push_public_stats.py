@@ -24,6 +24,7 @@ from public.stats import build_public_stats
 
 GITHUB_API = "https://api.github.com"
 TARGET_PATH = "docs/public_stats.json"
+TARGET_BRANCH = "main"
 
 
 def _get_current_sha(headers: dict, logger) -> str | None:
@@ -33,7 +34,7 @@ def _get_current_sha(headers: dict, logger) -> str | None:
     Returns None if the file doesn't exist yet (first run).
     """
     url = f"{GITHUB_API}/repos/{settings.github_repo}/contents/{TARGET_PATH}"
-    resp = requests.get(url, headers=headers, timeout=10, params={"ref": "demo-website"})
+    resp = requests.get(url, headers=headers, timeout=10, params={"ref": TARGET_BRANCH})
     if resp.status_code == 200:
         return resp.json().get("sha")
     if resp.status_code == 404:
@@ -68,7 +69,7 @@ def push_stats_to_github(payload: dict) -> str:
     body = {
         "message": f"chore: update public stats [{now}]",
         "content": encoded,
-        "branch": "main",
+        "branch": TARGET_BRANCH,
     }
     if sha:
         body["sha"] = sha
