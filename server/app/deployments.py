@@ -47,12 +47,23 @@ FLOW_REGISTRY = {
 }
 
 
+def _deployment_tags(flow) -> list[str]:
+    """Auto-derive tags from the flow object. 'notifies' is added when the
+    flow has on_completion or on_failure hooks registered in its decorator.
+    Uses the internal *_hooks lists, not the .on_completion/.on_failure bound methods."""
+    tags = []
+    if getattr(flow, "on_completion_hooks", None) or getattr(flow, "on_failure_hooks", None):
+        tags.append("notifies")
+    return tags
+
+
 if __name__ == "__main__":
     deployments = [
         FLOW_REGISTRY[name].to_deployment(
             name=FLOW_REGISTRY[name].name,
             schedule=Cron(cron, timezone="Europe/London") if cron else None,
             description=desc,
+            tags=_deployment_tags(FLOW_REGISTRY[name]),
         )
         for name, (cron, desc) in SCHEDULE_CONFIGS.items()
     ]
