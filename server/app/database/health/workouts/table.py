@@ -117,6 +117,7 @@ class WorkoutsTable(BaseTable[WorkoutRecord]):
 
             conn.execute("CREATE INDEX IF NOT EXISTS idx_workouts_start_ts ON workouts (start_ts);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_workouts_name ON workouts (name);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_workouts_place ON workouts (start_place_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_workout_route_workout_id ON workout_route (workout_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_workout_route_timestamp ON workout_route (timestamp);")
 

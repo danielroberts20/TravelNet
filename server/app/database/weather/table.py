@@ -2,11 +2,13 @@
 database/weather/table.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Schema and insert helpers for the weather_hourly and weather_daily tables,
-and the location_weather view that joins them with location_unified.
+and the place_weather view that joins them with places.
 
-Weather data is fetched retroactively from Open-Meteo's archive API and
-co-located with GPS points so the dashboard can show conditions at each
-location.
+Weather data is fetched retroactively from Open-Meteo's archive API. The
+place_weather view links each place to all weather rows for its grid cell
+(lat/lon rounded to COORD_PRECISION decimal places), enabling queries like
+"find places where it was snowing" that can then be joined to transactions,
+health data, or any other table that carries a place_id.
 
 insert_hourly_batch() and insert_daily_batch() accept the raw Open-Meteo API
 response dicts and handle unpacking, alignment, and idempotent insertion in a
@@ -66,7 +68,7 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
     """
 
     def init(self) -> None:
-        """Create weather tables, indexes, and the location_weather view."""
+        """Create weather tables, indexes, and the place_weather view."""
         with get_conn() as conn:
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS weather_hourly (
@@ -94,6 +96,9 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
                 CREATE INDEX IF NOT EXISTS idx_weather_hourly_lat_lon
                     ON weather_hourly(latitude, longitude);
 
+                CREATE INDEX IF NOT EXISTS idx_weather_hourly_lat_lon_ts
+                    ON weather_hourly(latitude, longitude, timestamp);
+
                 CREATE TABLE IF NOT EXISTS weather_daily (
                     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
                     fetched_at            TEXT NOT NULL,
@@ -117,13 +122,24 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
                 CREATE INDEX IF NOT EXISTS idx_weather_daily_lat_lon
                     ON weather_daily(latitude, longitude);
 
-                CREATE VIEW IF NOT EXISTS location_weather AS
+                CREATE INDEX IF NOT EXISTS idx_weather_daily_lat_lon_date
+                    ON weather_daily(latitude, longitude, date);
+
+                CREATE VIEW IF NOT EXISTS place_weather AS
                 SELECT
-                    u.*,
+                    p.id             AS place_id,
+                    p.lat_snap,
+                    p.lon_snap,
                     p.country_code,
                     p.country,
+                    p.region,
                     p.city,
                     p.suburb,
+                    p.road,
+                    p.display_name,
+                    p.timezone,
+                    h.timestamp,
+                    h.fetched_at,
                     h.temperature_c,
                     h.apparent_temperature_c,
                     h.precipitation_mm,
@@ -133,6 +149,7 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
                     h.cloudcover_pct,
                     h.is_day,
                     h.weathercode,
+                    d.date,
                     d.sunrise,
                     d.sunset,
                     d.precipitation_sum_mm,
@@ -140,16 +157,14 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
                     d.snowfall_sum_cm,
                     d.windspeed_max_kmh,
                     d.windgusts_max_kmh
-                FROM location_unified u
-                LEFT JOIN places p ON u.place_id = p.id
+                FROM places p
                 LEFT JOIN weather_hourly h
-                    ON  ROUND(u.latitude, 2) = h.latitude
-                    AND ROUND(u.longitude, 2) = h.longitude
-                    AND strftime('%Y-%m-%dT%H:00Z', u.timestamp) = h.timestamp
+                    ON  ROUND(p.lat_snap, 1) = h.latitude
+                    AND ROUND(p.lon_snap, 1) = h.longitude
                 LEFT JOIN weather_daily d
-                    ON  ROUND(u.latitude, 2) = d.latitude
-                    AND ROUND(u.longitude, 2) = d.longitude
-                    AND DATE(u.timestamp) = d.date;
+                    ON  ROUND(p.lat_snap, 1) = d.latitude
+                    AND ROUND(p.lon_snap, 1) = d.longitude
+                    AND DATE(h.timestamp) = d.date;
             """)
 
     def insert(self, record: WeatherHourlyRecord) -> None:

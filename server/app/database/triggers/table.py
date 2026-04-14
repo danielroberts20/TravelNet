@@ -24,7 +24,7 @@ class TriggerRecord:
 class TriggerLogTable(BaseTable[TriggerRecord]):
 
     def init(self) -> None:
-        """Create the trigger_log table if it does not exist."""
+        """Create the trigger_log table and its indexes if they do not exist."""
         with get_conn() as conn:
             conn.execute("""
             CREATE TABLE IF NOT EXISTS trigger_log (
@@ -34,6 +34,10 @@ class TriggerLogTable(BaseTable[TriggerRecord]):
                 place_id    INTEGER REFERENCES places(id),
                 payload     TEXT
             );""")
+            conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_trigger_log_fired_at
+                ON trigger_log(fired_at);
+            """)
 
     def insert(self, record: TriggerRecord) -> None:
         """Insert a trigger log entry."""
