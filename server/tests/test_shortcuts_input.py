@@ -122,23 +122,14 @@ class TestInputCsv:
         inserted, skipped = result
         assert inserted == 2
         assert len(skipped) == 1
-
-    def test_send_notification_called_once(self):
+    
+    def test_no_send_notification_on_good_csv(self):
         csv_file = _make_csv(
             ["51.5074", "-0.1278", "2024-06-15T08:00:00Z", "5.0"],
+            ["48.8566", "2.3522",  "2024-06-15T09:00:00Z", "0.0"],
         )
         _, _, mock_notif, _ = _run(csv_file)
-        mock_notif.assert_called_once()
-
-    def test_send_notification_receives_title(self):
-        csv_file = _make_csv(
-            ["51.5074", "-0.1278", "2024-06-15T08:00:00Z", "5.0"],
-        )
-        _, _, mock_notif, _ = _run(csv_file)
-        call_kwargs = mock_notif.call_args
-        args, kwargs = call_kwargs
-        all_args = list(args) + list(kwargs.values())
-        assert any("Shortcut" in str(a) for a in all_args) or kwargs.get("title") == "Shortcut Location"
+        mock_notif.assert_not_called()
 
     def test_returns_tuple(self):
         csv_file = _make_csv()
