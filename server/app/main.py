@@ -30,8 +30,7 @@ load_overrides()
 
 import config.runtime  # records the timestamp the container started
 
-from compute.ssh import ssh_run, wake_pc
-from compute.router import router as compute_router, wake
+from compute.router import router as compute_router
 from database.setup import init_db
 from middleware import PublicPathFilterMiddleware
 from notifications import send_notification

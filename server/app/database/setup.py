@@ -28,7 +28,6 @@ from database.health.workouts.table import table as workouts_table
 from database.health.mood.table import table as mood_table
 from database.transaction.table import table as transactions_table
 from database.triggers.table import table as trigger_table
-from database.compute.table import table as compute_table
 from database.location.overland.table import table as overland_table
 from database.location.gap_annotations.table import table as gap_annotations_table
 from database.location.known_places.table import table as known_places_table
@@ -51,7 +50,6 @@ TABLE_REGISTRY: list[BaseTable] = [
     mood_table,
     transactions_table,
     trigger_table,
-    compute_table,
     overland_table,
     gap_annotations_table,
     known_places_table,     # known_places + place_visits (must follow places_table)

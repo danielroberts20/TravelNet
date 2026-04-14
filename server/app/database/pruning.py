@@ -47,7 +47,6 @@ TABLE_CONFIG: dict[str, str] = {
     "weather_daily":      "date",
     "place_visits":       "arrived_at",  # must precede known_places (no CASCADE)
     "known_places":       "first_seen",
-    "compute":            "created_at",
 }
 
 # Tables deleted via parent CASCADE — never directly deleted.
@@ -71,7 +70,6 @@ DELETION_ORDER: list[str] = [
     "weather_daily",
     "place_visits",         # before known_places
     "known_places",
-    "compute",
 ]
 
 DEFAULT_TABLES: list[str] = DELETION_ORDER + list(CASCADE_ONLY)

@@ -24,8 +24,6 @@ DATA_DIR = Path("/data")
 
 DB_FILE = DATA_DIR / "travel.db"
 
-COMPUTE_DIR = DATA_DIR / "compute"
-
 DATA_BACKUP_DIR = DATA_DIR / "backups"
 DATABASE_BACKUP_DIR = DATA_BACKUP_DIR / "db"
 UPLOADS_BACKUP_DIR = DATA_BACKUP_DIR / "uploads"
@@ -56,7 +54,6 @@ BACKUP_DIRS = [
 # Outside Docker (e.g. during tests), /data won't exist and we skip the mkdir calls
 # to avoid creating stray directories relative to the process working directory.
 if DATA_DIR.exists():
-    COMPUTE_DIR.mkdir(exist_ok=True)
     for backup_dir in BACKUP_DIRS:
         backup_dir.mkdir(parents=True, exist_ok=True)
 
