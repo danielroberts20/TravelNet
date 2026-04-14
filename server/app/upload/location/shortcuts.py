@@ -41,8 +41,9 @@ def input_csv(csv_file):
             skipped_rows.append(idx+2)
             continue
     logger.info(f"Successfully uploaded {inserted}/{total_rows} entries")
-    send_notification(
-        title="Shortcut Location",
-        body=f"{total_rows} received | {inserted} inserted | {len(skipped_rows)} skipped",
-        time_sensitive=False)
+    if len(skipped_rows) != 0 or total_rows != inserted:
+        send_notification(
+            title="Shortcut Location",
+            body=f"⚠️ {total_rows} received | {inserted} inserted | {len(skipped_rows)} skipped",
+            time_sensitive=False)
     return inserted, skipped_rows
