@@ -1,4 +1,5 @@
 import math
+from datetime import datetime
 
 def _haversine(lat1, lon1, lat2, lon2, r):
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
@@ -14,3 +15,6 @@ def haversine_m(lat1, lon1, lat2, lon2) -> float:
 def haversine_km(lat1, lon1, lat2, lon2) -> float:
     """Returns distance in kilometres between two lat/lon points."""
     return _haversine(lat1, lon1, lat2, lon2, 6_371)
+
+def parse_ts(s):
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))

@@ -48,9 +48,19 @@ def batch_geocode(coords: list[tuple[float, float]]) -> list[dict]:
     return locations
 
 
-def insert_geocode(place_id: int, geocode: dict) -> None:
-    with get_conn() as conn:
-        conn.execute("""
+def insert_geocode(place_id: int, geocode: dict, conn=None) -> None:
+    params = (
+        geocode.get("address", {}).get("country_code"),
+        geocode.get("address", {}).get("country"),
+        geocode.get("address", {}).get("state"),
+        geocode.get("address", {}).get("city"),
+        geocode.get("address", {}).get("suburb"),
+        geocode.get("address", {}).get("road"),
+        geocode.get("display_name"),
+        to_iso_str(datetime.now(timezone.utc)),
+        place_id,
+    )
+    sql = """
         UPDATE places SET
             country_code = ?,
             country = ?,
@@ -61,17 +71,12 @@ def insert_geocode(place_id: int, geocode: dict) -> None:
             display_name = ?,
             geocoded_at = ?
         WHERE id = ?
-        """, (
-            geocode.get("address", {}).get("country_code"),
-            geocode.get("address", {}).get("country"),
-            geocode.get("address", {}).get("state"),
-            geocode.get("address", {}).get("city"),
-            geocode.get("address", {}).get("suburb"),
-            geocode.get("address", {}).get("road"),
-            geocode.get("display_name"),
-            to_iso_str(datetime.now(timezone.utc)),
-            place_id
-        ))
+        """
+    if conn is not None:
+        conn.execute(sql, params)
+    else:
+        with get_conn() as c:
+            c.execute(sql, params)
 
 
 def get_place_id(lat: float, lon: float) -> int | None:

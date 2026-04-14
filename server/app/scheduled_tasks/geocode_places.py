@@ -37,7 +37,7 @@ def store_geocodes(rows: list[tuple[int, float, float]], geocodes: list[dict]):
     tf = TimezoneFinder()
     with get_conn() as conn:
         for (place_id, lat, lon), geocode in zip(rows, geocodes):
-            insert_geocode(place_id, geocode)
+            insert_geocode(place_id, geocode, conn)
             tz = tf.timezone_at(lat=lat, lng=lon)
             if tz:
                 conn.execute(

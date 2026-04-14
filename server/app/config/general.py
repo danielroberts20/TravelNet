@@ -145,6 +145,10 @@ LOCATION_REVISIT_DURATION_MINS = editable("LOCATION_REVISIT_DURATION_MINS", "Dur
 LOCATION_MINIMUM_POINTS = editable("LOCATION_MINIMUM_POINTS", "Minimum number of location points within the stay duration to consider it a valid stay", group="Location")(5)
 LOCATION_STATIONARITY_RADIUS_M = editable("LOCATION_STATIONARITY_RADIUS_M", "Distance in meters that location points must be within to be considered stationary rather than in transit", group="Location")(150)
 LOCATION_NOISE_ACCURACY_THRESHOLD = editable("LOCATION_NOISE_ACCURACY_THRESHOLD", "Threshold for horizontal accuracy to consider a location point as tier 1 noise", group="Location")(100)
+TIER2_TRAILING_SKIP = editable("TIER2_TRAILING_SKIP", "Number of most recent points to skip when applying tier 2 noise flags, due to incomplete next-point context", group="Location")(10)
+TIER2_DISPLACEMENT_M = editable("TIER2_DISPLACEMENT_M", "Distance in meters that a point must displace from its predecessor to be considered a potential noise spike in tier 2 detection", group="Location")(150)
+TIER2_RETURN_M = editable("TIER2_RETURN_M", "Distance in meters that the point following a potential tier 2 spike must return to be considered an out-and-back noise signature", group="Location")(150)
+TIER2_WINDOW_S = editable("TIER2_WINDOW_S", "Time window in seconds to look for the next point when applying tier 2 noise flags", group="Location")(30)
 
 LOCATION_TIME_WINDOW = editable(
     "LOCATION_TIME_WINDOW",
