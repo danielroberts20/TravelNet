@@ -23,6 +23,7 @@ from scheduled_tasks.get_fx_up_to_date import get_fx_up_to_date_flow
 from scheduled_tasks.check_health_gaps import check_health_gaps_flow
 from scheduled_tasks.backup_db import backup_db_flow
 from scheduled_tasks.flag_location_noise import flag_location_noise_flow
+from scheduled_tasks.retroactive_location_scan import retroactive_location_scan_flow
 
 
 FLOW_REGISTRY = {
@@ -45,7 +46,8 @@ FLOW_REGISTRY = {
     "backup-db":                   backup_db_flow,
     "backup-db-to-cloudflare":     cloudflare_backup_db_flow,
     "push-public-stats":           push_public_stats_flow,
-    "identify-location-noise":     flag_location_noise_flow,
+    "identify-location-noise":        flag_location_noise_flow,
+    "retroactive-location-scan":      retroactive_location_scan_flow,
 }
 
 
