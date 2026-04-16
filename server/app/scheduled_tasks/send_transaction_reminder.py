@@ -4,7 +4,7 @@ load_overrides()
 from prefect import task, flow
 from prefect.logging import get_run_logger
 
-from notifications import send_notification
+from notifications import send_notification, record_flow_result
 
 
 @task
@@ -21,4 +21,6 @@ def send_transaction_reminder_task() -> dict:
 
 @flow(name="Send Transaction Reminder")
 def send_transaction_reminder_flow():
-    return send_transaction_reminder_task()
+    result = send_transaction_reminder_task()
+    record_flow_result(result)
+    return result

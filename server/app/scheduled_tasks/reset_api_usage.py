@@ -13,7 +13,7 @@ from prefect import task, flow
 from prefect.logging import get_run_logger
 
 from database.exchange.fx import reset_api_usage
-from notifications import notify_on_completion
+from notifications import notify_on_completion, record_flow_result
 
 @task
 def reset_all_api_counters() -> list[dict]:
@@ -33,4 +33,6 @@ def reset_all_api_counters() -> list[dict]:
 @flow(name="Reset API Usage", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
 def reset_api_usage_flow():
     results = reset_all_api_counters()
-    return {r["service"]: {"old_count": r["old_count"], "old_month": r["old_month"]} for r in results}
+    result = {r["service"]: {"old_count": r["old_count"], "old_month": r["old_month"]} for r in results}
+    record_flow_result(result)
+    return result

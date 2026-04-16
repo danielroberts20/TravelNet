@@ -16,7 +16,7 @@ from prefect import task, flow
 from prefect.logging import get_run_logger
 
 from database.connection import get_conn
-from notifications import notify_on_completion
+from notifications import notify_on_completion, record_flow_result
 
 
 EXPECTED_METRICS = {
@@ -117,4 +117,6 @@ def check_health_gaps_task() -> dict:
 
 @flow(name="Check Health Gaps", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
 def check_health_gaps_flow():
-    return check_health_gaps_task()
+    result = check_health_gaps_task()
+    record_flow_result(result)
+    return result

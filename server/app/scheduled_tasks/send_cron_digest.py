@@ -16,7 +16,7 @@ load_overrides()
 from prefect import task, flow
 from prefect.logging import get_run_logger
 
-from notifications import _flush_and_send
+from notifications import _flush_and_send, record_flow_result
 from config.settings import settings
 
 
@@ -33,4 +33,6 @@ def flush_daily_digest() -> dict:
 
 @flow(name="Send Digest")
 def send_cron_digest_flow():
-    return flush_daily_digest()
+    result = flush_daily_digest()
+    record_flow_result(result)
+    return result

@@ -26,7 +26,7 @@ from prefect.logging import get_run_logger
 from config.general import COORD_PRECISION, DAILY_VARS, HOURLY_VARS, OPEN_METEO_URL, REQUEST_DELAY
 from database.connection import get_conn, increment_api_usage
 from database.weather.table import table as weather_table
-from notifications import notify_on_completion
+from notifications import notify_on_completion, record_flow_result
 
 
 def _fetch_hourly(lat: float, lon: float, start_date: date, end_date: date, logger) -> dict | None:
@@ -162,7 +162,11 @@ def get_weather_flow():
 
     if not locations:
         logger.info("No location data in window — nothing to fetch.")
-        return {"num_locations": 0, "hourly_inserted": 0, "daily_inserted": 0,
-                "hourly_failed": 0, "daily_failed": 0}
+        result = {"num_locations": 0, "hourly_inserted": 0, "daily_inserted": 0,
+                  "hourly_failed": 0, "daily_failed": 0}
+        record_flow_result(result)
+        return result
 
-    return fetch_and_store_all_weather(locations, start_date, end_date)
+    result = fetch_and_store_all_weather(locations, start_date, end_date)
+    record_flow_result(result)
+    return result

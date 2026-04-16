@@ -18,7 +18,7 @@ load_overrides()
 from prefect import task, flow
 from prefect.logging import get_run_logger
 
-from notifications import notify_on_completion
+from notifications import notify_on_completion, record_flow_result
 from database.connection import get_conn
 from scheduled_tasks.geocode_places import geocode_places_flow
 from scheduled_tasks.detect_timezone_transitions import detect_timezone_transitions_flow
@@ -66,10 +66,12 @@ def weekly_location_analysis_flow():
         update_timezones_flow(timezone=current_tz)
         logger.info("Deployment schedules updated to %s", current_tz)
 
-    return {
+    result = {
         "geocoded": geocode_result,
         "timezone_transitions": tz_result,
         "country_transitions": country_result,
         "flights": flight_result,
         "timezone_updated_to": current_tz,
     }
+    record_flow_result(result)
+    return result

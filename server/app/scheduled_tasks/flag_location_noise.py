@@ -15,6 +15,7 @@ load_overrides()
 
 from prefect import task, flow
 from prefect.logging import get_run_logger
+from prefect.cache_policies import NO_CACHE
 
 from config.general import (
     LOCATION_NOISE_ACCURACY_THRESHOLD, 
@@ -25,10 +26,11 @@ from config.general import (
 )
 from database.connection import get_conn
 from database.location.noise.table import table as noise_table, LocationNoiseRecord
+from notifications import record_flow_result
 from util import haversine_m, parse_ts
 
 
-@task
+@task(cache_policy=NO_CACHE)
 def flag_tier1_noise(conn) -> int:
     """Flag unflagged points where horizontal_accuracy > threshold."""
     logger = get_run_logger()
@@ -51,7 +53,7 @@ def flag_tier1_noise(conn) -> int:
     logger.info("Flagged %d location point(s) as tier-1 noise", len(rows))
     return len(rows)
 
-@task
+@task(cache_policy=NO_CACHE)
 def flag_tier2_noise(conn) -> int:
     """
     Flag unflagged points where the point displaces far from its predecessor
@@ -129,5 +131,6 @@ def flag_location_noise_flow():
     with get_conn() as conn:
         t1 = flag_tier1_noise(conn)
         t2 = flag_tier2_noise(conn)
-    return {"tier1": t1,
-            "tier2": t2}
+    result = {"tier1": t1, "tier2": t2}
+    record_flow_result(result)
+    return result

@@ -14,7 +14,7 @@ from config.general import CURRENCIES, FX_BACKUP_DIR, FX_TIMEFRAME_URL, SOURCE_C
 from config.settings import settings
 from database.exchange.fx import get_api_usage, insert_fx_json
 from database.connection import get_conn, increment_api_usage
-from notifications import notify_on_completion
+from notifications import notify_on_completion, record_flow_result
 
 
 
@@ -127,7 +127,9 @@ def get_fx_up_to_date_flow(target_date: date | None = None):
 
     missing_dates = get_missing_fx_dates(target_date)
     if not missing_dates:
-        return {"start_date": "", "end_date": "", "dates_inserted": 0, "backup_path": ""}
+        result = {"start_date": "", "end_date": "", "dates_inserted": 0, "backup_path": ""}
+        record_flow_result(result)
+        return result
 
     start_date = missing_dates[0]
     end_date = missing_dates[-1]
@@ -141,10 +143,8 @@ def get_fx_up_to_date_flow(target_date: date | None = None):
         )
 
     response = fetch_fx_timeframe(start_date, end_date)
-    result = store_fx_and_backup(response)
+    stored = store_fx_and_backup(response)
 
-    return {
-        "start_date": start_date,
-        "end_date": end_date,
-        **result,
-    }
+    result = {"start_date": start_date, "end_date": end_date, **stored}
+    record_flow_result(result)
+    return result

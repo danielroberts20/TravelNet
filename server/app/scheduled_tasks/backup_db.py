@@ -15,7 +15,7 @@ from prefect.logging import get_run_logger
 
 from database.connection import backup_db
 from config.general import DATABASE_BACKUP_DIR
-from notifications import notify_on_completion
+from notifications import notify_on_completion, record_flow_result
 
 
 
@@ -49,8 +49,10 @@ def prune_old_db_backups(days: int = 28) -> int:
 def backup_db_flow():
     snapshot = create_db_snapshot()
     pruned = prune_old_db_backups(28)
-    return {
+    result = {
         "backup_path": snapshot["backup_path"],
         "size_mb": snapshot["size_mb"],
         "pruned": pruned,
     }
+    record_flow_result(result)
+    return result

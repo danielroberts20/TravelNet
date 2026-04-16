@@ -9,6 +9,7 @@ from prefect import task, flow
 from config.settings import settings
 from database.connection import get_conn
 from database.location.geocoding import batch_geocode, insert_geocode
+from notifications import record_flow_result
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +55,15 @@ def geocode_places_flow():
 
     if not rows:
         logger.info("No uncoded places found, skipping geocoding")
-        return {"geocoded_count": 0}
+        result = {"geocoded_count": 0}
+        record_flow_result(result)
+        return result
 
     coords = [(lat, lon) for _, lat, lon in rows]
     geocodes = geocode_batch(coords)
 
     store_geocodes(rows, geocodes)
 
-    return {"geocoded_count": len(rows)}
+    result = {"geocoded_count": len(rows)}
+    record_flow_result(result)
+    return result

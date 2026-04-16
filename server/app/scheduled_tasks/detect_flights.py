@@ -26,6 +26,7 @@ from util import haversine_km
 from config.general import FLIGHT_GAP_MIN_HOURS, FLIGHT_DISTANCE_MIN_KM
 from database.connection import get_conn
 from database.flights.table import table as flights_table, FlightRecord
+from notifications import record_flow_result
 
 
 def _ts_to_dt(ts: str) -> datetime:
@@ -131,6 +132,10 @@ def detect_flights_flow():
 
     if not candidates:
         logger.info("detect_flights: no new flight gaps found")
-        return {"detected": 0, "inserted": 0}
+        result = {"detected": 0, "inserted": 0}
+        record_flow_result(result)
+        return result
 
-    return insert_detected_flights(candidates)
+    result = insert_detected_flights(candidates)
+    record_flow_result(result)
+    return result

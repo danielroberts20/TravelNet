@@ -12,7 +12,7 @@ from config.general import CURRENCIES, FX_BACKUP_DIR, FX_DATE_URL, SOURCE_CURREN
 from config.settings import settings
 from database.connection import increment_api_usage
 from database.exchange.fx import insert_fx_json
-from notifications import notify_on_completion
+from notifications import notify_on_completion, record_flow_result
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +72,10 @@ def get_fx_flow(date: datetime | None = None):
     backup_path = FX_BACKUP_DIR / f"{date_string}.json"
     backup_fx(response, backup_path)
 
-    return {
+    result = {
         "date": date_string,
         "count": len(quotes),
         "backup": str(backup_path),
     }
+    record_flow_result(result)
+    return result

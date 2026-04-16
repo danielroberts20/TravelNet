@@ -8,7 +8,7 @@ from prefect import task, flow
 from config.settings import settings
 from database.connection import get_conn
 from upload.transaction.constants import WISE_SOURCE_MAP
-from notifications import notify_on_completion
+from notifications import notify_on_completion, record_flow_result
 
 
 logger = logging.getLogger(__name__)
@@ -86,4 +86,6 @@ def backfill_null_gbp() -> dict:
 
 @flow(name="Backfill GBP", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
 def backfill_gbp_flow():
-    return backfill_null_gbp()
+    result = backfill_null_gbp()
+    record_flow_result(result)
+    return result
