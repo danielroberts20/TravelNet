@@ -1,4 +1,4 @@
-from prefect import State, serve
+from prefect import serve
 from prefect.schedules import Cron
 
 from config.schedules import SCHEDULE_CONFIGS
@@ -51,10 +51,12 @@ FLOW_REGISTRY = {
 
 def _deployment_tags(flow) -> list[str]:
     """Auto-derive tags from the flow object. 'notifies' is added when the
-    flow has on_completion or on_failure hooks registered in its decorator.
-    Uses the internal *_hooks lists, not the .on_completion/.on_failure bound methods."""
+    flow has notify_on_completion registered as a completion or failure hook."""
+    from notifications import notify_on_completion as _notify
     tags = []
-    if getattr(flow, "on_completion_hooks", None) or getattr(flow, "on_failure_hooks", None):
+    all_hooks = list(getattr(flow, "on_completion_hooks", None) or []) + \
+                list(getattr(flow, "on_failure_hooks",   None) or [])
+    if _notify in all_hooks:
         tags.append("notifies")
     return tags
 

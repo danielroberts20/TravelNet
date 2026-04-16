@@ -33,14 +33,72 @@ logger = logging.getLogger(__name__)
 # PushCut
 # ---------------------------------------------------------------------------
 
+def record_flow_result(result: dict) -> None:
+    """Write a flow's return value to /data/flow_results.json for dashboard display.
+
+    Reads the current Prefect run context for flow name and run ID automatically.
+    Uses an exclusive flock + atomic rename so concurrent writers never corrupt the file,
+    even though flows are not expected to overlap.
+    """
+    import fcntl
+    import os
+    import json as _json
+    from config.general import DATA_DIR
+    from prefect.context import get_run_context
+
+    if not isinstance(result, dict):
+        return
+
+    try:
+        ctx = get_run_context()
+        flow_name   = ctx.flow.name
+        flow_run_id = str(ctx.flow_run.id)
+        # Skip sub-flows (called from within another flow) — they have no deployment_id
+        # and would overwrite the standalone deployment run entry with an untracked run ID.
+        if ctx.flow_run.deployment_id is None:
+            return
+    except Exception:
+        return  # Not in a flow run context — skip silently
+
+    path      = DATA_DIR / "flow_results.json"
+    lock_path = DATA_DIR / "flow_results.lock"
+    tmp_path  = DATA_DIR / "flow_results.tmp"
+
+    try:
+        with open(lock_path, "w") as _lock:
+            fcntl.flock(_lock, fcntl.LOCK_EX)
+            try:
+                try:
+                    with open(path) as f:
+                        data = _json.load(f)
+                except (FileNotFoundError, _json.JSONDecodeError):
+                    data = {}
+
+                data[flow_name] = {
+                    "flow_run_id":  flow_run_id,
+                    "result":       result,
+                    "completed_at": datetime.now(timezone.utc).isoformat(),
+                }
+
+                with open(tmp_path, "w") as f:
+                    _json.dump(data, f, indent=2, default=str)
+                os.replace(tmp_path, path)
+            finally:
+                fcntl.flock(_lock, fcntl.LOCK_UN)
+    except Exception:
+        pass  # Never let result recording affect the flow run
+
+
 def notify_on_completion(flow, flow_run, state: State):
     from notifications import send_notification
 
     send_notification(
         title=f"⏳ {flow.name}",
-        body=state.message or (f"✅ Completed successfully" if state.is_completed() else "❌ Failed"),
+        body=state.message or ("✅ Completed successfully" if state.is_completed() else "❌ Failed"),
         time_sensitive=state.is_failed()
     )
+
+
 
     
 def trigger_notification(notification_name):
