@@ -28,3 +28,4 @@ server/build-dashboard.sh
 server/build-server.sh
 server/build.sh
 server/build.sh
+server/scripts/graceful_reboot.sh
