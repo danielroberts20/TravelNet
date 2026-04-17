@@ -105,9 +105,12 @@ def trigger_notification(notification_name):
     """Fire a named Pushcut notification by looking up its URL from AVAILABLE_NOTIFICATIONS."""
     noti_url = AVAILABLE_NOTIFICATIONS.get(notification_name)
     if noti_url:
-        resp = requests.post(noti_url)
-        logger.info(resp)
-        return {}
+        try:
+            resp = requests.post(noti_url)
+            logger.info(resp)
+            return {}
+        except Exception as e:
+            logger.warning(f"Notification failed to fire. Error: {e}")
 
 def send_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True, prefix: str = None):
     """Send a Pushcut push notification via the custom webhook.
@@ -139,8 +142,11 @@ def _trigger_notification(url, title: str = "Title", body: str = "Body", use_pre
     headers = {
         "Content-Type": "application/json"
     }
-    resp = requests.post(url, json=payload, headers=headers)
-    return resp.json()
+    try:
+        resp = requests.post(url, json=payload, headers=headers)
+        return resp.json()
+    except Exception as e:
+        logger.warning(f"Notification failed to fire. Error: {e}")
 
 def warning_notification(body: str = "Warning"):
     """Send a warning-level notification to the dedicated warning webhook."""
@@ -159,8 +165,11 @@ def _warn_error_notification(body: str, is_warn: bool):
         "Content-Type": "application/json"
     }
     url = settings.warning_notification if is_warn else settings.error_notification
-    resp = requests.post(url, json=payload, headers=headers)
-    return resp.json()
+    try: 
+        resp = requests.post(url, json=payload, headers=headers)
+        return resp.json()
+    except Exception as e:
+        logger.warning(f"Notification failed to fire. Error: {e}")
 
 # ---------------------------------------------------------------------------
 # Primitive

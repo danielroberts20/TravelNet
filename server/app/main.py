@@ -52,11 +52,11 @@ async def lifespan(app: FastAPI):
     from scheduled_tasks.departure_backup import schedule_departure_backups
     schedule_departure_backups(COUNTRY_DEPARTURE_DATES)
 
-    send_notification(title="TravelNet", body="✅ Server online", use_prefix=False)
+    send_notification(title="TravelNet", body="✅ Server online", use_prefix=False, time_sensitive=False)
 
     yield
 
-    send_notification(title="TravelNet", body="❌ Server offline", use_prefix=False)
+    send_notification(title="TravelNet", body="❌ Server offline", use_prefix=False, time_sensitive=False)
 
 
 app = FastAPI(title="TravelNet API", version="1.0.1", lifespan=lifespan)
