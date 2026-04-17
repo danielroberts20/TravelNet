@@ -176,7 +176,7 @@ def check_departure():
                 "SELECT label FROM known_places WHERE id = ?", (place_id,)
             ).fetchone()
         name = row['label'] if row['label'] else f"known place {place_id}"
-        logger.info("Departed %s after %d mins", name, duration_mins)
+        logger.important("Departed %s after %d mins", name, duration_mins)
 
 
 # ---------------------------------------------------------------------------
@@ -264,11 +264,20 @@ def _handle_known_place(nearest, arrived_at: str) -> bool:
     name = row['label'] if row['label'] else f"known place {place_id}"
 
     if row['current_visit_id'] is not None:
-        logger.info("Still at %s, no action needed", name)
-        return False
+        with get_conn(read_only=True) as conn:
+            valid_visit = conn.execute(
+                "SELECT id FROM place_visits WHERE id = ? AND place_id = ? AND departed_at IS NULL",
+                (row['current_visit_id'], place_id),
+            ).fetchone()
+        if valid_visit is not None:
+            logger.info("Still at %s, no action needed", name)
+            return False
+        # Stale current_visit_id (wrong place or already closed) — clear it.
+        with get_conn() as conn:
+            conn.execute("UPDATE known_places SET current_visit_id = NULL WHERE id = ?", (place_id,))
 
     visit_id = known_places_table.insert_visit(place_id, arrived_at)
-    logger.info("Return visit to %s", name)
+    logger.important("Return visit to %s", name)
     known_places_table.increment_visit_count(place_id, arrived_at, visit_id)
     return True
 
@@ -281,7 +290,7 @@ def _handle_new_place(lat: float, lon: float, arrived_at: str) -> None:
     visit_id = known_places_table.insert_visit(place_id, arrived_at)
     known_places_table.set_current_visit(place_id, visit_id)
 
-    logger.info("New location detected at %.5f, %.5f", lat, lon)
+    logger.important("New location detected at %.5f, %.5f", lat, lon)
 
     address = get_address(lat, lon)
     name = (address.get("city") or address.get("suburb") or address.get("road")
