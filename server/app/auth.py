@@ -40,6 +40,13 @@ def require_upload_token(authorization: str = Header(None)) -> None:
                 detail="Unauthorized",
             )
 
+def require_watchdog_token(authorization: str = Header(...)) -> None:
+    if settings.watchdog_token:
+        if not authorization or authorization != f"Bearer {settings.watchdog_token}":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized",
+            )
 
 def verify_overland_token(authorization: str = Header(...)) -> None:
     """FastAPI dependency: enforce the OVERLAND_TOKEN bearer check.

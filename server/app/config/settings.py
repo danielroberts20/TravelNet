@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # --- Auth tokens ---
     upload_token: str = Field(alias="UPLOAD_TOKEN")
     overland_token: str = Field(alias="OVERLAND_TOKEN")
+    watchdog_token: str = Field(alias="WATCHDOG_TOKEN") 
 
     # --- SSH ---
     compute_host: str = Field(alias="COMPUTE_HOST")

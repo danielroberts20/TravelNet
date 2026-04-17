@@ -53,4 +53,7 @@ SCHEDULE_CONFIGS = {
 
     # Stats
     "push-public-stats":     ("0 7 * * *",           "Daily push of public_stats.json to GitHub"),
+
+    # Watchdog
+    "check-watchdog":     ("*/5 * * * *",           "Check for recent Watchdog heartbeat and send alert if stale"),
 }
