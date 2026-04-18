@@ -14,6 +14,7 @@ from upload.journal.router import router as journal_router
 from upload.places.router import router as places_router
 from upload.flight.router import router as flight_router
 from upload.watchdog.router import router as watchdog_router
+from upload.photos.router import router as photos_router
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -25,3 +26,4 @@ router.include_router(journal_router, prefix="/journal")
 router.include_router(places_router, prefix="/places")
 router.include_router(flight_router, prefix="/flight")
 router.include_router(watchdog_router, prefix="/watchdog")
+router.include_router(photos_router, prefix="/photos")
