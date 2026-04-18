@@ -170,6 +170,25 @@ def backfill_all_places() -> dict:
                 filled_trigger_log += 1
         logger.info(f"Backfilled place_id for {filled_trigger_log} trigger log entries")
 
+        # --- Photo Metadata ---
+        photo_row = conn.execute("""
+            SELECT id, taken_at FROM photo_metadata 
+            WHERE place_id IS NULL
+        """).fetchall()
+        logger.info(f"Found {len(photo_row)} photo metadata entries to backfill place_id for")
+
+        filled_photo_metadata = 0
+        for photo in photo_row:
+            place_id = _nearest_place_id(conn, photo["taken_at"], 900)
+            if place_id is not None:
+                conn.execute("""
+                    UPDATE photo_metadata SET place_id = :place_id
+                    WHERE id = :id
+                    """, {"place_id": place_id,
+                        "id": photo["id"]})
+                filled_photo_metadata += 1
+        logger.info(f"Backfilled place_id for {filled_photo_metadata} photo metadata entries")
+
     return {
         "transactions_found": len(transaction_rows),
         "transactions_backfilled": filled_transactions,
@@ -185,6 +204,8 @@ def backfill_all_places() -> dict:
         "workouts_backfilled": filled_workouts,
         "trigger_log_found": len(trigger_row),
         "trigger_log_backfilled": filled_trigger_log,
+        "photo_metadata_found": len(photo_row),
+        "photo_metadata_backfilled": filled_photo_metadata,
     }
 
 
