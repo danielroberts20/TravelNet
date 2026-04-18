@@ -16,7 +16,7 @@ import os
 import time
 
 from config.general import DB_FILE
-from config.runtime import app_start_time
+from config.runtime import get_app_uptime
 from database.connection import get_conn
 
 
@@ -43,7 +43,7 @@ def get_uptime() -> dict:
     with open("/proc/uptime") as f:
         pi_seconds = float(f.read().split()[0])
 
-    app_seconds = (datetime.now(tz=timezone.utc) - app_start_time).total_seconds()
+    app_seconds = get_app_uptime()
 
     return {
         "pi": _format_uptime(pi_seconds),

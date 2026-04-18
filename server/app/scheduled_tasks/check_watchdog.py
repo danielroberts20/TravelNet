@@ -2,16 +2,20 @@ from prefect import flow, task, get_run_logger
 from database.connection import get_conn
 from notifications import error_notification
 from datetime import datetime, timezone, timedelta
+from config.runtime import get_app_uptime
 
 
 @task
 def get_server_uptime() -> float:
-    """Return seconds since TravelNet server started."""
-    from config.runtime import app_start_time
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
-    uptime = (now - app_start_time).total_seconds()
-    return uptime
+    """Return seconds since TravelNet server started, read from shared volume."""
+    log = get_run_logger()
+    try:
+        uptime = get_app_uptime()
+        log.info(f"TravelNet uptime: {int(uptime)}s")
+        return uptime
+    except Exception as e:
+        log.warning(f"Could not read app start time: {e}")
+        return 0.0
 
 @task
 def get_last_heartbeat():

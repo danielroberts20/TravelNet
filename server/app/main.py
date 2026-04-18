@@ -28,7 +28,7 @@ from config.editable import load_overrides
 configure_logging()
 load_overrides()
 
-import config.runtime  # records the timestamp the container started
+from config.runtime import initialise as init_app_uptime # records the timestamp the container started
 
 from compute.router import router as compute_router
 from database.setup import init_db
@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: initialise DB, schedule departure backups, send online notification."""
+    init_app_uptime()
     init_db()
     logger.info("Database initialized.")
 
