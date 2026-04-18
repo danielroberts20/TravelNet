@@ -56,4 +56,7 @@ SCHEDULE_CONFIGS = {
 
     # Watchdog
     "check-watchdog":     ("*/5 * * * *",           "Check for recent Watchdog heartbeat and send alert if stale"),
+
+    # Power
+    "poll-shelly":          ("*/5 * * * *",           "Poll Shelly device for power readings")
 }

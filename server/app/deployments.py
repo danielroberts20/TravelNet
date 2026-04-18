@@ -25,6 +25,7 @@ from scheduled_tasks.backup_db import backup_db_flow
 from scheduled_tasks.flag_location_noise import flag_location_noise_flow
 from scheduled_tasks.retroactive_location_scan import retroactive_location_scan_flow
 from scheduled_tasks.check_watchdog import check_watchdog_flow
+from scheduled_tasks.poll_shelly import poll_shelly_flow
 
 
 FLOW_REGISTRY = {
@@ -50,6 +51,7 @@ FLOW_REGISTRY = {
     "identify-location-noise":        flag_location_noise_flow,
     "retroactive-location-scan":      retroactive_location_scan_flow,
     "check-watchdog":                check_watchdog_flow,
+    "poll-shelly":                 poll_shelly_flow,
 }
 
 

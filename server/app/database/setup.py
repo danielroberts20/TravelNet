@@ -37,6 +37,7 @@ from database.logging.digest.table import table as log_digest_table
 from database.logging.daily.table import table as daily_cron_table
 from database.ml.table import table as ml_table
 from database.watchdog.table import table as watchdog_table
+from database.power.table import table as power_table
 
 TABLE_REGISTRY: list[BaseTable] = [
     places_table,           # Must be first — FK target for all place_id columns
@@ -62,6 +63,7 @@ TABLE_REGISTRY: list[BaseTable] = [
     transition_timezone_table,
     transition_country_table,
     watchdog_table,
+    power_table,
 ]
 
 
