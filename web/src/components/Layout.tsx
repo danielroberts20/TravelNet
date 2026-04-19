@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, Link } from 'react-router-dom';
+import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { useStats } from '../hooks/useStats';
 import { GITHUB_REPO, TREVOR_REPO, DOCS_URL, PERSONAL_SITE } from '../data/travel';
 
@@ -85,6 +85,11 @@ function TrevorWidget() {
 
 export default function Layout() {
   const stats = useStats();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+
   const statusDotColor =
     stats?.status === 'travelling' ? 'var(--accent-teal)' :
     stats?.status === 'finished'   ? 'var(--accent-orange)' :
@@ -106,15 +111,39 @@ export default function Layout() {
             ))}
           </ul>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+          <div className="nav-actions">
             <a href={DOCS_URL} className="nav-github">Docs</a>
             <a href={GITHUB_REPO} className="nav-github" target="_blank" rel="noopener">
               {GITHUB_SVG}
               GitHub
             </a>
+            <button
+              className={`nav-hamburger${menuOpen ? ' open' : ''}`}
+              aria-label="Toggle navigation"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(v => !v)}
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
           </div>
         </div>
       </nav>
+
+      {menuOpen && (
+        <div className="nav-mobile-menu">
+          {NAV_ITEMS.map(item => (
+            <NavLink key={item.path} to={item.path} className={({ isActive }) => isActive ? 'active' : ''}>
+              {item.title}
+            </NavLink>
+          ))}
+          <div className="nav-mobile-actions">
+            <a href={DOCS_URL}>Docs</a>
+            <a href={GITHUB_REPO} target="_blank" rel="noopener">GitHub</a>
+          </div>
+        </div>
+      )}
 
       <div className="page-wrapper">
         <Outlet />
