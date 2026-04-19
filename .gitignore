@@ -29,3 +29,4 @@ server/build-server.sh
 server/build.sh
 server/build.sh
 server/scripts/graceful_reboot.sh
+server/app/database/migrations/
