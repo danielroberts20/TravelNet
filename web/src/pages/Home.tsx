@@ -314,39 +314,39 @@ export default function Home() {
 
           <div className="stack-grid">
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/server.rack.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">🖥️</span>
               Raspberry Pi 4B — always-on server
             </div>
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/bolt.fill.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">⚡</span>
               FastAPI — data ingest endpoints
             </div>
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/cylinder.fill.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">🗄️</span>
               SQLite — unified travel database
             </div>
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/location.fill.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">📍</span>
               Overland + iOS Shortcuts
             </div>
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/heart.fill.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">❤️</span>
               Apple Watch Ultra + Health Auto Export
             </div>
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/creditcard.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">💳</span>
               Revolut · Wise · exchangerate.host
             </div>
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/function.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">🧮</span>
               scikit-learn · HDBSCAN · pandas
             </div>
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/chart.xyaxis.line.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">📊</span>
               Kepler.gl · Plotly · Dash
             </div>
             <div className="stack-item reveal">
-              <span className="stack-item-icon"><img src="/assets/icons/24/lock.shield.fill.svg" width="16" height="16" alt="" /></span>
+              <span className="stack-item-icon">🔒</span>
               Tailscale · Cloudflare R2
             </div>
           </div>
