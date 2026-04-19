@@ -33,7 +33,7 @@ const PATH_STEPS    = 80;   // great-circle interpolation steps per arc
 const VIEW_STATE: MapViewState = {
   longitude: 150,
   latitude: 10,
-  zoom: 1.5,
+  zoom: 1.0,
   pitch: 0,
   bearing: 0,
 };
@@ -47,12 +47,24 @@ const LABEL: [number, number, number, number] = [255, 255, 255, 153];
 
 type Pos = [number, number];
 
-// Compute a great-circle path between two [lon, lat] points
+// Compute a great-circle path between two [lon, lat] points.
+// Normalises each point so longitudes are continuous (no ±180 jump),
+// which prevents deck.gl PathLayer from drawing the arc the wrong way
+// around the globe when crossing the antimeridian.
 function greatCircle(from: Pos, to: Pos, steps: number): Pos[] {
   const interp = d3.geoInterpolate(from, to);
   const path: Pos[] = [];
   for (let i = 0; i <= steps; i++) {
-    path.push(interp(i / steps) as Pos);
+    const [lon, lat] = interp(i / steps) as Pos;
+    if (path.length === 0) {
+      path.push([lon, lat]);
+    } else {
+      const prevLon = path[path.length - 1][0];
+      let adjustedLon = lon;
+      while (adjustedLon - prevLon >  180) adjustedLon -= 360;
+      while (prevLon - adjustedLon >  180) adjustedLon += 360;
+      path.push([adjustedLon, lat]);
+    }
   }
   return path;
 }
