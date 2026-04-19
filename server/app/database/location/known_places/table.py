@@ -24,6 +24,7 @@ class KnownPlaceRecord:
     latitude: float
     longitude: float
     first_seen: str         # ISO 8601 UTC
+    place_id: Optional[int] = None
     label: Optional[str] = None
 
 
@@ -35,24 +36,25 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS known_places (
                     id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                    label            TEXT,
                     latitude         REAL NOT NULL,
                     longitude        REAL NOT NULL,
+                    place_id         INTEGER REFERENCES places(id),
                     first_seen       TEXT NOT NULL,
-                    visit_count      INTEGER NOT NULL DEFAULT 0,
                     last_visited     TEXT,
+                    visit_count      INTEGER NOT NULL DEFAULT 0,
                     total_time_mins  INTEGER NOT NULL DEFAULT 0,
-                    current_visit_id INTEGER REFERENCES place_visits(id),
-                    label            TEXT
+                    current_visit_id INTEGER REFERENCES place_visits(id)
                 );
             """)
 
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS place_visits (
-                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                    place_id     INTEGER NOT NULL REFERENCES known_places(id),
-                    arrived_at   TEXT NOT NULL,
-                    departed_at  TEXT,
-                    duration_mins INTEGER
+                    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    known_place_id INTEGER NOT NULL REFERENCES known_places(id),
+                    arrived_at     TEXT NOT NULL,
+                    departed_at    TEXT,
+                    duration_mins  INTEGER
                 );
             """)
 
@@ -62,8 +64,8 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
             """)
 
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_place_visits_place_id
-                    ON place_visits(place_id);
+                CREATE INDEX IF NOT EXISTS idx_place_visits_known_place_id
+                    ON place_visits(known_place_id);
             """)
 
             conn.execute("""
@@ -75,9 +77,9 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
         """Insert a new known place and return its id."""
         with get_conn() as conn:
             cursor = conn.execute("""
-                INSERT INTO known_places (latitude, longitude, first_seen, visit_count, last_visited, label)
-                VALUES (?, ?, ?, 1, ?, ?)
-            """, (record.latitude, record.longitude, record.first_seen, record.first_seen, record.label))
+                INSERT INTO known_places (latitude, longitude, place_id, first_seen, visit_count, last_visited, label)
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+            """, (record.latitude, record.longitude, record.place_id, record.first_seen, record.first_seen, record.label))
             return cursor.lastrowid
 
     def label_place(self, place_id: int, label: str) -> bool:
@@ -93,7 +95,7 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
         """Open a new visit record for a known place and return its id."""
         with get_conn() as conn:
             cursor = conn.execute("""
-                INSERT INTO place_visits (place_id, arrived_at)
+                INSERT INTO place_visits (known_place_id, arrived_at)
                 VALUES (?, ?)
             """, (place_id, arrived_at))
             return cursor.lastrowid

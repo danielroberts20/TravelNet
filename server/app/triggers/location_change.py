@@ -11,7 +11,7 @@ from config.general import (
     LOCATION_DEPARTURE_CONFIRMATION_MINS,
     LOCATION_STREAK_POINT_LIMIT,
 )
-from database.location.geocoding import insert_geocode, reverse_geocode
+from database.location.geocoding import get_place_id, insert_geocode, reverse_geocode
 from database.location.known_places.table import table as known_places_table, KnownPlaceRecord
 from database.connection import get_conn, to_iso_str
 from datetime import datetime, timedelta, timezone
@@ -95,9 +95,9 @@ def get_all_open_visits():
     """Return all place_visits rows where departed_at IS NULL, joined to known_places."""
     with get_conn(read_only=True) as conn:
         return conn.execute("""
-            SELECT pv.id, pv.place_id, kp.latitude, kp.longitude, pv.arrived_at
+            SELECT pv.id, pv.known_place_id, kp.latitude, kp.longitude, pv.arrived_at
             FROM place_visits pv
-            JOIN known_places kp ON kp.id = pv.place_id
+            JOIN known_places kp ON kp.id = pv.known_place_id
             WHERE pv.departed_at IS NULL
             ORDER BY pv.arrived_at DESC
         """).fetchall()
@@ -192,7 +192,7 @@ def visit_exists(place_id: int, arrived_at: str, tolerance_mins: int = 5) -> boo
     with get_conn(read_only=True) as conn:
         row = conn.execute("""
             SELECT id FROM place_visits
-            WHERE place_id = ?
+            WHERE known_place_id = ?
               AND ABS(
                   (julianday(arrived_at) - julianday(?)) * 24 * 60
               ) <= ?
@@ -222,8 +222,9 @@ def get_address(lat, lon):
             "display_name": row["display_name"]
         }
 
+    geo_place_id = get_place_id(lat, lon)
     geocode = reverse_geocode(lat, lon)
-    insert_geocode(lat, lon, geocode)
+    insert_geocode(geo_place_id, geocode)
     return {
         "country_code": geocode.get("address", {}).get("country_code"),
         "country": geocode.get("address", {}).get("country"),
@@ -266,7 +267,7 @@ def _handle_known_place(nearest, arrived_at: str) -> bool:
     if row['current_visit_id'] is not None:
         with get_conn(read_only=True) as conn:
             valid_visit = conn.execute(
-                "SELECT id FROM place_visits WHERE id = ? AND place_id = ? AND departed_at IS NULL",
+                "SELECT id FROM place_visits WHERE id = ? AND known_place_id = ? AND departed_at IS NULL",
                 (row['current_visit_id'], place_id),
             ).fetchone()
         if valid_visit is not None:
@@ -284,8 +285,9 @@ def _handle_known_place(nearest, arrived_at: str) -> bool:
 
 def _handle_new_place(lat: float, lon: float, arrived_at: str) -> None:
     """Create a new known place and its first visit, then fire the discovery notification."""
+    geo_place_id = get_place_id(lat, lon)
     place_id = known_places_table.insert(KnownPlaceRecord(
-        latitude=lat, longitude=lon, first_seen=arrived_at,
+        latitude=lat, longitude=lon, first_seen=arrived_at, place_id=geo_place_id,
     ))
     visit_id = known_places_table.insert_visit(place_id, arrived_at)
     known_places_table.set_current_visit(place_id, visit_id)

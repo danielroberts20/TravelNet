@@ -28,22 +28,23 @@ def db():
     conn.executescript("""
         CREATE TABLE known_places (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            label            TEXT,
             latitude         REAL NOT NULL,
             longitude        REAL NOT NULL,
+            place_id         INTEGER,
             first_seen       TEXT NOT NULL,
-            visit_count      INTEGER NOT NULL DEFAULT 0,
             last_visited     TEXT,
+            visit_count      INTEGER NOT NULL DEFAULT 0,
             total_time_mins  INTEGER NOT NULL DEFAULT 0,
-            current_visit_id INTEGER REFERENCES place_visits(id),
-            label            TEXT
+            current_visit_id INTEGER REFERENCES place_visits(id)
         );
 
         CREATE TABLE place_visits (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            place_id      INTEGER NOT NULL REFERENCES known_places(id),
-            arrived_at    TEXT NOT NULL,
-            departed_at   TEXT,
-            duration_mins INTEGER
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            known_place_id INTEGER NOT NULL REFERENCES known_places(id),
+            arrived_at     TEXT NOT NULL,
+            departed_at    TEXT,
+            duration_mins  INTEGER
         );
     """)
     return conn
@@ -140,8 +141,8 @@ class TestInsertVisit:
         t, db = tbl
         place_id = t.insert(KnownPlaceRecord(latitude=51.5, longitude=-0.1, first_seen="2024-06-15T09:00:00Z"))
         visit_id = t.insert_visit(place_id, "2024-06-15T09:00:00Z")
-        row = db.execute("SELECT place_id, arrived_at FROM place_visits WHERE id = ?", (visit_id,)).fetchone()
-        assert row["place_id"] == place_id
+        row = db.execute("SELECT known_place_id, arrived_at FROM place_visits WHERE id = ?", (visit_id,)).fetchone()
+        assert row["known_place_id"] == place_id
         assert row["arrived_at"] == "2024-06-15T09:00:00Z"
 
     def test_departed_at_initially_null(self, tbl):

@@ -71,21 +71,22 @@ def db():
         );
         CREATE TABLE known_places (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            label            TEXT,
             latitude         REAL NOT NULL,
             longitude        REAL NOT NULL,
+            place_id         INTEGER,
             first_seen       TEXT NOT NULL,
-            visit_count      INTEGER NOT NULL DEFAULT 0,
             last_visited     TEXT,
+            visit_count      INTEGER NOT NULL DEFAULT 0,
             total_time_mins  INTEGER NOT NULL DEFAULT 0,
-            current_visit_id INTEGER,
-            label            TEXT
+            current_visit_id INTEGER
         );
         CREATE TABLE place_visits (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            place_id      INTEGER NOT NULL,
-            arrived_at    TEXT NOT NULL,
-            departed_at   TEXT,
-            duration_mins INTEGER
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            known_place_id INTEGER NOT NULL,
+            arrived_at     TEXT NOT NULL,
+            departed_at    TEXT,
+            duration_mins  INTEGER
         );
         CREATE TABLE places (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,7 +120,7 @@ def _place(db, lat, lon, first_seen=None, label=None):
 
 def _visit(db, place_id, arrived_at, departed_at=None):
     cur = db.execute(
-        "INSERT INTO place_visits (place_id, arrived_at, departed_at) VALUES (?,?,?)",
+        "INSERT INTO place_visits (known_place_id, arrived_at, departed_at) VALUES (?,?,?)",
         (place_id, arrived_at, departed_at),
     )
     db.commit()
@@ -295,6 +296,7 @@ class TestScanForStays:
         patches = _cfg_patches() + [
             patch("triggers.location_change.get_conn", return_value=db),
             patch("database.location.known_places.table.get_conn", return_value=db),
+            patch("triggers.location_change.get_place_id", return_value=1),
             patch("triggers.location_change.dispatch"),
             patch("triggers.location_change.get_address",
                   return_value={"city": "London", "suburb": None, "road": None,
@@ -358,7 +360,7 @@ class TestScanForStays:
         count = self._run(db, points)
         assert count == 1
         row = db.execute(
-            "SELECT id FROM place_visits WHERE place_id = ?", (place_id,)
+            "SELECT id FROM place_visits WHERE known_place_id = ?", (place_id,)
         ).fetchone()
         assert row is not None
 

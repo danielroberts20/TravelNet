@@ -96,21 +96,22 @@ def db():
         );
         CREATE TABLE known_places (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            label            TEXT,
             latitude         REAL NOT NULL,
             longitude        REAL NOT NULL,
+            place_id         INTEGER,
             first_seen       TEXT NOT NULL,
-            visit_count      INTEGER NOT NULL DEFAULT 0,
             last_visited     TEXT,
+            visit_count      INTEGER NOT NULL DEFAULT 0,
             total_time_mins  INTEGER NOT NULL DEFAULT 0,
-            current_visit_id INTEGER,
-            label            TEXT
+            current_visit_id INTEGER
         );
         CREATE TABLE place_visits (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            place_id      INTEGER NOT NULL,
-            arrived_at    TEXT NOT NULL,
-            departed_at   TEXT,
-            duration_mins INTEGER
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            known_place_id INTEGER NOT NULL,
+            arrived_at     TEXT NOT NULL,
+            departed_at    TEXT,
+            duration_mins  INTEGER
         );
         CREATE TABLE places (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,7 +150,7 @@ def _place(db, lat, lon, first_seen=None, label=None, visit_count=1):
 def _visit(db, place_id, arrived_at, departed_at=None, duration_mins=None):
     """Insert a place_visits row and return its id."""
     cur = db.execute(
-        "INSERT INTO place_visits (place_id, arrived_at, departed_at, duration_mins) VALUES (?,?,?,?)",
+        "INSERT INTO place_visits (known_place_id, arrived_at, departed_at, duration_mins) VALUES (?,?,?,?)",
         (place_id, arrived_at, departed_at, duration_mins),
     )
     db.commit()
@@ -764,6 +765,7 @@ class TestDetectArrival:
         with patch("triggers.location_change.get_conn", return_value=db), \
              patch("database.location.known_places.table.get_conn", return_value=db), \
              patch("triggers.location_change.get_stationary_streak", return_value=streak), \
+             patch("triggers.location_change.get_place_id", return_value=1), \
              patch("triggers.location_change.dispatch"), \
              patch("triggers.location_change.get_address", return_value={"city": "London"}):
             ctx = __import__("contextlib").ExitStack()
@@ -790,7 +792,7 @@ class TestDetectArrival:
         streak = self._make_streak(lat, lon, duration_mins=REVISIT_MINS)
         result = self._run(db, streak)
         assert result is True
-        row = db.execute("SELECT id FROM place_visits WHERE place_id = ?", (place_id,)).fetchone()
+        row = db.execute("SELECT id FROM place_visits WHERE known_place_id = ?", (place_id,)).fetchone()
         assert row is not None
 
     def test_known_place_already_visiting_no_duplicate(self, db):
@@ -872,7 +874,7 @@ class TestHandleKnownPlace:
     def test_not_visiting_inserts_new_visit(self, db):
         nearest = self._nearest(db, *LONDON)
         self._run(db, nearest, _fixed(0))
-        row = db.execute("SELECT id FROM place_visits WHERE place_id = ?", (nearest["id"],)).fetchone()
+        row = db.execute("SELECT id FROM place_visits WHERE known_place_id = ?", (nearest["id"],)).fetchone()
         assert row is not None
 
     def test_not_visiting_sets_arrived_at(self, db):
@@ -897,7 +899,7 @@ class TestHandleKnownPlace:
             "SELECT current_visit_id FROM known_places WHERE id = ?", (nearest["id"],)
         ).fetchone()
         pv = db.execute(
-            "SELECT id FROM place_visits WHERE place_id = ?", (nearest["id"],)
+            "SELECT id FROM place_visits WHERE known_place_id = ?", (nearest["id"],)
         ).fetchone()
         assert kp["current_visit_id"] == pv["id"]
 
@@ -911,6 +913,7 @@ class TestHandleNewPlace:
     def _run(self, db, lat, lon, arrived_at):
         with patch("triggers.location_change.get_conn", return_value=db), \
              patch("database.location.known_places.table.get_conn", return_value=db), \
+             patch("triggers.location_change.get_place_id", return_value=1), \
              patch("triggers.location_change.dispatch") as mock_dispatch, \
              patch("triggers.location_change.get_address",
                    return_value={"city": "London", "suburb": None, "road": None,
@@ -974,6 +977,7 @@ class TestRun:
         with patch("triggers.location_change.get_conn", return_value=db), \
              patch("database.location.known_places.table.get_conn", return_value=db), \
              patch("triggers.location_change.get_stationary_streak", return_value=streak), \
+             patch("triggers.location_change.get_place_id", return_value=1), \
              patch("triggers.location_change.dispatch"), \
              patch("triggers.location_change.get_address",
                    return_value={"city": "London", "suburb": None, "road": None,
@@ -1005,7 +1009,7 @@ class TestRun:
         place_id = _place(db, lat, lon)
         streak = (lat, lon, _fixed(0), _fixed(REVISIT_MINS), 5)
         self._run(db, streak=streak)
-        row = db.execute("SELECT id FROM place_visits WHERE place_id = ?", (place_id,)).fetchone()
+        row = db.execute("SELECT id FROM place_visits WHERE known_place_id = ?", (place_id,)).fetchone()
         assert row is not None
 
     def test_stationary_at_new_location_creates_place(self, db):
