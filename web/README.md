@@ -5,65 +5,53 @@ Public demo dashboard for the TravelNet travel data platform.
 ## Local development
 
 ```bash
-bundle install
-bundle exec jekyll serve --livereload
-# → http://localhost:4000
+npm install
+npm run dev
+# → http://localhost:5173
+```
+
+## Build
+
+```bash
+npm run build   # outputs to dist/
+npm run preview # preview production build locally
 ```
 
 ## Structure
 
 ```
-_config.yml          # Site config + trip metadata
-_data/stats.yml      # Update this as you travel — stats auto-populate
-_layouts/
-  default.html       # Main layout (nav + footer)
-  coming-soon.html   # Stub layout for unreleased pages
-_pages/              # (reserved for future markdown pages)
+src/
+  main.tsx          # React entry point
+  App.tsx           # Router (6 routes)
+  components/
+    Layout.tsx      # Navbar, footer, Trevor chat widget
+    GPSCanvas.tsx   # Animated deck.gl + MapLibre map preview
+    ComingSoon.tsx  # Shared stub for unreleased pages
+  pages/
+    Home.tsx        # Hero, countdown, stats, features, trip timeline
+    Journey.tsx     # Trip legs, build status
+    Explorer.tsx    # Coming soon (late 2026)
+    ML.tsx          # Coming soon (2027)
+    Trevor.tsx      # AI assistant showcase
+    About.tsx       # Architecture & data sources
+  hooks/
+    useStats.ts     # Fetches live stats from API with fallback
+  data/
+    travel.ts       # Build-time constants from travel.yml
 assets/
-  css/main.css       # Full design system — edit CSS variables to retheme
-  js/main.js         # Countdown, scroll reveal, GPS canvas animation
-index.html           # Homepage
-journey/             # Coming soon → swap for Kepler.gl embed
-explorer/            # Coming soon → swap for Plotly/Dash embed
-ml/                  # Coming soon → swap for ML results
-about/               # Project overview
+  css/main.css      # Full design system — edit CSS variables to retheme
+public/
+  public_stats.json # Fallback stats if API unavailable
 ```
 
-## Updating stats (while travelling)
+## Trip data
 
-Edit `_data/stats.yml`:
+All trip metadata lives in `travel.yml` at the repo root — leg dates, map route stops, display strings. The Vite build reads it via a virtual module plugin and bakes it into the bundle.
 
-```yaml
-status: "live"
-last_synced: "2026-09-15T14:32:00Z"
-days_travelling: 7
-countries_visited: 2
-gps_points: 150000
-health_records: 2800
-transactions: 143
-current_location: "Sydney, Australia"
-current_leg: "Australia (WHV)"
-```
+## Stats API
 
-Commit and push — GitHub Pages rebuilds automatically.
-
-## Adding Kepler.gl (Journey page)
-
-Replace `journey/index.html` with an iframe embed:
-
-```html
----
-layout: default
-title: Journey
-permalink: /journey/
----
-<div style="height: calc(100vh - 52px);">
-  <iframe src="/assets/kepler/index.html" style="width:100%;height:100%;border:none;"></iframe>
-</div>
-```
-
-Drop the exported Kepler.gl bundle into `assets/kepler/`.
+Live stats are fetched from `https://api.travelnet.dev/public/stats` at runtime. If the API is unreachable (pre-departure, network error), `public/public_stats.json` is used as a fallback.
 
 ## Deploying
 
-Push to GitHub. Set Pages source to `main` branch root in repo Settings.
+Deployed via Netlify. Push to `main` — Netlify builds automatically. SPA routing is handled by `public/_redirects`.
