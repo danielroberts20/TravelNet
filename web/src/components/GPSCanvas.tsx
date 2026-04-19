@@ -33,7 +33,7 @@ const PATH_STEPS    = 80;   // great-circle interpolation steps per arc
 const VIEW_STATE: MapViewState = {
   longitude: 150,
   latitude: 10,
-  zoom: 2.0,
+  zoom: 1.5,
   pitch: 0,
   bearing: 0,
 };
