@@ -17,7 +17,7 @@ def update_reboot_cron(timezone: str):
     )
 
     subprocess.run([
-        "ssh", "-o", "StrictHostKeyChecking=no", "dan@192.168.0.61",
+        "ssh", "-o", "StrictHostKeyChecking=no", "dan@pi-server.tail186ff8.ts.net",
         f'(crontab -l | grep -v graceful_reboot.sh; echo "{new_cron}") | crontab -'
     ], check=True)
 
