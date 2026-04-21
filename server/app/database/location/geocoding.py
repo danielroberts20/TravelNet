@@ -15,6 +15,7 @@ batch_geocode()   — geocode a list of coordinates with a 1s rate-limit delay.
 from datetime import datetime, timezone
 import logging
 import time
+import sqlite3
 
 import requests
 
@@ -79,9 +80,12 @@ def insert_geocode(place_id: int, geocode: dict, conn=None) -> None:
             c.execute(sql, params)
 
 
-def get_place_id(lat: float, lon: float) -> int | None:
+def get_place_id(lat: float, lon: float, conn: sqlite3.Connection = None) -> int | None:
+    if lat is None or lon is None:
+        return None
     lat_snap, lon_snap = round(lat, 3), round(lon, 3)
-    with get_conn() as conn:
+    conn = get_conn() if conn is None else conn
+    with conn:
         conn.execute("""
         INSERT OR IGNORE INTO places (lat_snap, lon_snap) VALUES (?, ?)
         """, (lat_snap, lon_snap))
