@@ -136,9 +136,9 @@ def insert(csv_text: str, source: str = "revolut"):
                 raw_json = json.dumps(dict(row), ensure_ascii=False)
 
                 lat, lon = get_closest_lat_lon_by_timestamp(cursor, timestamp)
-                logger.info(f"Closest lat/lon to transaction {tx_id} is {lat}, {lon}")
+                #logger.info(f"Closest lat/lon to transaction {tx_id} is {lat}, {lon}")
                 place_id = get_place_id(lat, lon, conn=conn)
-                logger.info(f"place_id: {place_id}")
+                #logger.info(f"place_id: {place_id}")
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO transactions (
@@ -168,7 +168,7 @@ def insert(csv_text: str, source: str = "revolut"):
         conn.commit()
         
     send_notification(title="Revolut", 
-                      body=f"{len(rows)} rows received | {inserted} inserted | {skipped} skipped",
+                      body=f"💵 {len(rows)} rows received | {inserted} inserted | {skipped} skipped",
                       time_sensitive=False)
     
     return inserted, skipped, errors

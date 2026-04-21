@@ -48,7 +48,7 @@ async def parse_wise_upload(contents):
     skipped = sum(r.get("parsed", 0) - r.get("inserted", 0) for r in all_results if "parsed" in r)
 
     send_notification(title="Wise",
-                      body=f"{received} accounts received | {inserted} inserted | {skipped} skipped",
+                      body=f"💵 {received} accounts received | {inserted} inserted | {skipped} skipped",
                       time_sensitive=False)
 
     return received, inserted, skipped, all_errors

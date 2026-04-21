@@ -152,9 +152,9 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
                 for row in rows:
                     row["timestamp"] = to_iso_str(row["timestamp"])
                     lat, lon = get_closest_lat_lon_by_timestamp(cursor, row["timestamp"])
-                    logger.info(f"Closest lat/lon to transaction {row["id"]} is {lat}, {lon}")
+                    #logger.info(f"Closest lat/lon to transaction {row["id"]} is {lat}, {lon}")
                     place_id = get_place_id(lat, lon, conn=conn)
-                    logger.info(f"place_id: {place_id}")
+                    #logger.info(f"place_id: {place_id}")
                     result = cursor.execute("""
                         INSERT OR IGNORE INTO transactions (
                             id, source, bank, timestamp, amount, currency,
