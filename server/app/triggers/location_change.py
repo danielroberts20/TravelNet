@@ -286,7 +286,8 @@ def _handle_new_place(lat: float, lon: float, arrived_at: str) -> None:
 
     address = get_address(lat, lon)
     if address:
-        body = f"Discovered {f'in {address["locality"]}' if address["locality"] else f'near {lat:.3f}, {lon:.3f}'}. Tap here to add a label"
+        locality = address.get("locality", None)
+        body = f"Discovered {f'in {locality}' if locality else f'near {lat:.3f}, {lon:.3f}'}. Tap here to add a label"
     
     now = to_iso_str(datetime.now(timezone.utc))
 

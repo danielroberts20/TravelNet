@@ -28,10 +28,12 @@ PLACES_DDL = """
         country_code TEXT,
         country      TEXT,
         region       TEXT,
+        locality     TEXT,
         city         TEXT,
         suburb       TEXT,
         road         TEXT,
         display_name TEXT,
+        raw_json     TEXT,
         geocoded_at  TEXT,
         UNIQUE(lat_snap, lon_snap)
     );
@@ -117,6 +119,7 @@ class TestInsertGeocode:
                 "city": "Paris",
                 "suburb": "1st Arrondissement",
                 "road": "Rue de Rivoli",
+                #"locality": "Paris",
             },
         }
         insert_geocode(place_id, geocode)
@@ -126,6 +129,7 @@ class TestInsertGeocode:
         assert row["country"] == "France"
         assert row["region"] == "Île-de-France"
         assert row["city"] == "Paris"
+        #assert row["locality"] == "Paris"
         assert row["suburb"] == "1st Arrondissement"
         assert row["road"] == "Rue de Rivoli"
         assert row["display_name"] == "Paris, France"
