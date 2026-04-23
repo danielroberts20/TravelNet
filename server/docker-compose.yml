@@ -1,6 +1,7 @@
 services:
   ingest:
     build: .
+    image: travelnet:latest
     container_name: travelnet
     env_file: .env
     environment:
@@ -60,6 +61,7 @@ services:
   
   prefect-worker:
     build: .
+    image: travelnet:latest
     command: python -m deployments
     env_file: .env
     environment:
