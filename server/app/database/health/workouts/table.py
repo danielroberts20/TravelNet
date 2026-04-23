@@ -101,7 +101,7 @@ class WorkoutsTable(BaseTable[WorkoutRecord]):
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS workout_route (
                     id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                    workout_id          TEXT NOT NULL REFERENCES workouts(id),
+                    workout_id          TEXT NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
                     timestamp           TEXT NOT NULL,
                     latitude            REAL NOT NULL,
                     longitude           REAL NOT NULL,

@@ -2,9 +2,9 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends  # type: ignore
-from fastapi.responses import FileResponse  # type: ignore
-from pydantic import BaseModel  # type: ignore
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from auth import require_upload_token
 from database.connection import backup_db, get_conn
@@ -53,8 +53,20 @@ class PruneRequest(BaseModel):
 async def prune_tables_list():
     """Return the tables eligible for pruning and their cascade relationships."""
     return {
-        "tables": list(TABLE_CONFIG.keys()),
+        "tables":      list(TABLE_CONFIG.keys()),
         "cascade_only": list(CASCADE_ONLY),
+        "pre_delete":  [],  # no pre-delete tables — all have timestamps or cascade
+        "cascade_parents": {
+            # True SQLite ON DELETE CASCADE relationships
+            "mood_labels":                 "state_of_mind",
+            "mood_associations":           "state_of_mind",
+            "location_noise":              "location_overland",
+            "cellular_state":              "location_shortcuts",
+            "workout_route":               "workouts",
+            "place_visits":                "known_places",
+            # ml_location_cluster_members cascades from location_overland (overland_id FK)
+            # but is deleted directly via its own created_at — not listed here as cascade
+        },
         "default": DEFAULT_TABLES,
     }
 
@@ -63,9 +75,8 @@ async def prune_tables_list():
 async def prune_preview(req: PruneRequest):
     """Return row counts that would be deleted — no data is modified."""
     try:
-        conn = get_conn(read_only=True)
-        counts = get_prune_counts(conn, req.cutoff, req.tables)
-        conn.close()
+        with get_conn(read_only=True) as conn:
+            counts = get_prune_counts(conn, req.cutoff, req.tables)
         return {"counts": counts}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -80,11 +91,11 @@ async def prune_execute(req: PruneRequest):
         validate_tables(req.tables or DEFAULT_TABLES)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
     try:
         backup_path = backup_db(prefix="pre_prune")
-        conn = get_conn()
-        deleted = prune_before(conn, req.cutoff, req.tables)
-        conn.close()
+        with get_conn() as conn:
+            deleted = prune_before(conn, req.cutoff, req.tables)
         logger.warning(
             f"Prune executed: cutoff={req.cutoff}, tables={req.tables}, "
             f"deleted={deleted}, backup={backup_path}"
@@ -104,11 +115,10 @@ async def download(background_tasks: BackgroundTasks):
     backup_path = backup_db()
     background_tasks.add_task(os.remove, backup_path)
     logger.info(f"Database backup created at {backup_path}, scheduled for deletion after response")
-
     return FileResponse(
         path=backup_path,
         filename=backup_path.name,
-        media_type="application/octet-stream"
+        media_type="application/octet-stream",
     )
 
 

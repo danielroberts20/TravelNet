@@ -244,3 +244,13 @@ HEALTH_MIN_POINTS_AFTER = editable("HEALTH_MIN_POINTS_AFTER", "Fewer than this m
 # ---------------------------------------------------------------------------
 
 JOURNAL_STALENESS_HOURS = editable("JOURNAL_STALENESS_HOURS", "Number of hours after which a journal entry is considered stale", group="Journal")(18)
+
+# ---------------------------------------------------------------------------
+# Daily Summary
+# ---------------------------------------------------------------------------
+
+RECOMPUTE_WINDOW_DAYS = editable("RECOMPUTE_WINDOW_DAYS", "How many past days to scan for rows needing recompute", group="Daily Summary")(14)
+WAKING_HOURS = editable("WAKING_HOURS", "Typical hours you are awake and active. 18 would be 06:00 local → local midnight", group="Daily Summary")(18)
+EXPECTED_POINTS_PER_HOUR = editable("EXPECTED_POINTS_PER_HOUR", "Expected Overland points at typical cadence during waking hours.", group="Daily Summary")(60)
+BACKFILL_MONTHS = editable("BACKFILL_MONTHS", "Number of months to backfill for transaction data", group="Daily Summary")(2)
+BACKFILL_DAYS = editable("BACKFILL_DAYS", "Number of days to backfill for weather data. Must exceed the 40-day weather fetch window", group="Daily Summary")(45)

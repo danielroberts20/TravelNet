@@ -42,6 +42,7 @@ class MlTable(BaseTable[MlRecord]):
                 CREATE TABLE IF NOT EXISTS ml_location_cluster_members (
                     overland_id INTEGER NOT NULL REFERENCES location_overland(id) ON DELETE CASCADE,
                     cluster_id  INTEGER NOT NULL REFERENCES ml_location_clusters(id),
+                    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
                     PRIMARY KEY (overland_id, cluster_id)
                 );
             """)

@@ -26,6 +26,12 @@ from scheduled_tasks.flag_location_noise import flag_location_noise_flow
 from scheduled_tasks.retroactive_location_scan import retroactive_location_scan_flow
 from scheduled_tasks.check_watchdog import check_watchdog_flow
 from scheduled_tasks.poll_shelly import poll_shelly_flow
+from scheduled_tasks.daily_summary.compute import compute_daily_summary_flow
+from scheduled_tasks.daily_summary.health import compute_health_flow
+from scheduled_tasks.daily_summary.location import compute_location_flow
+from scheduled_tasks.daily_summary.pi import compute_pi_flow
+from scheduled_tasks.daily_summary.transactions import backfill_transactions_in_summary_flow
+from scheduled_tasks.daily_summary.weather import backfill_weather_in_summary_flow
 
 
 FLOW_REGISTRY = {
@@ -48,10 +54,16 @@ FLOW_REGISTRY = {
     "backup-db":                   backup_db_flow,
     "backup-db-to-cloudflare":     cloudflare_backup_db_flow,
     "push-public-stats":           push_public_stats_flow,
-    "identify-location-noise":        flag_location_noise_flow,
-    "retroactive-location-scan":      retroactive_location_scan_flow,
-    "check-watchdog":                check_watchdog_flow,
+    "identify-location-noise":     flag_location_noise_flow,
+    "retroactive-location-scan":   retroactive_location_scan_flow,
+    "check-watchdog":              check_watchdog_flow,
     "poll-shelly":                 poll_shelly_flow,
+    "compute-daily-summary":       compute_daily_summary_flow,
+    "daily-summary-health":        compute_health_flow,
+    "daily-summary-location":      compute_location_flow,
+    "daily-summary-pi":            compute_pi_flow,
+    "daily-summary-transactions":  backfill_transactions_in_summary_flow,
+    "daily-summary-weather":       backfill_weather_in_summary_flow,
 }
 
 

@@ -207,20 +207,10 @@ def visit_exists(place_id: int, arrived_at: str, tolerance_mins: int = 5) -> boo
 def get_address(lat, lon):
     with get_conn(read_only=True) as conn:
         row = conn.execute("""
-        SELECT country_code, country, region,
-               city, suburb, road, display_name, geocoded_at FROM places
+        SELECT * FROM places
         WHERE lat_snap = ROUND(?, 3) AND lon_snap = ROUND(?, 3)
         """, (lat, lon)).fetchone()
-    if row:
-        return {
-            "country_code": row["country_code"],
-            "country": row["country"],
-            "region": row["region"],
-            "city": row["city"],
-            "suburb": row["suburb"],
-            "road": row["road"],
-            "display_name": row["display_name"]
-        }
+    return row if row else None
 
     geo_place_id = get_place_id(lat, lon)
     geocode = reverse_geocode(lat, lon)
@@ -295,15 +285,17 @@ def _handle_new_place(lat: float, lon: float, arrived_at: str) -> None:
     logger.important("New location detected at %.5f, %.5f", lat, lon)
 
     address = get_address(lat, lon)
-    name = (address.get("city") or address.get("suburb") or address.get("road")
-            or address.get("region") or f"{lat:.3f}, {lon:.3f}")
+    if address:
+        locality = address.get("locality", None)
+        body = f"Discovered {f'in {locality}' if locality else f'near {lat:.3f}, {lon:.3f}'}. Tap here to add a label"
+    
     now = to_iso_str(datetime.now(timezone.utc))
 
     dispatch(trigger="location_change",
              payload={"lat": lat, "lon": lon, "first_seen": now},
              cooldown_hours=1,
              noti_title="📍 New Location Discovered",
-             noti_body=f"Discovered near {name}. Tap here to add a label.")
+             noti_body=body)
 
 
 # ---------------------------------------------------------------------------

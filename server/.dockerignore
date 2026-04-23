@@ -1,0 +1,13 @@
+# Logs — change on every server run, bust the COPY app/ layer constantly
+app/logs/
+
+# Python bytecode — rewritten on every execution
+app/**/__pycache__/
+app/**/*.pyc
+app/**/*.pyo
+
+# Tests — not needed in the image
+app/tests/
+
+# Secrets — should never be baked in
+.env

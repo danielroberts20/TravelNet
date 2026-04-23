@@ -44,6 +44,7 @@ class TransactionRecord:
     is_interest: int = 0
     running_balance: float | None = None
     place_id: int | None = None
+    category: str | None = None
 
 
 class TransactionsTable(BaseTable[TransactionRecord]):
@@ -74,6 +75,7 @@ class TransactionsTable(BaseTable[TransactionRecord]):
                 running_balance     REAL,
                 place_id            INTEGER REFERENCES places(id),
                 raw                 TEXT NOT NULL,
+                category            TEXT,
                 PRIMARY KEY (id, currency, source)
             );
             """)

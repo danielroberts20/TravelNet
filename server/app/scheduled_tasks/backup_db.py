@@ -20,9 +20,9 @@ from notifications import notify_on_completion, record_flow_result
 
 
 @task
-def create_db_snapshot() -> dict:
+def create_db_snapshot(prefix=None, suffix=None) -> dict:
     logger = get_run_logger()
-    backup_path = backup_db()
+    backup_path = backup_db(prefix, suffix)
     size_mb = round(backup_path.stat().st_size / (1024 * 1024), 2)
     logger.info("DB snapshot created: %s (%.2f MB)", backup_path, size_mb)
     return {"backup_path": str(backup_path), "size_mb": size_mb}
@@ -46,8 +46,8 @@ def prune_old_db_backups(days: int = 28) -> int:
 
 
 @flow(name="Backup DB", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
-def backup_db_flow():
-    snapshot = create_db_snapshot()
+def backup_db_flow(prefix: str | None = None, suffix: str | None = None):
+    snapshot = create_db_snapshot(prefix, suffix)
     pruned = prune_old_db_backups(28)
     result = {
         "backup_path": snapshot["backup_path"],

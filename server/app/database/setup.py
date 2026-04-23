@@ -39,6 +39,7 @@ from database.ml.table import table as ml_table
 from database.watchdog.table import table as watchdog_table
 from database.power.table import table as power_table
 from database.photos.table import table as photo_table
+from database.summary.table import table as daily_summary_table
 
 TABLE_REGISTRY: list[BaseTable] = [
     places_table,           # Must be first — FK target for all place_id columns
@@ -66,6 +67,7 @@ TABLE_REGISTRY: list[BaseTable] = [
     watchdog_table,
     power_table,
     photo_table,
+    daily_summary_table,
 ]
 
 
@@ -81,6 +83,7 @@ def init_db() -> None:
     # Must be last — depends on location_shortcuts and location_overland tables
     location_table.init_unified_view()
     noise_table.init_clean_view()
+    daily_summary_table.init_complete_view()
 
     log_config_summary()
 

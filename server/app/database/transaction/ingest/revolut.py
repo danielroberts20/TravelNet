@@ -14,7 +14,8 @@ import io
 import json
 from datetime import datetime
 import logging
-from notifications import send_notification
+from database.location.geocoding import get_place_id
+from notifications import send_notification # required for tests
 from database.exchange.fx import convert_to_gbp
 from database.connection import get_conn, to_iso_str
 from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp, safe_float
@@ -135,21 +136,23 @@ def insert(csv_text: str, source: str = "revolut"):
                 raw_json = json.dumps(dict(row), ensure_ascii=False)
 
                 lat, lon = get_closest_lat_lon_by_timestamp(cursor, timestamp)
-                logger.info(f"Closest lat/lon to transaction {tx_id} is {lat}, {lon}")
+                #logger.info(f"Closest lat/lon to transaction {tx_id} is {lat}, {lon}")
+                place_id = get_place_id(lat, lon, conn=conn)
+                #logger.info(f"place_id: {place_id}")
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO transactions (
                         id, source, bank, timestamp, amount, currency, amount_gbp,
                         description, payment_reference, payer, payee, merchant,
                         fees, transaction_type, transaction_detail, state,
-                        is_internal, is_interest, running_balance, raw
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        is_internal, is_interest, running_balance, raw, place_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         tx_id, source, "Revolut", timestamp, amount, currency, amount_gbp,
                         description, None, None, None, None,
                         fees, transaction_type, detail_type, state,
-                        internal, interest, running_balance, raw_json,
+                        internal, interest, running_balance, raw_json, place_id
                     ),
                 )
                 if cursor.rowcount == 1:
@@ -165,7 +168,7 @@ def insert(csv_text: str, source: str = "revolut"):
         conn.commit()
         
     send_notification(title="Revolut", 
-                      body=f"{len(rows)} rows received | {inserted} inserted | {skipped} skipped",
+                      body=f"💵 {len(rows)} rows received | {inserted} inserted | {skipped} skipped",
                       time_sensitive=False)
     
     return inserted, skipped, errors
