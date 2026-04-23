@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     is_internal         INTEGER DEFAULT 0,
     is_interest         INTEGER DEFAULT 0,
     running_balance     REAL,
+    place_id            INTEGER,
     raw                 TEXT NOT NULL,
     PRIMARY KEY (id, currency, source)
 );

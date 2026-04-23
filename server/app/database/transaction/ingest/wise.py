@@ -9,6 +9,7 @@ from zipfile import ZipFile
 from database.location.geocoding import get_place_id
 from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp
 from upload.transaction.constants import WISE_SOURCE_MAP
+from notifications import send_notification # required for tests
 from database.exchange.fx import convert_to_gbp
 from database.connection import get_conn, to_iso_str
 
