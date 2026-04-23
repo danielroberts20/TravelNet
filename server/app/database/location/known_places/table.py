@@ -51,7 +51,7 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS place_visits (
                     id             INTEGER PRIMARY KEY AUTOINCREMENT,
-                    known_place_id INTEGER NOT NULL REFERENCES known_places(id),
+                    known_place_id INTEGER NOT NULL REFERENCES known_places(id) ON DELETE CASCADE,
                     arrived_at     TEXT NOT NULL,
                     departed_at    TEXT,
                     duration_mins  INTEGER
