@@ -205,26 +205,14 @@ def visit_exists(place_id: int, arrived_at: str, tolerance_mins: int = 5) -> boo
 # ---------------------------------------------------------------------------
 
 def get_address(lat, lon):
+    lat_r = round(lat, 3)
+    lon_r = round(lon, 3)
     with get_conn(read_only=True) as conn:
         row = conn.execute("""
         SELECT * FROM places
-        WHERE lat_snap = ROUND(?, 3) AND lon_snap = ROUND(?, 3)
-        """, (lat, lon)).fetchone()
-    return row if row else None
-
-    geo_place_id = get_place_id(lat, lon)
-    geocode = reverse_geocode(lat, lon)
-    insert_geocode(geo_place_id, geocode)
-    return {
-        "country_code": geocode.get("address", {}).get("country_code"),
-        "country": geocode.get("address", {}).get("country"),
-        "region": geocode.get("address", {}).get("state"),
-        "city": geocode.get("address", {}).get("city"),
-        "suburb": geocode.get("address", {}).get("suburb"),
-        "road": geocode.get("address", {}).get("road"),
-        "display_name": geocode.get("display_name")
-    }
-
+        WHERE lat_snap = ? AND lon_snap = ?
+        """, (lat_r, lon_r)).fetchone()
+    return dict(row) if row else None
 
 def get_nearest_known_place(lat, lon):
     """Return the nearest known place row if within LOCATION_CHANGE_RADIUS_M, else None."""

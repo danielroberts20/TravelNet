@@ -7,7 +7,7 @@ from datetime import datetime
 from zipfile import ZipFile
 
 from database.location.geocoding import get_place_id
-from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp
+from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp, maybe_mark_internal
 from upload.transaction.constants import WISE_SOURCE_MAP
 from notifications import send_notification # required for tests
 from database.exchange.fx import convert_to_gbp
@@ -70,7 +70,6 @@ def _parse_timestamp(date_time_str: str) -> str:
     dt = datetime.strptime(date_time_str.strip(), "%d-%m-%Y %H:%M:%S.%f")
     return dt.isoformat()
 
-
 def parse_wise_csv(csv_text: str, source: str) -> list[dict]:
     """Parse a Wise CSV export into a list of normalised transaction dicts.
 
@@ -100,7 +99,7 @@ def parse_wise_csv(csv_text: str, source: str) -> list[dict]:
         timestamp = _parse_timestamp(date_time_str)
         tx_date = datetime.fromisoformat(timestamp).date()
 
-        rows.append({
+        row_dict = {
             "id":                 row.get("TransferWise ID"),
             "source":             source,
             "bank":               "Wise",
@@ -121,7 +120,9 @@ def parse_wise_csv(csv_text: str, source: str) -> list[dict]:
             "is_interest":        1 if detail_type_raw == "ACCRUAL_CHARGE" else 0,
             "running_balance":    float(row.get("Running Balance") or 0) if row.get("Running Balance") else None,
             "raw":                json.dumps(dict(row)),
-        })
+        }
+        cleaned_row_dict = maybe_mark_internal(row_dict)
+        rows.append(cleaned_row_dict)
     return rows
 
 def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
@@ -176,5 +177,6 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
             logger.info(f"Inserting {inserted} transactions from Wise-{source} ({WISE_SOURCE_MAP[source]})...")
     except Exception as e:
         errors.append({"file": csv_filename, "error": str(e)})
+        logger.error(f"Error when processing account {csv_filename}: {str(e)}")
     
     return results, errors

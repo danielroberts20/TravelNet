@@ -5,6 +5,7 @@ Shared helpers used by both the Revolut and Wise ingest modules.
 """
 
 from typing import Optional
+from config.general import SELF_NAMES
 
 
 def safe_float(value: str) -> Optional[float]:
@@ -30,3 +31,10 @@ def get_closest_lat_lon_by_timestamp(cursor, timestamp: str) -> tuple[Optional[f
         lat, lon = lat_lon["latitude"], lat_lon["longitude"]
 
     return lat, lon
+
+def maybe_mark_internal(row: dict) -> dict:
+    desc = (row.get('description') or '').lower()
+    payee = (row.get('payee') or '').lower()
+    if any(name in desc or name in payee for name in SELF_NAMES):
+        row['is_internal'] = 1
+    return row
