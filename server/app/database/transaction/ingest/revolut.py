@@ -18,7 +18,7 @@ from database.location.geocoding import get_place_id
 from notifications import send_notification # required for tests
 from database.exchange.fx import convert_to_gbp
 from database.connection import get_conn, to_iso_str
-from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp, safe_float
+from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp, maybe_mark_internal, safe_float
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,9 @@ INTERNAL_DESCRIPTION_KEYWORDS = [
     "to vault",
     "from vault",
     "to pocket",
-    "from pocket"
+    "from pocket",
+    "pocket withdrawal",  # Revolut pocket close
+    "closing transaction", # Revolut pocket close artefact
 ]
 
 INTEREST_DESCRIPTION_KEYWORDS = ["interest", "cashback"]
@@ -139,6 +141,32 @@ def insert(csv_text: str, source: str = "revolut"):
                 #logger.info(f"Closest lat/lon to transaction {tx_id} is {lat}, {lon}")
                 place_id = get_place_id(lat, lon, conn=conn)
                 #logger.info(f"place_id: {place_id}")
+
+                txn_dict = {
+                    "id": tx_id,
+                    "source": source,
+                    "bank": "Revolut",
+                    "timestamp": timestamp,
+                    "amount": amount,
+                    "currency": currency,
+                    "amount_gbp": amount_gbp,
+                    "description": description,
+                    "payment_reference": None,
+                    "payer": None,
+                    "payee": None,
+                    "merchant": None,
+                    "fees": fees,
+                    "transaction_type": transaction_type,
+                    "transaction_detail": detail_type,
+                    "state": state,
+                    "is_internal": internal,
+                    "is_interest": interest,
+                    "running_balance": running_balance,
+                    "raw": raw_json,
+                    "place_id": place_id
+                }
+                cleaned_txn_dict = maybe_mark_internal(txn_dict)
+
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO transactions (
@@ -146,14 +174,14 @@ def insert(csv_text: str, source: str = "revolut"):
                         description, payment_reference, payer, payee, merchant,
                         fees, transaction_type, transaction_detail, state,
                         is_internal, is_interest, running_balance, raw, place_id
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (:id, :source, :bank, :timestamp, 
+                    :amount, :currency, :amount_gbp, :description, 
+                    :payment_reference, :payer, :payee, :merchant, 
+                    :fees, :transaction_type, :transaction_detail, 
+                    :state, :is_internal, :is_interest, :running_balance, 
+                    :raw, :place_id)
                     """,
-                    (
-                        tx_id, source, "Revolut", timestamp, amount, currency, amount_gbp,
-                        description, None, None, None, None,
-                        fees, transaction_type, detail_type, state,
-                        internal, interest, running_balance, raw_json, place_id
-                    ),
+                    cleaned_txn_dict,
                 )
                 if cursor.rowcount == 1:
                     inserted += 1
@@ -162,7 +190,7 @@ def insert(csv_text: str, source: str = "revolut"):
                     skipped += 1
 
             except Exception as e:
-                logger.error(f"Error when processing transaction {row}")
+                logger.error(f"Error when processing transaction {row}: {str(e)}")
                 errors += 1
 
         conn.commit()
