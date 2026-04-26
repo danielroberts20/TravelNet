@@ -36,6 +36,7 @@ SCHEDULE_CONFIGS = {
     # Transactions & finance
     "backfill-gbp":                     ("30 2 * * *",              "Daily backfill of NULL amount_gbp values using stored FX rates"),
     "send-transaction-reminder":        ("0 8 2 * *",               "Monthly push notification to upload transactions"),
+    "categorise-transactions":          ("0 3 3,10,17,24 * *",               "Use LLM-based classification to add categories to transaction data"),
 
     # Health
     "check-health-gaps":                ("50 5 * * 1",              "Weekly check for missing or partial health metric days"),

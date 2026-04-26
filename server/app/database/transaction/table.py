@@ -46,13 +46,7 @@ class TransactionRecord:
     place_id: int | None = None
     category: str | None = None
 
-
-class TransactionsTable(BaseTable[TransactionRecord]):
-
-    def init(self) -> None:
-        """Create the transactions table and its indexes if they do not exist."""
-        with get_conn() as conn:
-            conn.execute("""
+TRANSACTION_TABLE_DDL = """
             CREATE TABLE IF NOT EXISTS transactions (
                 id                  TEXT NOT NULL,          -- source ID or generated hash
                 source              TEXT NOT NULL,          -- 'revolut', 'wise_usd', 'wise_gbp', 'cash', etc.
@@ -76,14 +70,25 @@ class TransactionsTable(BaseTable[TransactionRecord]):
                 place_id            INTEGER REFERENCES places(id),
                 raw                 TEXT NOT NULL,
                 category            TEXT,
+                sub_category        TEXT,
+                confidence          REAL,
                 PRIMARY KEY (id, currency, source)
             );
-            """)
+            """
+
+
+class TransactionsTable(BaseTable[TransactionRecord]):
+
+    def init(self) -> None:
+        """Create the transactions table and its indexes if they do not exist."""
+        with get_conn() as conn:
+            conn.execute(TRANSACTION_TABLE_DDL)
 
             conn.execute("CREATE INDEX IF NOT EXISTS idx_txn_timestamp ON transactions(timestamp);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_txn_source ON transactions(source);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_txn_currency ON transactions(currency);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_txn_place ON transactions(place_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_txn_category ON transactions(category);")
 
     def insert(self, record: TransactionRecord) -> bool:
         """Insert a single transaction row. Returns True if inserted, False if duplicate."""

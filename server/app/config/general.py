@@ -213,14 +213,169 @@ REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMet
 
 
 # ---------------------------------------------------------------------------
-# Foreign Exchange
+# Foreign Exchange / Financial
 # ---------------------------------------------------------------------------
 
 FX_BASE_URL = URL("https://api.exchangerate.host")
 FX_TIMEFRAME_URL = FX_BASE_URL / "timeframe"
 FX_DATE_URL = FX_BASE_URL / "historical"
-CURRENCIES = editable("CURRENCIES", "Currencies used on travel", group="Foreign Exchange")(["GBP", "USD", "CAD", "EUR", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"])
-SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from", group="Foreign Exchange")("GBP")
+SELF_NAMES = editable("SELF_NAMES", "Names that may appear on transactions as you. NOT case sensitive", group="Financial")([
+    "dan roberts",
+    "daniel roberts",
+    "daniel james roberts",
+    "d roberts",
+    "roberts d",
+    "d j roberts",
+    "dj roberts",
+    "dan james roberts",
+    "roberts d j",
+    "roberts dj"
+])
+CURRENCIES = editable("CURRENCIES", "Currencies used on travel", group="Financial")(["GBP", "USD", "CAD", "EUR", "AUD", "NZD", "FJD", "THB", "KHR", "VND", "LAK"])
+SOURCE_CURRENCY = editable("SOURCE_CURRENCY", "Currency to convert from", group="Financial")("GBP")
+TRANSACTION_CATEGORIES = editable("TRANSACTION_CATEGORIES", "Distinct categories to classify transactions using LLM-based classification", group="Financial")({
+    "Housing": "Rent, mortgage payments, home repairs, property taxes, and home insurance.",
+    "Utilities": "Recurring bills for electricity, gas, water, heating, internet, and mobile phone services.",
+    "Groceries": "Food, beverages, and household essentials purchased at supermarkets or grocery stores.",
+    "Transportation": "Fuel, public transit, ride-shares (Uber/Lyft), parking, tolls, and vehicle maintenance.",
+    "Healthcare": "Medical services, doctor visits, dental, pharmacy purchases, and health insurance premiums.",
+    "Food & Dining": "Meals and drinks consumed at restaurants, cafes, bars, fast food outlets, and delivery (Deliveroo/UberEats).",
+    "Entertainment": "Streaming services (Netflix, Spotify, Disney+), cinema, concerts, gaming, nightclubs, and ticketed events.",
+    "Shopping": "Non-essential retail purchases including clothing, electronics, home decor, and general e-commerce.",
+    "Travel & Leisure": "Flights, hotels, holiday rentals, car hires, and vacation-specific activities.",
+    "Income": "Incoming funds from salary, wages, bonuses, interest, dividends, or tax refunds.",
+    "Savings & Investments": "Contributions to savings accounts, ISAs, pension funds, or stock market investments.",
+    "Debt Repayment": "Payments toward credit card balances, personal loans, student loans, or other borrowed capital.",
+    "Transfers": "Internal movement of money between your own accounts (e.g., from Checking to Savings).",
+    "Education": "Tuition fees, professional courses, textbooks, and school-related expenses.",
+    "Personal Care": "Self-care expenses including gym memberships, hair salons, spas, and cosmetics.",
+    "Gifts & Donations": "Charitable contributions and purchases intended as gifts for others.",
+    "Friends & Family": "Casual transfers to/from individuals via apps like Venmo, PayPal, or Revolut for shared costs, splitting bills, or social reimbursements.",
+    "Cash Withdrawal": "ATM or cashpoint withdrawals",
+    "Fees & Charges": "Non-discretionary financial costs imposed by banks or service providers, including account fees, foreign exchange (FX) fees, ATM fees, overdraft charges, and late payment penalties. These are costs of using financial services rather than purchases of goods or services.",
+    "Miscellaneous": "Fallback category for transactions that cannot be confidently classified due to missing, unclear, or ambiguous information. Prefer this over guessing when classification confidence is low."
+})
+TRANSACTION_SUBCATEGORIES = {
+    "Housing": [
+        "Rent",
+        "Mortgage",
+        "Council Tax",
+        "Home Insurance",
+        "Maintenance & Repairs",
+        "Furnishings"
+    ],
+    "Utilities": [
+        "Electricity",
+        "Gas",
+        "Water",
+        "Internet",
+        "Mobile Phone",
+        "TV Licence"
+    ],
+    "Groceries": [
+        "Supermarket",
+        "Convenience Store",
+        "Alcohol & Tobacco",
+        "Household Supplies"
+    ],
+    "Transportation": [
+        "Public Transport",
+        "Fuel",
+        "Ride-share",
+        "Parking",
+        "Tolls",
+        "Vehicle Maintenance"
+    ],
+    "Healthcare": [
+        "Doctor / GP",
+        "Dental",
+        "Pharmacy",
+        "Health Insurance"
+    ],
+    "Food & Dining": [
+        "Restaurant",
+        "Cafe",
+        "Fast Food",
+        "Takeaway / Delivery",
+        "Bar / Pub"
+    ],
+    "Entertainment": [
+        "Streaming",
+        "Gaming",
+        "Events & Tickets",
+        "Nightlife",
+        "Hobbies"
+    ],
+    "Shopping": [
+        "Clothing",
+        "Electronics",
+        "Home Goods",
+        "General Retail",
+        "Online Marketplace"
+    ],
+    "Travel & Leisure": [
+        "Flights",
+        "Accommodation",
+        "Local Transport",
+        "Activities & Tours",
+        "Travel Insurance"
+    ],
+    "Income": [
+        "Salary",
+        "Bonus",
+        "Interest",
+        "Refund",
+        "Other Income"
+    ],
+    "Savings & Investments": [
+        "Savings Transfer",
+        "ISA Contribution",
+        "Pension Contribution",
+        "Investments"
+    ],
+    "Debt Repayment": [
+        "Credit Card Payment",
+        "Loan Repayment",
+        "Student Loan Repayment"
+    ],
+    "Transfers": [
+        "Internal Transfer",
+        "Currency Conversion"
+    ],
+    "Education": [
+        "Tuition",
+        "Courses",
+        "Books",
+        "Learning Subscriptions"
+    ],
+    "Personal Care": [
+        "Haircut",
+        "Skincare & Cosmetics",
+        "Toiletries"
+    ],
+    "Gifts & Donations": [
+        "Gifts",
+        "Charity"
+    ],
+    "Friends & Family": [
+        "Shared Expenses",
+        "Reimbursement Given",
+        "Reimbursement Received"
+    ],
+    "Cash Withdrawal": [
+        "ATM Withdrawal",
+        "Cashback"
+    ],
+    "Fees & Charges": [
+        "Bank Fees",
+        "ATM Fees",
+        "FX Fees",
+        "Late Fees"
+    ],
+    "Miscellaneous": [
+        "Uncategorised"
+    ]
+}
 
 
 # ---------------------------------------------------------------------------

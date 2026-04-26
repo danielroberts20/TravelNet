@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     email_password: str = Field(alias="ALERT_EMAIL_PASSWORD")
     email_recipient: str = Field(alias="ALERT_EMAIL_RECIPIENT")
 
+    # --- LLM / OpenAI ---
+    openai_api_key: str = Field(alias="OPENAI_API_KEY")
+    openai_model: str = Field(alias="OPENAI_MODEL")
+
     model_config = {
         "env_file": Path(__file__).parent.parent.parent / ".env",  # → server/.env
         "populate_by_name": True,
