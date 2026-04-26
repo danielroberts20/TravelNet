@@ -31,3 +31,5 @@ server/build.sh
 server/scripts/graceful_reboot.sh
 server/app/database/migrations/
 server/schema.sql
+server/app/prompt.py
+server/__init__.py
