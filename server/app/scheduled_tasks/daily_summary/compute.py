@@ -40,11 +40,11 @@ def get_dates_to_compute() -> list[str]:
         completeness flag (health/location/pi) is still 0
       - Any local date with source data but no daily_summary row yet
     """
-    today_local  = datetime.now(dt_timezone.utc).date()
-    window_start = today_local - timedelta(days=RECOMPUTE_WINDOW_DAYS)
+    yesterday_local = datetime.now(dt_timezone.utc).date() - timedelta(days=1)
+    window_start = yesterday_local - timedelta(days=RECOMPUTE_WINDOW_DAYS)
 
     dates = set()
-    dates.add((today_local - timedelta(days=1)).isoformat())
+    dates.add((yesterday_local - timedelta(days=1)).isoformat())
 
     with get_conn(read_only=True) as conn:
         rows = conn.execute("""
