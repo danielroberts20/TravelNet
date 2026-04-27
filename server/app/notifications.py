@@ -18,7 +18,7 @@ from contextlib import contextmanager
 from prefect import State
 from database.connection import get_conn
 from database.logging.daily.table import table as daily_cron_table, DailyCronRecord
-from config.general import AVAILABLE_NOTIFICATIONS, DAILY_CRON_JOBS
+from config.general import DAILY_CRON_JOBS
 from config.settings import settings
 from datetime import datetime, timezone
 from email.message import EmailMessage
@@ -97,20 +97,7 @@ def notify_on_completion(flow, flow_run, state: State):
         body=state.message or ("✅ Completed successfully" if state.is_completed() else "❌ Failed"),
         time_sensitive=state.is_failed()
     )
-
-
-
     
-def trigger_notification(notification_name):
-    """Fire a named Pushcut notification by looking up its URL from AVAILABLE_NOTIFICATIONS."""
-    noti_url = AVAILABLE_NOTIFICATIONS.get(notification_name)
-    if noti_url:
-        try:
-            resp = requests.post(noti_url)
-            logger.info(resp)
-            return {}
-        except Exception as e:
-            logger.warning(f"Notification failed to fire. Error: {e}")
 
 def send_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True, prefix: str = None):
     """Send a Pushcut push notification via the custom webhook.

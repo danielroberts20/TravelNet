@@ -97,14 +97,6 @@ TRAVEL_YML = Path("/travel.yml")
 FLIGHT_GAP_MIN_HOURS = editable("FLIGHT_GAP_MIN_HOURS", description="Minimum gap duration (hours) between location points to be considered a possible flight.", group="Flight Detection")(2)
 FLIGHT_DISTANCE_MIN_KM = editable("FLIGHT_DISTANCE_MIN_KM", description="Minimum great-circle distance (km) across a gap to be considered a possible flight.", group="Flight Detection")(200)
 
-# ---------------------------------------------------------------------------
-# Notifications
-# ---------------------------------------------------------------------------
-
-AVAILABLE_NOTIFICATIONS = editable("AVAILABLE_NOTIFICATIONS", "Pushcut notification Webhook URL and internal name", group="Notifications")({
-    "travelnet_test": "https://api.pushcut.io/KjvFN6-uKZjR0S3lNehts/notifications/TravelNet%20Test",
-})
-
 
 # ---------------------------------------------------------------------------
 # API & Access Control
