@@ -14,6 +14,7 @@ import io
 import json
 from datetime import datetime
 import logging
+from database.cost_of_living.queries import get_col_entry, get_uk_col_index
 from database.location.geocoding import get_place_id
 from notifications import send_notification # required for tests
 from database.exchange.fx import convert_to_gbp
@@ -138,9 +139,11 @@ def insert(csv_text: str, source: str = "revolut"):
                 raw_json = json.dumps(dict(row), ensure_ascii=False)
 
                 lat, lon = get_closest_lat_lon_by_timestamp(cursor, timestamp)
-                #logger.info(f"Closest lat/lon to transaction {tx_id} is {lat}, {lon}")
                 place_id = get_place_id(lat, lon, conn=conn)
-                #logger.info(f"place_id: {place_id}")
+
+                cost_of_living = get_col_entry(lat=lat, lon=lon, conn=conn)
+                col_id = cost_of_living["id"] if cost_of_living else None
+                amount_normalised = amount_gbp * (get_uk_col_index(conn) / cost_of_living["col_index"]) if cost_of_living else None
 
                 txn_dict = {
                     "id": tx_id,
@@ -163,7 +166,9 @@ def insert(csv_text: str, source: str = "revolut"):
                     "is_interest": interest,
                     "running_balance": running_balance,
                     "raw": raw_json,
-                    "place_id": place_id
+                    "place_id": place_id,
+                    "col_id": col_id,
+                    "amount_normalised": amount_normalised,
                 }
                 cleaned_txn_dict = maybe_mark_internal(txn_dict)
 
@@ -173,13 +178,14 @@ def insert(csv_text: str, source: str = "revolut"):
                         id, source, bank, timestamp, amount, currency, amount_gbp,
                         description, payment_reference, payer, payee, merchant,
                         fees, transaction_type, transaction_detail, state,
-                        is_internal, is_interest, running_balance, raw, place_id
+                        is_internal, is_interest, running_balance, raw, place_id,
+                        col_id, amount_normalised
                     ) VALUES (:id, :source, :bank, :timestamp, 
                     :amount, :currency, :amount_gbp, :description, 
                     :payment_reference, :payer, :payee, :merchant, 
                     :fees, :transaction_type, :transaction_detail, 
                     :state, :is_internal, :is_interest, :running_balance, 
-                    :raw, :place_id)
+                    :raw, :place_id, :col_id, :amount_normalised)
                     """,
                     cleaned_txn_dict,
                 )
