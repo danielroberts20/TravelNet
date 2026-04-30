@@ -90,17 +90,32 @@ def reverse_geocode(lat: float, lon: float) -> dict:
 
 
 def batch_geocode(coords: list[tuple[float, float]]) -> list[dict]:
-    """Batch geocode a list of (lat, lon) tuples using Nominatim's bulk endpoint."""
     locations = []
+    errors = []
     for lat, lon in coords:
         try:
             loc = reverse_geocode(lat, lon)
             locations.append(loc)
-            time.sleep(1)
+            time.sleep(1.5)
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 429:
+                logger.warning(f"Rate limited at ({lat}, {lon}), backing off 60s")
+                time.sleep(60)
+                # Retry once after backoff
+                try:
+                    loc = reverse_geocode(lat, lon)
+                    locations.append(loc)
+                    time.sleep(1)
+                except Exception as retry_e:
+                    logger.error(f"Retry failed for {lat}, {lon}: {retry_e}")
+                    errors.append({"lat": lat, "lon": lon, "error": retry_e})
+            else:
+                logger.error(f"Error geocoding {lat}, {lon}: {e}")
+                errors.append({"lat": lat, "lon": lon, "error": e})
         except Exception as e:
             logger.error(f"Error geocoding {lat}, {lon}: {e}")
-            locations.append({})
-    return locations
+            errors.append({"lat": lat, "lon": lon, "error": e})
+    return locations, errors
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +144,7 @@ def insert_geocode(place_id: int, geocode: dict, conn=None) -> None:
         addr.get("suburb"),
         addr.get("road"),
         geocode.get("display_name"),
-        json.dumps(geocode) if geocode else None,
+        json.dumps(geocode) if geocode is not None else None,
         to_iso_str(datetime.now(timezone.utc)),
         place_id,
     )

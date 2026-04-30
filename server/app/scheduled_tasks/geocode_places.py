@@ -4,22 +4,22 @@ load_overrides()
 import logging
 from timezonefinder import TimezoneFinder
 
-from prefect import task, flow
+from prefect import get_run_logger, task, flow
 
 from config.settings import settings
 from database.connection import get_conn
 from database.location.geocoding import batch_geocode, insert_geocode
 from notifications import record_flow_result
-
-logger = logging.getLogger(__name__)
+from itertools import batched
 
 
 @task
 def fetch_uncoded_places() -> list[tuple[int, float, float]]:
+    logger = get_run_logger()
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT id, lat_snap, lon_snap FROM places
-            WHERE geocoded_at IS NULL
+            WHERE (geocoded_at IS NULL OR raw_json IS NULL)
               AND lat_snap IS NOT NULL
               AND lon_snap IS NOT NULL
         """).fetchall()
@@ -35,10 +35,16 @@ def geocode_batch(coords: list[tuple[float, float]]) -> list[dict]:
 @task
 def store_geocodes(rows: list[tuple[int, float, float]], geocodes: list[dict]):
     """Insert geocode results and timezones in a single connection."""
+
+    logger = get_run_logger()
+
     tf = TimezoneFinder()
     with get_conn() as conn:
         for (place_id, lat, lon), geocode in zip(rows, geocodes):
-            insert_geocode(place_id, geocode, conn)
+            try:
+                insert_geocode(place_id, geocode, conn)
+            except Exception as e:
+                logger.error(str(e))
             tz = tf.timezone_at(lat=lat, lng=lon)
             if tz:
                 conn.execute(
@@ -49,8 +55,10 @@ def store_geocodes(rows: list[tuple[int, float, float]], geocodes: list[dict]):
                 logger.warning(f"Could not determine timezone for place_id={place_id} ({lat}, {lon})")
 
 
+
 @flow(name="Geocode Places")
 def geocode_places_flow():
+    logger = get_run_logger()
     rows = fetch_uncoded_places()
 
     if not rows:
@@ -59,10 +67,15 @@ def geocode_places_flow():
         record_flow_result(result)
         return result
 
-    coords = [(lat, lon) for _, lat, lon in rows]
-    geocodes = geocode_batch(coords)
-
-    store_geocodes(rows, geocodes)
+    for i, batch in enumerate(batched(rows, n=50)):          # batch rows, not coords
+        batch = list(batch)
+        coords = [(lat, lon) for _, lat, lon in batch]       # derive coords from batch
+        logger.info(f"Batch {i+1}: {len(batch)} places")
+        geocodes, errors = geocode_batch(coords)
+        if errors:
+            for e in errors:
+                logger.error(f"Error processing {e['lat']}, {e['lon']}: {e['error']}")
+        store_geocodes(batch, geocodes)                       # only current batch's rows
 
     result = {"geocoded_count": len(rows)}
     record_flow_result(result)
