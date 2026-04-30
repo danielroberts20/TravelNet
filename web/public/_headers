@@ -1,4 +1,4 @@
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.travelnet.dev https://cdn.jsdelivr.net https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com; img-src 'self' data: blob: https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com; worker-src blob:; font-src 'self' data:;
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.travelnet.dev https://public.travelnet.dev https://cdn.jsdelivr.net https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com; img-src 'self' data: blob: https://basemaps.cartocdn.com https://*.basemaps.cartocdn.com; worker-src blob:; font-src 'self' data:;
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
