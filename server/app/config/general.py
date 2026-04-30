@@ -208,6 +208,8 @@ REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMet
 # Foreign Exchange / Financial
 # ---------------------------------------------------------------------------
 
+COL_CITY_RADIUS_KM = editable("COL_CITY_RADIUS_KM", "Radius from the centre of a city to consider when matching for cost of living", group="Financial")(50)
+TRANSACTION_COL_BATCH_SIZE = editable("TRANSACTION_COL_BATCH_SIZE", "Batch size for computing cost of living for transactions when inserting them in to the daily summaries", group="Financial")(500)
 FX_BASE_URL = URL("https://api.exchangerate.host")
 FX_TIMEFRAME_URL = FX_BASE_URL / "timeframe"
 FX_DATE_URL = FX_BASE_URL / "historical"
