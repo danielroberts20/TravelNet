@@ -17,7 +17,7 @@ from config.general import PUBLIC_ALLOWED_PREFIXES
 class PublicPathFilterMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         host = request.headers.get("host", "")
-        if "api.travelnet.dev" in host:
+        if "public.travelnet.dev" in host:
             if not any(request.url.path.startswith(p) for p in PUBLIC_ALLOWED_PREFIXES):
                 return JSONResponse({"detail": "Forbidden"}, status_code=403)
         return await call_next(request)

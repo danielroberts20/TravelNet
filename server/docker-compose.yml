@@ -6,7 +6,7 @@ services:
     env_file: .env
     environment:
       CRONTAB_FILE: "/var/spool/cron/crontabs/dan"
-      PREFECT_API_URL: "http://pi-server.tail186ff8.ts.net:4200/api"
+      PREFECT_API_URL: "http://travelnet.tail186ff8.ts.net:4200/api"
     volumes:
       - /mnt/linux/docker/services/travelnet/data:/data
       - ./app:/app
@@ -54,6 +54,7 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - /home/dan/services/Dashboard/certs:/certs:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - dashboard
     networks:
@@ -65,7 +66,7 @@ services:
     command: python -m deployments
     env_file: .env
     environment:
-      - PREFECT_API_URL=http://pi-server.tail186ff8.ts.net:4200/api
+      - PREFECT_API_URL=http://travelnet.tail186ff8.ts.net:4200/api
     volumes:
       - /mnt/linux/docker/services/travelnet/data:/data
       - ./app:/app

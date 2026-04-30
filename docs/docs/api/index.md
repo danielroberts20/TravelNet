@@ -14,7 +14,7 @@ This section documents every FastAPI endpoint in the TravelNet ingest server.
 
 ## Base URL
 
-Over Tailscale: `https://pi-server.tail186ff8.ts.net`
+Over Tailscale: `https://travelnet.tail186ff8.ts.net`
 Public stats only: `https://api.travelnet.dev`
 
 ## Auth

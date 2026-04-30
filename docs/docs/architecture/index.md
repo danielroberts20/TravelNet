@@ -50,12 +50,12 @@ A single SQLite file lives on an external HDD mounted at `/mnt/linux/docker/serv
 ## Networking
 
 - **Public ingest** — nginx handles TLS (cert via Tailscale) on port 443, proxies to FastAPI on 8000
-- **Private dashboard** — only reachable via Tailscale at `pi-server.tail186ff8.ts.net`
+- **Private dashboard** — only reachable via Tailscale at `travelnet.tail186ff8.ts.net`
 - **Public stats endpoint** — Cloudflare Tunnel exposes only `GET /public/stats` at `api.travelnet.dev`
 
 ## Remote access
 
-Tailscale provides the VPN layer. The Pi is always reachable at `pi-server.tail186ff8.ts.net` as long as it has internet — even across hotel WiFi, mobile data, or NAT.
+Tailscale provides the VPN layer. The Pi is always reachable at `travelnet.tail186ff8.ts.net` as long as it has internet — even across hotel WiFi, mobile data, or NAT.
 
 ## Reliability features
 
