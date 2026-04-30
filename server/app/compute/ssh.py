@@ -109,7 +109,7 @@ def shutdown_pc(callback=None) -> threading.Thread:
         client = get_ssh_client()
         try:
             client.exec_command(
-                "docker ps -q | xargs -r docker stop; /mnt/c/Windows/System32/shutdown.exe /s /t 0",
+                "docker ps -q | xargs -r docker stop; /mnt/c/Windows/System32/shutdown.exe /s /f /t 0",
                 get_pty=False
             )
             time.sleep(2)  # give it a moment to fire before closing
