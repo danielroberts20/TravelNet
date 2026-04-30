@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from middleware import PublicPathFilterMiddleware
 
 
-PUBLIC_HOST = "api.travelnet.dev"
+PUBLIC_HOST = "public.travelnet.dev"
 INTERNAL_HOST = "travelnet.internal"
 ALLOWED = ["/public/"]
 
