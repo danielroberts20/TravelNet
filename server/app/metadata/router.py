@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 import json
 import logging
 from typing import Any
+from database.location.geocoding import get_place_id
+from database.connection import get_conn
 from config.editable import get_editable, get_value, coerce_value
 from fastapi import APIRouter, Query, HTTPException, Body, Depends  # type: ignore
 from fastapi.responses import Response  # type: ignore
@@ -15,6 +17,8 @@ from metadata.backups import get_local_backups, get_remote_backups
 from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES, LOG_FILE, OVERRIDES_PATH, STALE_DAYS
 from notifications import send_notification
 from pydantic import BaseModel  # type: ignore
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from triggers.location_change import label_place  # type: ignore
 from scheduled_tasks.update_timezone import update_timezones_flow
@@ -194,25 +198,62 @@ async def get_annotations():
 # Deployment timezone conversion
 # ---------------------------------------------------------------------------
 
-class DeploymentTzRequest(BaseModel):
-    """Request body for re-timing all Prefect deployment schedules to a new local timezone."""
 
+def _tz_offset(iana_tz: str) -> str:
+    """Return the current UTC offset for an IANA timezone, e.g. '+10:00'."""
+    offset = datetime.now(ZoneInfo(iana_tz)).utcoffset()
+    total_mins = int(offset.total_seconds() // 60)
+    sign = "+" if total_mins >= 0 else "-"
+    h, m = divmod(abs(total_mins), 60)
+    return f"{sign}{h:02d}:{m:02d}"
+
+class DeploymentTzRequest(BaseModel):
     timezone: str
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 @router.post("/deployment_tz", dependencies=[Depends(require_upload_token)])
 async def update_deployment_tz(body: DeploymentTzRequest):
-    """Update all Prefect deployment cron schedules to fire at the same wall-clock time in the given timezone."""
+    """Update all Prefect deployment cron schedules to fire at the same wall-clock time
+    in the given timezone. No-ops if the timezone hasn't changed since the last update."""
+    with get_conn(read_only=True) as conn:
+        row = conn.execute("""
+            SELECT to_tz FROM transition_timezone
+            ORDER BY transitioned_at DESC
+            LIMIT 1
+        """).fetchone()
+        current_tz = row["to_tz"] if row else None
+
+    if current_tz == body.timezone:
+        logger.info("Timezone unchanged (%s), skipping update.", body.timezone)
+        return {"status": "unchanged", "timezone": body.timezone}
+
     await update_timezones_flow(timezone=body.timezone)
 
+    with get_conn() as conn:
+        place_id = None
+        if body.latitude is not None and body.longitude is not None:
+            place_id = get_place_id(body.latitude, body.longitude, conn=conn)
+
+        conn.execute("""
+            INSERT INTO transition_timezone (transitioned_at, from_tz, to_tz, from_offset, to_offset, place_id)
+            VALUES (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), ?, ?, ?, ?, ?)
+        """, (
+            current_tz,
+            body.timezone,
+            _tz_offset(current_tz) if current_tz else None,
+            _tz_offset(body.timezone),
+            place_id,
+        ))
+
     send_notification(
-        title="Schedule Updated",
-        body=f"Deployment schedules adjusted to {body.timezone}",
+        title="Timezone Changed",
+        body=f"Schedules updated: {current_tz or 'unknown'} → {body.timezone}",
         time_sensitive=False,
     )
-    logger.info("Deployment schedules updated to timezone: %s", body.timezone)
-
-    return {"timezone": body.timezone}
+    logger.info("Timezone changed: %s → %s", current_tz, body.timezone)
+    return {"status": "updated", "from": current_tz, "to": body.timezone}
 
 @router.get("/widget_status")
 async def widget_status():

@@ -10,6 +10,8 @@ own monthly schedules and are NOT called from here.
 
 Runs daily at 08:00.
 """
+from zoneinfo import ZoneInfo
+
 from config.editable import load_overrides
 load_overrides()
 
@@ -31,22 +33,31 @@ from scheduled_tasks.daily_summary.pi       import compute_pi_flow
 # Determine dates
 # ---------------------------------------------------------------------------
 
+def _get_current_timezone(conn) -> str:
+    row = conn.execute("""
+        SELECT to_tz FROM transition_timezone
+        ORDER BY transitioned_at DESC
+        LIMIT 1
+    """).fetchone()
+    return row["to_tz"] if row else "UTC"
+    
 @task
 def get_dates_to_compute() -> list[str]:
     """
     Return dates to process on this run:
-      - Always yesterday (primary target)
+      - Always yesterday in the current local timezone (primary target)
       - Any date in the last RECOMPUTE_WINDOW_DAYS where a daily-cadence
         completeness flag (health/location/pi) is still 0
       - Any local date with source data but no daily_summary row yet
     """
-    yesterday_local = datetime.now(dt_timezone.utc).date() - timedelta(days=1)
-    window_start = yesterday_local - timedelta(days=RECOMPUTE_WINDOW_DAYS)
-
-    dates = set()
-    dates.add((yesterday_local - timedelta(days=1)).isoformat())
-
     with get_conn(read_only=True) as conn:
+        tz = _get_current_timezone(conn)
+        yesterday_local = datetime.now(ZoneInfo(tz)).date() - timedelta(days=1)
+        window_start = yesterday_local - timedelta(days=RECOMPUTE_WINDOW_DAYS)
+
+        dates = set()
+        dates.add(yesterday_local.isoformat())
+
         rows = conn.execute("""
             SELECT date FROM daily_summary
             WHERE date >= ?
@@ -64,7 +75,6 @@ def get_dates_to_compute() -> list[str]:
         dates.update(r["d"] for r in rows)
 
     return sorted(dates)
-
 
 # ---------------------------------------------------------------------------
 # Master flow
