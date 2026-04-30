@@ -37,6 +37,8 @@ def _dominant_place(conn, ctx: dict) -> dict:
     Most-visited place for the day. Returns country/region/city metadata
     with `city` sourced from the pre-computed `locality` column, falling
     back to the raw `city` field for places geocoded before the migration.
+    Also returns the dominant known_place_id based on the longest overlapping
+    place_visit within the day's UTC window.
     """
     row = conn.execute("""
         SELECT place_id, COUNT(*) AS c
@@ -51,6 +53,7 @@ def _dominant_place(conn, ctx: dict) -> dict:
         return {
             "country_code": None, "country": None, "region": None,
             "city": None, "dominant_place_id": None,
+            "dominant_known_place_id": None,
         }
 
     place_id = row["place_id"]
@@ -63,18 +66,39 @@ def _dominant_place(conn, ctx: dict) -> dict:
         return {
             "country_code": None, "country": None, "region": None,
             "city": None, "dominant_place_id": place_id,
+            "dominant_known_place_id": None,
         }
 
-    # Prefer the pre-computed locality; fall back to the raw city column
-    # for rows that haven't been re-geocoded through the new pipeline yet.
-    best_city = place["locality"] or place["city"]
+    known = conn.execute("""
+        SELECT
+            pv.known_place_id,
+            SUM(
+                CAST(
+                    (strftime('%s', MIN(COALESCE(pv.departed_at, ?), ?)) -
+                     strftime('%s', MAX(pv.arrived_at, ?)))
+                AS REAL) / 60.0
+            ) AS overlap_mins
+        FROM place_visits pv
+        WHERE pv.arrived_at < ?
+          AND (pv.departed_at IS NULL OR pv.departed_at > ?)
+        GROUP BY pv.known_place_id
+        ORDER BY overlap_mins DESC
+        LIMIT 1
+    """, (
+        ctx["utc_end"], ctx["utc_end"],   # COALESCE fallback, MIN cap
+        ctx["utc_start"],                  # MAX floor
+        ctx["utc_end"],                    # arrived before day end
+        ctx["utc_start"],                  # departed after day start
+    )).fetchone()
 
+    best_city = place["locality"] or place["city"]
     return {
-        "country_code":      place["country_code"],
-        "country":           place["country"],
-        "region":            place["region"],
-        "city":              best_city,
-        "dominant_place_id": place_id,
+        "country_code":            place["country_code"],
+        "country":                 place["country"],
+        "region":                  place["region"],
+        "city":                    best_city,
+        "dominant_place_id":       place_id,
+        "dominant_known_place_id": known["known_place_id"] if known else None,
     }
 
 def _movement(conn, ctx: dict) -> dict:
@@ -140,8 +164,9 @@ LOCATION_DOMAIN = Domain(
     name="location",
     columns=frozenset({
         "country_code", "country", "region", "city", "dominant_place_id",
-        "location_points", "overland_points", "overland_coverage_pct",
-        "distinct_places", "new_places_visited", "was_in_transit",
+        "dominant_known_place_id", "location_points", "overland_points", 
+        "overland_coverage_pct", "distinct_places", "new_places_visited", 
+        "was_in_transit",
     }),
     completeness_flag="location_complete",
     compute_fn=compute_location_data,

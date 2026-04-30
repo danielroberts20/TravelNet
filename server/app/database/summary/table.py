@@ -32,17 +32,18 @@ class DailySummaryRecord:
     day_label:  Optional[str] = None
 
     # Location
-    country_code:      Optional[str] = None
-    country:           Optional[str] = None
-    region:            Optional[str] = None
-    city:              Optional[str] = None
-    dominant_place_id: Optional[int] = None
-    location_points:       Optional[int]   = None
-    overland_points:       Optional[int]   = None
-    overland_coverage_pct: Optional[float] = None
-    distinct_places:       Optional[int]   = None
-    new_places_visited:    Optional[int]   = None
-    was_in_transit:        Optional[int]   = None
+    country_code:            Optional[str]   = None
+    country:                 Optional[str]   = None
+    region:                  Optional[str]   = None
+    city:                    Optional[str]   = None
+    dominant_place_id:       Optional[int]   = None
+    dominant_known_place_id: Optional[int]   = None
+    location_points:         Optional[int]   = None
+    overland_points:         Optional[int]   = None
+    overland_coverage_pct:   Optional[float] = None
+    distinct_places:         Optional[int]   = None
+    new_places_visited:      Optional[int]   = None
+    was_in_transit:          Optional[int]   = None
 
     # Health — activity
     steps:                 Optional[int]   = None
@@ -55,22 +56,22 @@ class DailySummaryRecord:
     vo2_max:               Optional[float] = None
 
     # Health — vitals
-    resting_hr:        Optional[float] = None
-    avg_hrv_ms:        Optional[float] = None
-    avg_spo2_pct:      Optional[float] = None
-    respiratory_rate:  Optional[float] = None
-    wrist_temp_c:      Optional[float] = None
+    resting_hr:       Optional[float] = None
+    avg_hrv_ms:       Optional[float] = None
+    avg_spo2_pct:     Optional[float] = None
+    respiratory_rate: Optional[float] = None
+    wrist_temp_c:     Optional[float] = None
 
-    # Sleep — with both efficiency and quality
-    wake_time_local:        Optional[str]   = None
-    sleep_time_local:       Optional[str]   = None
-    sleep_hours:            Optional[float] = None
-    awake_hours:            Optional[float] = None
-    deep_sleep_hours:       Optional[float] = None
-    rem_sleep_hours:        Optional[float] = None
-    light_sleep_hours:      Optional[float] = None
-    sleep_efficiency_pct:   Optional[float] = None   # asleep / (asleep + awake)
-    restorative_sleep_pct:  Optional[float] = None   # (deep + rem) / total asleep
+    # Sleep
+    wake_time_local:       Optional[str]   = None
+    sleep_time_local:      Optional[str]   = None
+    sleep_hours:           Optional[float] = None
+    awake_hours:           Optional[float] = None
+    deep_sleep_hours:      Optional[float] = None
+    rem_sleep_hours:       Optional[float] = None
+    light_sleep_hours:     Optional[float] = None
+    sleep_efficiency_pct:  Optional[float] = None
+    restorative_sleep_pct: Optional[float] = None
 
     # Mood
     avg_valence:  Optional[float] = None
@@ -127,6 +128,7 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                     region                        TEXT,
                     city                          TEXT,
                     dominant_place_id             INTEGER REFERENCES places(id),
+                    dominant_known_place_id       INTEGER REFERENCES known_places(id),
                     location_points               INTEGER,
                     overland_points               INTEGER,
                     overland_coverage_pct         REAL,
@@ -192,34 +194,27 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                         DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_daily_summary_date "
-                         "ON daily_summary(date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_daily_summary_country "
-                         "ON daily_summary(country_code)")
-
-            conn.execute("""
-                CREATE VIEW IF NOT EXISTS daily_summary_complete AS
-                SELECT * FROM daily_summary
-                WHERE health_complete   = 1
-                  AND location_complete = 1
-                  AND pi_complete       = 1
-                  AND spend_complete    = 1
-                  AND weather_complete  = 1
-            """)
-
-    def init_complete_view(self) -> None:
-        """Create the daily_summary_complete view by filtering that all domains are complete"""
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_daily_summary_date "
+                "ON daily_summary(date)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_daily_summary_country "
+                "ON daily_summary(country_code)"
+            )
+    
+    def init_complete_view(self):
         with get_conn() as conn:
             conn.execute("""
                 CREATE VIEW IF NOT EXISTS daily_summary_complete AS
                 SELECT * FROM daily_summary
-                WHERE health_complete = 1
-                AND location_complete = 1
-                AND spend_complete = 1
-                AND weather_complete = 1
-                AND pi_complete = 1;
+                WHERE health_complete   = 1
+                    AND location_complete = 1
+                    AND pi_complete       = 1
+                    AND spend_complete    = 1
+                    AND weather_complete  = 1
             """)
- 
+
     def insert(self, record: DailySummaryRecord) -> None:
         """Insert or replace a daily summary row.
 
@@ -231,21 +226,24 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
             conn.execute("""
                 INSERT OR REPLACE INTO daily_summary (
                     date, timezone, utc_offset, utc_start, utc_end,
-                    country_code, country, region, city, dominant_place_id,
+                    country_code, country, region, city,
+                    dominant_place_id, dominant_known_place_id,
+                    location_points, overland_points, overland_coverage_pct,
+                    distinct_places, new_places_visited, was_in_transit,
                     steps, active_energy_kcal, resting_energy_kcal,
                     distance_km, flights_climbed, time_in_daylight_min,
                     avg_walking_speed_kmh, vo2_max,
                     resting_hr, avg_hrv_ms, avg_spo2_pct,
                     respiratory_rate, wrist_temp_c,
-                    wake_time_local, sleep_time_local, sleep_hours, awake_hours, deep_sleep_hours, rem_sleep_hours,
-                    light_sleep_hours, sleep_efficiency_pct,
+                    wake_time_local, sleep_time_local,
+                    sleep_hours, awake_hours, deep_sleep_hours,
+                    rem_sleep_hours, light_sleep_hours,
+                    sleep_efficiency_pct, restorative_sleep_pct,
                     avg_valence, mood_entries,
-                    location_points, overland_points, overland_coverage_pct,
-                    distinct_places, new_places_visited, was_in_transit,
                     spend_gbp, spend_local, spend_currency,
                     transaction_count, spend_normalised,
-                    photo_count,
                     temp_max_c, temp_min_c, precipitation_mm, weathercode,
+                    photo_count,
                     watchdog_heartbeats_received, watchdog_max_gap_mins,
                     watchdog_max_consecutive_fail,
                     travelnet_internet_ok_pct, travelnet_api_ok_pct,
@@ -253,56 +251,57 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                 ) VALUES (
                     ?, ?, ?, ?, ?,
                     ?, ?, ?, ?,
+                    ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?,
+                    ?, ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?,
+                    ?, ?, ?,
+                    ?, ?,
                     ?, ?, ?, ?,
-                    ?, ?, ?, ?,
-                    ?, ?,
-                    ?, ?, ?,
-                    ?, ?,
-                    ?, ?, ?,
-                    ?, ?,
-                    ?, ?,
-                    ?, ?, ?,
-                    ?, ?,
-                    ?, ?, ?,
+                    ?,
                     ?, ?,
                     ?,
-                    ?, ?, ?, ?,
                     ?, ?,
-                    ?,
-                    ?, ?,
-                    ?, ?, ?, ?, ?
+                    ?, ?
                 )
             """, (
                 record.date, record.timezone, record.utc_offset,
                 record.utc_start, record.utc_end,
                 record.country_code, record.country, record.region, record.city,
-                record.dominant_place_id,
-                record.steps, record.active_energy_kcal,
-                record.resting_energy_kcal,
-                record.distance_km, record.flights_climbed,
-                record.time_in_daylight_min,
+                record.dominant_place_id, record.dominant_known_place_id,
+                record.location_points, record.overland_points,
+                record.overland_coverage_pct,
+                record.distinct_places, record.new_places_visited,
+                int(record.was_in_transit) if record.was_in_transit is not None else 0,
+                record.steps, record.active_energy_kcal, record.resting_energy_kcal,
+                record.distance_km, record.flights_climbed, record.time_in_daylight_min,
                 record.avg_walking_speed_kmh, record.vo2_max,
                 record.resting_hr, record.avg_hrv_ms, record.avg_spo2_pct,
                 record.respiratory_rate, record.wrist_temp_c,
-                record.wake_time_local, record.sleep_time_local, record.sleep_hours, record.awake_hours, 
-                record.deep_sleep_hours, record.rem_sleep_hours, record.light_sleep_hours,
-                record.sleep_efficiency_pct,
+                record.wake_time_local, record.sleep_time_local,
+                record.sleep_hours, record.awake_hours, record.deep_sleep_hours,
+                record.rem_sleep_hours, record.light_sleep_hours,
+                record.sleep_efficiency_pct, record.restorative_sleep_pct,
                 record.avg_valence, record.mood_entries,
-                record.location_points, record.overland_points,
-                record.overland_coverage_pct, record.distinct_places, record.new_places_visited,
-                int(record.was_in_transit) if record.was_in_transit is not None else 0,
                 record.spend_gbp, record.spend_local, record.spend_currency,
                 record.transaction_count, record.spend_normalised,
-                record.photo_count,
                 record.temp_max_c, record.temp_min_c,
                 record.precipitation_mm, record.weathercode,
-                record.watchdog_heartbeats_received,
-                record.watchdog_max_gap_mins,
+                record.photo_count,
+                record.watchdog_heartbeats_received, record.watchdog_max_gap_mins,
                 record.watchdog_max_consecutive_fail,
-                record.travelnet_internet_ok_pct,
-                record.travelnet_api_ok_pct,
+                record.travelnet_internet_ok_pct, record.travelnet_api_ok_pct,
                 record.avg_w_pi, record.total_wh_pi,
             ))
- 
- 
+
+
 table = DailySummaryTable()
