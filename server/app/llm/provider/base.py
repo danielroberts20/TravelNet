@@ -7,7 +7,6 @@ from abc import ABC, abstractmethod
 import json
 import re
 from config.general import TRANSACTION_CATEGORIES, TRANSACTION_SUBCATEGORIES
-from database.transaction.table import TRANSACTION_TABLE_DDL
 from prompt import TRANSACTION_PROMPT
 
 
