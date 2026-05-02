@@ -26,6 +26,7 @@ class KnownPlaceRecord:
     first_seen: str         # ISO 8601 UTC
     place_id: Optional[int] = None
     label: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
@@ -37,6 +38,7 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
                 CREATE TABLE IF NOT EXISTS known_places (
                     id               INTEGER PRIMARY KEY AUTOINCREMENT,
                     label            TEXT,
+                    notes            TEXT,
                     latitude         REAL NOT NULL,
                     longitude        REAL NOT NULL,
                     place_id         INTEGER REFERENCES places(id),
@@ -77,9 +79,9 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
         """Insert a new known place and return its id."""
         with get_conn() as conn:
             cursor = conn.execute("""
-                INSERT INTO known_places (latitude, longitude, place_id, first_seen, visit_count, last_visited, label)
+                INSERT INTO known_places (latitude, longitude, place_id, first_seen, visit_count, last_visited, label, notes)
                 VALUES (?, ?, ?, ?, 1, ?, ?)
-            """, (record.latitude, record.longitude, record.place_id, record.first_seen, record.first_seen, record.label))
+            """, (record.latitude, record.longitude, record.place_id, record.first_seen, record.first_seen, record.label, record.notes))
             return cursor.lastrowid
 
     def label_place(self, place_id: int, label: str) -> bool:
@@ -88,6 +90,15 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
             cursor = conn.execute(
                 "UPDATE known_places SET label = ? WHERE id = ?",
                 (label, place_id),
+            )
+            return cursor.rowcount > 0
+    
+    def add_note_place(self, place_id: int, note: str)-> bool:
+        """Set or update the human-readable notes for a known place. Returns True if found."""
+        with get_conn() as conn:
+            cursor = conn.execute(
+                "UPDATE known_places SET notes = ? WHERE id = ?",
+                (note, place_id),
             )
             return cursor.rowcount > 0
 

@@ -49,8 +49,8 @@ SCHEDULE_CONFIGS = {
     "send-cron-digest":                 ("0 9 * * *",               "Daily safety-net flush of cron job digest"),
 
     # Backups
-    "backup-db":                        ("0 1 * * 0",               "Weekly local DB snapshot with 4-week retention"),
-    "backup-db-to-cloudflare":          ("0 3 2,16 * *",            "Fortnightly backup of database to Cloudflare"),
+    "backup-db":                        ("0 1 * * *",               "Daily local DB snapshot with 10-day retention"),
+    "backup-db-to-cloudflare":          ("0 3 2,9,16,23 * *",       "Weekly backup of database to Cloudflare"),
 
     # Stats
     "push-public-stats":                ("0 7 * * *",               "Daily push of public_stats.json to GitHub"),

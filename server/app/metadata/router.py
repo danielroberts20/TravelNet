@@ -35,6 +35,14 @@ async def get_logs(lines: int = Query(200, ge=1, le=1000)):
     return Response(content=logs, media_type="text/plain")
 
 
+@router.get("/watchdog", dependencies=[Depends(require_upload_token)])
+async def get_watchdog():
+    return {
+        "status": "ok",
+        "uptime": get_uptime()
+    }
+
+
 @router.get("/status")
 async def get_status():
     """Return a live system status snapshot (uptime, DB stats, last uploads, FX info)."""

@@ -33,7 +33,7 @@ def get_conn(read_only=False) -> sqlite3.Connection:
     if read_only:
         conn = sqlite3.connect(f"file:{DB_FILE}?mode=ro", uri=True)
     else:
-        conn = sqlite3.connect(DB_FILE, timeout=10)
+        conn = sqlite3.connect(DB_FILE, timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     if not read_only:

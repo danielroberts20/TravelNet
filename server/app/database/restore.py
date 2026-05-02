@@ -1,158 +1,27 @@
-import logging
 import os
-from pathlib import Path
-import shutil
 import signal
+import shutil
 import sqlite3
 import subprocess
 import tempfile
-from typing import Generator, Optional
+from pathlib import Path
+from typing import Generator
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Query
-from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
-from config.general import DB_FILE
-from auth import require_upload_token
-from database.connection import backup_db, get_conn
-from database.pruning import (
-    CASCADE_ONLY, DEFAULT_TABLES, TABLE_CONFIG,
-    get_prune_counts, prune_before, validate_tables,
-)
-from config.settings import settings
-
+from app.auth import require_upload_token
+from app.config.settings import settings
+from app.config.general import DB_FILE
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
-RESETTABLE_TABLES = [
-    "country_transitions",
-    "cost_of_living",
-    "cron_results",
-    "daily_summary",
-    "flights",
-    "fx_rates",
-    "gap_annotations",
-    "known_places",
-    "location_noise",
-    "log_digest",
-    "ml_anomolies",
-    "ml_location_cluster_members",
-    "ml_location_clusters",
-    "ml_segments",
-    "photo_metadata",
-    "place_visits",
-    "places",
-    "transition_timezone",
-    "trigger_log",
-    "watchdog_heartbeat",
-    "weather_daily",
-    "weather_hourly"
-]
-
-
-class PruneRequest(BaseModel):
-    cutoff: str
-    tables: Optional[list[str]] = None
-
-
-@router.get("/prune/tables", dependencies=[Depends(require_upload_token)])
-async def prune_tables_list():
-    """Return the tables eligible for pruning and their cascade relationships."""
-    return {
-        "tables":      list(TABLE_CONFIG.keys()),
-        "cascade_only": list(CASCADE_ONLY),
-        "pre_delete":  [],  # no pre-delete tables — all have timestamps or cascade
-        "cascade_parents": {
-            # True SQLite ON DELETE CASCADE relationships
-            "mood_labels":                 "state_of_mind",
-            "mood_associations":           "state_of_mind",
-            "location_noise":              "location_overland",
-            "cellular_state":              "location_shortcuts",
-            "workout_route":               "workouts",
-            "place_visits":                "known_places",
-            # ml_location_cluster_members cascades from location_overland (overland_id FK)
-            # but is deleted directly via its own created_at — not listed here as cascade
-        },
-        "default": DEFAULT_TABLES,
-    }
-
-
-@router.post("/prune/preview", dependencies=[Depends(require_upload_token)])
-async def prune_preview(req: PruneRequest):
-    """Return row counts that would be deleted — no data is modified."""
-    try:
-        with get_conn(read_only=True) as conn:
-            counts = get_prune_counts(conn, req.cutoff, req.tables)
-        return {"counts": counts}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/prune/execute", dependencies=[Depends(require_upload_token)])
-async def prune_execute(req: PruneRequest):
-    """Create a pre-prune backup then delete rows older than cutoff."""
-    try:
-        validate_tables(req.tables or DEFAULT_TABLES)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    try:
-        backup_path = backup_db(prefix="pre_prune")
-        with get_conn() as conn:
-            deleted = prune_before(conn, req.cutoff, req.tables)
-        logger.warning(
-            f"Prune executed: cutoff={req.cutoff}, tables={req.tables}, "
-            f"deleted={deleted}, backup={backup_path}"
-        )
-        return {"deleted": deleted, "backup": str(backup_path)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/download", dependencies=[Depends(require_upload_token)])
-async def download(background_tasks: BackgroundTasks):
-    """Create a point-in-time DB backup and stream it to the caller.
-
-    The backup file is scheduled for deletion once the response is sent so it
-    does not accumulate on disk.
-    """
-    backup_path = backup_db()
-    background_tasks.add_task(os.remove, backup_path)
-    logger.info(f"Database backup created at {backup_path}, scheduled for deletion after response")
-    return FileResponse(
-        path=backup_path,
-        filename=backup_path.name,
-        media_type="application/octet-stream",
-    )
-
-
-@router.get("/reset", dependencies=[Depends(require_upload_token)])
-async def reset_table(table: str):
-    """Delete all rows from a resettable table.
-
-    Only tables explicitly listed in RESETTABLE_TABLES are permitted.
-    Returns HTTP 400 for any other table name.
-    """
-    if table not in RESETTABLE_TABLES:
-        raise HTTPException(status_code=400, detail=f"Table '{table}' is not resettable")
-    with get_conn() as conn:
-        conn.execute(f"DELETE FROM [{table}]")
-        conn.commit()
-        logger.warning(f"Table {table} was cleared!")
-    return {"message": f"Table '{table}' cleared successfully"}
-
-# ------------------------------------------------
-# Restore from Cloudflare R2
-# ------------------------------------------------
 
 def _sse(message: str, level: str = "info") -> str:
     return f"data: {level}|{message}\n\n"
 
 
-@router.get("/restore/list", dependencies=[Depends(require_upload_token)])
+@router.get("/list", dependencies=[Depends(require_upload_token)])
 def list_r2_backups():
     """List .db.age backups available in Cloudflare R2."""
     try:
@@ -279,7 +148,7 @@ def _restore_stream(filename: str, live: bool) -> Generator[str, None, None]:
         os.kill(os.getpid(), signal.SIGTERM)
 
 
-@router.get("/restore/stream", dependencies=[Depends(require_upload_token)])
+@router.get("/stream", dependencies=[Depends(require_upload_token)])
 def stream_restore(
     filename: str = Query(...),
     live: bool = Query(False),

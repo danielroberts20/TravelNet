@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(alias="OPENAI_API_KEY")
     openai_model: str = Field(alias="OPENAI_MODEL")
 
+    # --- Rclone / R2 ---
+    age_key_path: str = Field(alias="AGE_KEY_PATH")
+    rclone_remote: str = Field(alias="RCLONE_REMOTE")
+    rclone_bucket: str = Field(alias="RCLONE_BUCKET")
+
     model_config = {
         "env_file": Path(__file__).parent.parent.parent / ".env",  # → server/.env
         "populate_by_name": True,
