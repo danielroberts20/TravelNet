@@ -18,9 +18,10 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 
 from database.connection import get_conn
+from database.cost_of_living.queries import get_col_entry, get_uk_col_index
 from notifications import notify_on_completion, record_flow_result
 from scheduled_tasks.daily_summary.base import Domain, never_auto_close
-from config.general import BACKFILL_MONTHS
+from config.general import BACKFILL_MONTHS, TRANSACTION_COL_BATCH_SIZE
 
 
 # ---------------------------------------------------------------------------
@@ -28,21 +29,25 @@ from config.general import BACKFILL_MONTHS
 # ---------------------------------------------------------------------------
 
 def compute_transaction_data(conn, ctx: dict) -> dict:
-    """Aggregate transactions + compute col-normalised spend."""
-    txn = _transactions(conn, ctx)
-    country_code, city = _location_for_date(conn, ctx["date"])
-    txn["spend_normalised"] = _normalise_spend(
-        conn, txn["spend_gbp"], country_code, city
-    )
-    return txn
+    """Aggregate transactions for the given UTC window."""
+    return _transactions(conn, ctx)
 
 
 def _transactions(conn, ctx: dict) -> dict:
-    """Aggregate transactions for the UTC window, excluding internal/interest/failed."""
+    """
+    Aggregate transactions for the UTC window, excluding internal/interest/failed.
+ 
+    amount_normalised is populated by the monthly backfill flow — it will be
+    NULL for any transactions that have not yet been through that flow, so
+    spend_normalised may be NULL or partial until backfill has run.
+    """
     row = conn.execute("""
         SELECT
-            COALESCE(SUM(amount_gbp), 0) AS spend_gbp,
-            COUNT(*)                     AS n
+            COALESCE(SUM(ABS(amount_gbp)), 0)         AS spend_gbp,
+            COALESCE(SUM(ABS(amount_normalised)), 0)  AS spend_normalised,
+            COUNT(*)                                  AS n,
+            SUM(CASE WHEN amount_normalised IS NOT NULL
+                     THEN 1 ELSE 0 END)               AS n_normalised
         FROM transactions
         WHERE timestamp >= ? AND timestamp < ?
           AND is_internal = 0
@@ -50,79 +55,50 @@ def _transactions(conn, ctx: dict) -> dict:
           AND (state != 'FAILED' OR state IS NULL)
           AND amount_gbp IS NOT NULL
     """, (ctx["utc_start"], ctx["utc_end"])).fetchone()
-
-    count     = row["n"] or 0
-    spend_gbp = round(abs(row["spend_gbp"]), 2) if count else None
-
-    dom_cur     = None
-    spend_local = None
-    if count:
-        cur_row = conn.execute("""
-            SELECT currency,
-                   COUNT(*)         AS n,
-                   SUM(ABS(amount)) AS total_local
-            FROM transactions
-            WHERE timestamp >= ? AND timestamp < ?
-              AND is_internal = 0
-              AND is_interest = 0
-              AND (state != 'FAILED' OR state IS NULL)
-            GROUP BY currency
-            ORDER BY n DESC
-            LIMIT 1
-        """, (ctx["utc_start"], ctx["utc_end"])).fetchone()
-        if cur_row:
-            dom_cur     = cur_row["currency"]
-            spend_local = round(cur_row["total_local"], 2)
-
+ 
+    count        = row["n"] or 0
+    n_normalised = row["n_normalised"] or 0
+ 
+    if not count:
+        return {
+            "spend_gbp":         None,
+            "spend_local":       None,
+            "spend_currency":    None,
+            "transaction_count": 0,
+            "spend_normalised":  None,
+        }
+ 
+    spend_gbp        = round(row["spend_gbp"], 2)
+    # Only store spend_normalised if at least one transaction was normalised.
+    # Partial normalisation (some NULL) is accepted — Trevor/ML can check
+    # n_normalised vs transaction_count if full coverage matters.
+    spend_normalised = round(row["spend_normalised"], 2) if n_normalised else None
+ 
+    # Dominant local currency (by transaction count)
+    cur_row = conn.execute("""
+        SELECT currency,
+               COUNT(*)         AS n,
+               SUM(ABS(amount)) AS total_local
+        FROM transactions
+        WHERE timestamp >= ? AND timestamp < ?
+          AND is_internal = 0
+          AND is_interest = 0
+          AND (state != 'FAILED' OR state IS NULL)
+        GROUP BY currency
+        ORDER BY n DESC
+        LIMIT 1
+    """, (ctx["utc_start"], ctx["utc_end"])).fetchone()
+ 
+    dom_cur     = cur_row["currency"] if cur_row else None
+    spend_local = round(cur_row["total_local"], 2) if cur_row else None
+ 
     return {
         "spend_gbp":         spend_gbp,
         "spend_local":       spend_local,
         "spend_currency":    dom_cur,
         "transaction_count": count,
+        "spend_normalised":  spend_normalised,
     }
-
-
-def _location_for_date(conn, local_date: str) -> tuple:
-    """Read country_code + city from daily_summary (populated by location domain)."""
-    row = conn.execute("""
-        SELECT country_code, city FROM daily_summary WHERE date = ?
-    """, (local_date,)).fetchone()
-    if not row:
-        return None, None
-    return row["country_code"], row["city"]
-
-
-def _normalise_spend(conn, spend_gbp, country_code, city) -> float | None:
-    """
-    Divide spend_gbp by Numbeo cost-of-living index, scaled by 100.
-    Result is "spend as % of NYC norm" — 50 means spending half of NYC-
-    equivalent, 120 means 20% above NYC-equivalent.
-    """
-    if spend_gbp is None or not country_code:
-        return None
-
-    try:
-        col = None
-        if city:
-            row = conn.execute("""
-                SELECT col_index FROM cost_of_living
-                WHERE country_code = ? AND city = ? LIMIT 1
-            """, (country_code, city)).fetchone()
-            col = row["col_index"] if row else None
-        if col is None:
-            row = conn.execute("""
-                SELECT col_index FROM cost_of_living
-                WHERE country_code = ? AND city IS NULL LIMIT 1
-            """, (country_code,)).fetchone()
-            col = row["col_index"] if row else None
-
-        return round(spend_gbp / col * 100, 2) if col else None
-    except Exception as e:
-        logger = get_run_logger()
-        logger.warning("Failed to normalise spend. " \
-        "Most likely `cost_of_living` table is not yet implemented.")
-        return None
-
 
 # ---------------------------------------------------------------------------
 # Domain spec
@@ -177,27 +153,135 @@ def find_dates_in_window() -> list[str]:
     return [r["date"] for r in rows]
 
 
+@task
+def backfill_col_normalisation(force: bool = False) -> dict:
+    """
+    Populate col_id and amount_normalised on transactions that are missing them.
+ 
+    Runs before the daily summary aggregation so that spend_normalised in
+    daily_summary reflects the normalised values.
+ 
+    Args:
+        force: If True, reprocess all transactions in the backfill window
+               regardless of whether col_id is already set. Use when CoL
+               data has been updated (e.g. new Numbeo year).
+ 
+    Returns dict with counts: processed, updated, skipped, failed.
+    """
+    logger = get_run_logger()
+ 
+    cutoff = (datetime.now(dt_timezone.utc).date()
+              - timedelta(days=30 * BACKFILL_MONTHS)).isoformat()
+ 
+    where_clause = (
+        "WHERE timestamp >= ? AND amount_gbp IS NOT NULL"
+        if force else
+        "WHERE timestamp >= ? AND amount_gbp IS NOT NULL AND col_id IS NULL"
+    )
+ 
+    with get_conn(read_only=True) as conn:
+        uk_col = get_uk_col_index(conn)
+        if not uk_col:
+            logger.warning("UK CoL index not found — skipping CoL normalisation")
+            return {"processed": 0, "updated": 0, "skipped": 0, "failed": 0}
+ 
+        rows = conn.execute(f"""
+            SELECT t.id, t.currency, t.source,
+                t.amount_gbp,
+                p.lat_snap, p.lon_snap
+            FROM transactions t
+            LEFT JOIN places p ON p.id = t.place_id
+            {where_clause}
+            ORDER BY t.timestamp ASC
+        """, (cutoff,)).fetchall()
+ 
+    total     = len(rows)
+    updated   = 0
+    skipped   = 0
+    failed    = 0
+ 
+    logger.info(f"CoL normalisation: {total} transactions to process "
+                f"({'force' if force else 'NULL only'})")
+ 
+    for batch_start in range(0, total, TRANSACTION_COL_BATCH_SIZE):
+        batch = rows[batch_start: batch_start + TRANSACTION_COL_BATCH_SIZE]
+        updates = []
+
+        with get_conn() as conn:
+            for row in batch:
+                try:
+                    entry = get_col_entry(row["lat_snap"], row["lon_snap"], conn)
+                    if not entry or not entry["index_value"]:
+                        logger.warning(
+                            f"No CoL entry for transaction {row['id']} "
+                            f"({row['lat_snap']}, {row['lon_snap']}) — skipping"
+                        )
+                        skipped += 1
+                        continue
+    
+                    amount_normalised = round(
+                        abs(row["amount_gbp"]) * (uk_col / entry["index_value"]), 2
+                    )
+                    updates.append((
+                        entry["id"],
+                        amount_normalised,
+                        row["id"],
+                        row["currency"],
+                        row["source"],
+                    ))
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to normalise transaction {row['id']}/{row['currency']}: {e}"
+                    )
+                    failed += 1
+    
+            if updates:
+                conn.executemany("""
+                    UPDATE transactions
+                    SET col_id = ?, amount_normalised = ?
+                    WHERE id = ? AND currency = ? AND source = ?
+                """, updates)
+                updated += len(updates)
+    
+            logger.debug(f"CoL batch {batch_start}–{batch_start + len(batch)}: "
+                        f"{len(updates)} updated")
+ 
+    logger.info(f"CoL normalisation complete: "
+                f"{updated} updated, {skipped} skipped, {failed} failed")
+    return {"processed": total, "updated": updated,
+            "skipped": skipped, "failed": failed}
+
 @flow(
     name="Backfill Transactions in Summary",
     on_completion=[notify_on_completion],
     on_failure=[notify_on_completion],
 )
-def backfill_transactions_in_summary_flow():
+def backfill_transactions_in_summary_flow(force_col: bool = False):
     """
-    Monthly: recompute transaction columns for every date in the last
-    BACKFILL_MONTHS months, then mark those dates spend_complete = 1.
+    Monthly: populate CoL normalisation on transactions, then recompute
+    transaction columns for every date in the last BACKFILL_MONTHS months,
+    then mark those dates spend_complete = 1.
     Scheduled: 2nd of each month at 08:30.
+ 
+    Args:
+        force_col: passed through to backfill_col_normalisation. Set True
+                   when CoL data has been updated (e.g. new Numbeo year).
     """
-    logger  = get_run_logger()
-    dates   = find_dates_in_window()
+    logger = get_run_logger()
+ 
+    # Step 1: populate col_id + amount_normalised on transactions
+    col_result = backfill_col_normalisation(force=force_col)
+    logger.info(f"CoL normalisation: {col_result}")
+ 
+    # Step 2: aggregate into daily_summary
+    dates = find_dates_in_window()
     logger.info(f"Backfilling transactions for {len(dates)} dates")
-
+ 
     updated = 0
     failed  = 0
     for d in dates:
         try:
             TRANSACTIONS_DOMAIN.upsert_for_date(d)
-            # Mark complete once the monthly pass has run
             with get_conn() as conn:
                 conn.execute(
                     "UPDATE daily_summary SET spend_complete = 1 WHERE date = ?",
@@ -207,8 +291,13 @@ def backfill_transactions_in_summary_flow():
         except Exception as e:
             logger.error(f"Failed to backfill transactions for {d}: {e}")
             failed += 1
-
-    result = {"dates_considered": len(dates),
-              "updated": updated, "failed": failed}
+ 
+    result = {
+        "col_normalisation":  col_result,
+        "dates_considered":   len(dates),
+        "updated":            updated,
+        "failed":             failed,
+    }
     record_flow_result(result)
     return result
+ 

@@ -40,6 +40,7 @@ from database.watchdog.table import table as watchdog_table
 from database.power.table import table as power_table
 from database.photos.table import table as photo_table
 from database.summary.table import table as daily_summary_table
+from database.cost_of_living.table import table as cost_of_living_table
 
 TABLE_REGISTRY: list[BaseTable] = [
     places_table,           # Must be first — FK target for all place_id columns
@@ -68,6 +69,7 @@ TABLE_REGISTRY: list[BaseTable] = [
     power_table,
     photo_table,
     daily_summary_table,
+    cost_of_living_table,
 ]
 
 

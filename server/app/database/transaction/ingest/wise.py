@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 from zipfile import ZipFile
 
+from database.cost_of_living.queries import get_col_entry, get_uk_col_index
 from database.location.geocoding import get_place_id
 from database.transaction.ingest.util import get_closest_lat_lon_by_timestamp, maybe_mark_internal
 from upload.transaction.constants import WISE_SOURCE_MAP
@@ -154,22 +155,30 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
                 for row in rows:
                     row["timestamp"] = to_iso_str(row["timestamp"])
                     lat, lon = get_closest_lat_lon_by_timestamp(cursor, row["timestamp"])
-                    #logger.info(f"Closest lat/lon to transaction {row["id"]} is {lat}, {lon}")
+
                     place_id = get_place_id(lat, lon, conn=conn)
-                    #logger.info(f"place_id: {place_id}")
+                    
+                    cost_of_living = get_col_entry(lat=lat, lon=lon, conn=conn)
+                    col_id = cost_of_living["id"] if cost_of_living else None
+                    amount_normalised = row["amount_gbp"] * (get_uk_col_index(conn) / cost_of_living["col_index"]) if cost_of_living else None
+                    
                     result = cursor.execute("""
                         INSERT OR IGNORE INTO transactions (
                             id, source, bank, timestamp, amount, currency,
                             amount_gbp, description, payment_reference, payer,
                             payee, merchant, fees, transaction_type, transaction_detail,
                             state, is_internal, is_interest, running_balance, raw, place_id
+                            col_id, amount_normalised
                         ) VALUES (
                             :id, :source, :bank, :timestamp, :amount, :currency,
                             :amount_gbp, :description, :payment_reference, :payer,
                             :payee, :merchant, :fees, :transaction_type, :transaction_detail,
                             :state, :is_internal, :is_interest, :running_balance, :raw, :place_id
+                            :col_id, :amount_normalised
                         )
-                    """, row | {"place_id": place_id})
+                    """, row | {"place_id": place_id, 
+                                "amount_normalised": amount_normalised,
+                                "col_id": col_id})
                     inserted += result.rowcount
 
                 conn.commit()
