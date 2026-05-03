@@ -84,7 +84,7 @@ def backfill_null_gbp() -> dict:
         return {"backfilled": backfilled, "still_null": len(still_null)}
 
 
-@flow(name="Backfill GBP", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Backfill GBP", on_failure=[notify_on_completion])
 def backfill_gbp_flow():
     result = backfill_null_gbp()
     record_flow_result(result)

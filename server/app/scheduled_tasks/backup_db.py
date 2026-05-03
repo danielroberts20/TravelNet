@@ -45,7 +45,7 @@ def prune_old_db_backups(days: int = 10) -> int:
     return deleted
 
 
-@flow(name="Backup DB", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Backup DB", on_failure=[notify_on_completion])
 def backup_db_flow(prefix: str | None = None, suffix: str | None = None):
     snapshot = create_db_snapshot(prefix, suffix)
     pruned = prune_old_db_backups(10)

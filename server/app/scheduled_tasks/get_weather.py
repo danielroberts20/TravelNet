@@ -146,7 +146,7 @@ def fetch_and_store_all_weather(
     }
 
 
-@flow(name="Get Weather", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Get Weather", on_failure=[notify_on_completion])
 def get_weather_flow():
     logger = get_run_logger()
     today      = date.today()

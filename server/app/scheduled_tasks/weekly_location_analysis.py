@@ -44,7 +44,7 @@ def get_current_timezone() -> str | None:
     return None
 
 
-@flow(name="Weekly Location Analysis", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Weekly Location Analysis", on_failure=[notify_on_completion])
 def weekly_location_analysis_flow():
     logger = get_run_logger()
     logger.info("Starting weekly location analysis pipeline")
