@@ -54,6 +54,7 @@ class Settings(BaseSettings):
 
     # --- Power Consumption ---
     shelly_ip: str = Field(alias="SHELLY_IP")
+    watchdog_maintenance_url: str = Field(alias="WATCHDOG_MAINTENANCE_URL")
 
     # --- SMTP / email alerts ---
     smtp_host: str = Field(alias="ALERT_SMTP_HOST")
