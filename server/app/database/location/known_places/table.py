@@ -80,7 +80,7 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
         with get_conn() as conn:
             cursor = conn.execute("""
                 INSERT INTO known_places (latitude, longitude, place_id, first_seen, visit_count, last_visited, label, notes)
-                VALUES (?, ?, ?, ?, 1, ?, ?)
+                VALUES (?, ?, ?, ?, 1, ?, ?, ?)
             """, (record.latitude, record.longitude, record.place_id, record.first_seen, record.first_seen, record.label, record.notes))
             return cursor.lastrowid
 
