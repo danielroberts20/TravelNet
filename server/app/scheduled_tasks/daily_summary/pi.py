@@ -43,7 +43,8 @@ def _watchdog(conn, ctx: dict) -> dict:
             COUNT(*)                     AS n,
             MAX(consecutive_failures)    AS max_fail,
             AVG(CASE WHEN internet_ok = 1 THEN 100.0 ELSE 0.0 END) AS internet_pct,
-            AVG(CASE WHEN api_ok      = 1 THEN 100.0 ELSE 0.0 END) AS api_pct
+            AVG(CASE WHEN api_ok      = 1 THEN 100.0 ELSE 0.0 END) AS api_pct,
+            AVG(CASE WHEN prefect_ok  = 1 THEN 100.0 ELSE 0.0 END) AS prefect_pct
         FROM watchdog_heartbeat
         WHERE received_at >= ? AND received_at < ?
     """, (ctx["utc_start"], ctx["utc_end"])).fetchone()
@@ -71,6 +72,7 @@ def _watchdog(conn, ctx: dict) -> dict:
         "watchdog_max_consecutive_fail": wd["max_fail"],
         "travelnet_internet_ok_pct":     round(wd["internet_pct"], 2) if wd["internet_pct"] is not None else None,
         "travelnet_api_ok_pct":          round(wd["api_pct"], 2)      if wd["api_pct"]      is not None else None,
+        "prefect_ok_pct":                round(wd["prefect_pct"], 2)  if wd["prefect_pct"]  is not None else None,
     }
 
 
@@ -95,7 +97,7 @@ PI_DOMAIN = Domain(
         "watchdog_heartbeats_received", "watchdog_max_gap_mins",
         "watchdog_max_consecutive_fail",
         "travelnet_internet_ok_pct", "travelnet_api_ok_pct",
-        "avg_w_pi", "total_wh_pi",
+        "prefect_ok_pct", "avg_w_pi", "total_wh_pi",
     }),
     completeness_flag="pi_complete",
     compute_fn=compute_pi_data,
