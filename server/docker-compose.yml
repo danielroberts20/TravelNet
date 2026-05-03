@@ -32,7 +32,7 @@ services:
       FASTAPI_API_KEY:       "${UPLOAD_TOKEN}"
       DOCKER_CONTAINER_NAME: "travelnet"
       TREVOR_CONTAINER_NAME: "trevor"
-      TREVOR_URL:            "http://trevor:8300"
+      TREVOR_URL:            "${TREVOR_URL}"
       TREVOR_API_KEY:        "${TREVOR_API_KEY}"
     volumes:
       - /mnt/linux/docker/services/travelnet/data:/data:ro

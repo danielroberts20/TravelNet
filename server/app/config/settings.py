@@ -73,6 +73,10 @@ class Settings(BaseSettings):
     rclone_remote: str = Field(alias="RCLONE_REMOTE")
     rclone_bucket: str = Field(alias="RCLONE_BUCKET")
 
+    # --- Trevor ---
+    trevor_url: str = Field(alias="TREVOR_URL", default="http://trevor:8300")
+    trevor_api_key: str = Field(alias="TREVOR_API_KEY")
+
     model_config = {
         "env_file": Path(__file__).parent.parent.parent / ".env",  # → server/.env
         "populate_by_name": True,
