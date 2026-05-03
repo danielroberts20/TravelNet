@@ -32,6 +32,10 @@ class DailySummaryRecord:
     day_label:  Optional[str] = None
 
     # Location
+    movement_entropy: Optional[float] = None
+    settling_day:     Optional[int]   = None
+    novelty_score:    Optional[float] = None
+
     country_code:            Optional[str]   = None
     country:                 Optional[str]   = None
     region:                  Optional[str]   = None
@@ -73,9 +77,19 @@ class DailySummaryRecord:
     sleep_efficiency_pct:  Optional[float] = None
     restorative_sleep_pct: Optional[float] = None
 
+    # Training load
+    workout_tss: Optional[float] = None
+    atl:         Optional[float] = None
+    ctl:         Optional[float] = None
+    tsb:         Optional[float] = None
+
+    # Sleep midpoint
+    sleep_midpoint_hr: Optional[float] = None
+
     # Mood
-    avg_valence:  Optional[float] = None
-    mood_entries: Optional[int]   = None
+    avg_valence:         Optional[float] = None
+    mood_entries:        Optional[int]   = None
+    mood_classification: Optional[str]  = None
 
     # Spending
     spend_gbp:         Optional[float] = None
@@ -97,8 +111,15 @@ class DailySummaryRecord:
     watchdog_max_consecutive_fail: Optional[int]   = None
     travelnet_internet_ok_pct:     Optional[float] = None
     travelnet_api_ok_pct:          Optional[float] = None
+    prefect_ok_pct:                Optional[float] = None
     avg_w_pi:                      Optional[float] = None
     total_wh_pi:                   Optional[float] = None
+
+    # ML outputs (schema-only — no domain owns these yet)
+    anomaly_score:    Optional[float] = None
+    is_anomaly:       int             = 0
+    travel_phase:     Optional[str]   = None
+    day_embedding_id: Optional[int]   = None
 
     # Completeness flags — one per domain
     health_complete:   int = 0
@@ -122,6 +143,10 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                     utc_start                     TEXT,
                     utc_end                       TEXT,
                     day_label                     TEXT,
+
+                    movement_entropy              REAL,
+                    settling_day                  INTEGER,
+                    novelty_score                 REAL,
 
                     country_code                  TEXT,
                     country                       TEXT,
@@ -161,8 +186,16 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                     sleep_efficiency_pct          REAL,
                     restorative_sleep_pct         REAL,
 
+                    workout_tss                   REAL,
+                    atl                           REAL,
+                    ctl                           REAL,
+                    tsb                           REAL,
+
+                    sleep_midpoint_hr             REAL,
+
                     avg_valence                   REAL,
                     mood_entries                  INTEGER,
+                    mood_classification           TEXT,
 
                     spend_gbp                     REAL,
                     spend_local                   REAL,
@@ -181,8 +214,14 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                     watchdog_max_consecutive_fail INTEGER,
                     travelnet_internet_ok_pct     REAL,
                     travelnet_api_ok_pct          REAL,
+                    prefect_ok_pct                REAL,
                     avg_w_pi                      REAL,
                     total_wh_pi                   REAL,
+
+                    anomaly_score                 REAL,
+                    is_anomaly                    INTEGER DEFAULT 0,
+                    travel_phase                  TEXT,
+                    day_embedding_id              INTEGER,
 
                     health_complete               INTEGER NOT NULL DEFAULT 0,
                     location_complete             INTEGER NOT NULL DEFAULT 0,
@@ -246,7 +285,7 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                     photo_count,
                     watchdog_heartbeats_received, watchdog_max_gap_mins,
                     watchdog_max_consecutive_fail,
-                    travelnet_internet_ok_pct, travelnet_api_ok_pct,
+                    travelnet_internet_ok_pct, travelnet_api_ok_pct, prefect_ok_pct,
                     avg_w_pi, total_wh_pi
                 ) VALUES (
                     ?, ?, ?, ?, ?,
@@ -262,7 +301,7 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                     ?, ?,
                     ?, ?, ?,
                     ?, ?,
-                    ?, ?,
+                    ?, ?, ?,
                     ?, ?,
                     ?, ?, ?,
                     ?, ?,
@@ -300,7 +339,7 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                 record.watchdog_heartbeats_received, record.watchdog_max_gap_mins,
                 record.watchdog_max_consecutive_fail,
                 record.travelnet_internet_ok_pct, record.travelnet_api_ok_pct,
-                record.avg_w_pi, record.total_wh_pi,
+                record.prefect_ok_pct, record.avg_w_pi, record.total_wh_pi,
             ))
 
 
