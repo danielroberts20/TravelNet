@@ -54,6 +54,7 @@ class Settings(BaseSettings):
 
     # --- Power Consumption ---
     shelly_ip: str = Field(alias="SHELLY_IP")
+    watchdog_maintenance_url: str = Field(alias="WATCHDOG_MAINTENANCE_URL")
 
     # --- SMTP / email alerts ---
     smtp_host: str = Field(alias="ALERT_SMTP_HOST")
@@ -66,6 +67,11 @@ class Settings(BaseSettings):
     # --- LLM / OpenAI ---
     openai_api_key: str = Field(alias="OPENAI_API_KEY")
     openai_model: str = Field(alias="OPENAI_MODEL")
+
+    # --- Rclone / R2 ---
+    age_key_path: str = Field(alias="AGE_KEY_PATH")
+    rclone_remote: str = Field(alias="RCLONE_REMOTE")
+    rclone_bucket: str = Field(alias="RCLONE_BUCKET")
 
     model_config = {
         "env_file": Path(__file__).parent.parent.parent / ".env",  # → server/.env

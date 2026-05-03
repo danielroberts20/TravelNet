@@ -924,12 +924,12 @@ class TestGetConnConfiguration:
         assert result == 0
 
     @pytest.mark.slow
-    def test_get_conn_write_timeout_is_10_seconds(self, tmp_path):
-        """get_conn() sets timeout=10, so a locked DB waits up to 10 s.
+    def test_get_conn_write_timeout_is_30_seconds(self, tmp_path):
+        """get_conn() sets timeout=30, so a locked DB waits up to 30 s.
 
-        NOTE: this test takes ~10 seconds — run with `-m slow` to include it.
+        NOTE: this test takes ~30 seconds — run with `-m slow` to include it.
 
-        We don't actually wait 10 s — we just verify the timeout attribute.
+        We don't actually wait 30 s — we just verify the timeout attribute.
         """
         db_path = tmp_path / "timeout_attr.db"
         db_path.touch()
@@ -956,11 +956,11 @@ class TestGetConnConfiguration:
             blocker.close()
             conn.close()
 
-        # The default timeout is 10 s; since we set the blocker to NOT commit,
-        # conn should wait ~10 s then raise.  We cap the test at 12 s to avoid
+        # The default timeout is 30 s; since we set the blocker to NOT commit,
+        # conn should wait ~30 s then raise.  We cap the test at 65 s to avoid
         # hanging CI.
-        assert elapsed < 12, "get_conn() appears to be waiting longer than 10 s"
-        assert elapsed >= 9, (
-            f"get_conn() gave up after {elapsed:.1f} s — expected ~10 s timeout. "
-            "Check that connection.py still passes timeout=10 to sqlite3.connect()."
+        assert elapsed < 35, "get_conn() appears to be waiting longer than 30 s"
+        assert elapsed >= 28, (
+            f"get_conn() gave up after {elapsed:.1f} s — expected ~30 s timeout. "
+            "Check that connection.py still passes timeout=30 to sqlite3.connect()."
         )

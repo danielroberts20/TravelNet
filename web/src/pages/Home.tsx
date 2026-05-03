@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import GPSCanvas from '../components/GPSCanvas';
 import { useStats, fmt, fmtDate } from '../hooks/useStats';
-import { TRIP_START, LEGS, GITHUB_REPO, TREVOR_REPO } from '../data/travel';
+import { TRIP_START, LEGS, GITHUB_REPO, TREVOR_REPO, PLANNED_COUNTRIES } from '../data/travel';
 
 /* ------------------------------------------------------------------ */
 /* Countdown                                                            */
@@ -110,25 +109,6 @@ export default function Home() {
           <Link to="/about" className="btn btn-secondary">How it works</Link>
         </div>
 
-        <div className="hero-map-container">
-          <div className="hero-map-card">
-            <div className="hero-map-chrome">
-              <span className="chrome-dot chrome-dot-red"></span>
-              <span className="chrome-dot chrome-dot-yellow"></span>
-              <span className="chrome-dot chrome-dot-green"></span>
-              <span className="chrome-label mono">kepler.gl &mdash; GPS trace preview</span>
-            </div>
-            <GPSCanvas />
-            <div className="map-coming-soon" style={{ position: 'absolute', bottom: 'var(--space-4)', left: '50%', transform: 'translateX(-50%)', top: 'auto' }}>
-              <div className="map-coming-soon">
-                <span className="kepler-badge">
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-teal)', display: 'inline-block' }}></span>
-                  Kepler.gl full interactive map &mdash; live from September 2026
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* ============================================================
@@ -159,9 +139,19 @@ export default function Home() {
 
             <div className="stat-card reveal">
               <span className="stat-icon">🌍</span>
-              <span className="stat-value accent-blue" data-stat="total_countries">{fmt(stats?.total_countries)}</span>
-              <span className="stat-label">Countries visited</span>
-              <span className="stat-sublabel">{stats?.current_leg?.name ?? 'Starting June 2026'}</span>
+              <span className="stat-value accent-blue" data-stat="total_countries">
+                {stats?.status === 'pre_departure' || !stats
+                  ? PLANNED_COUNTRIES
+                  : fmt(stats.total_countries)}
+              </span>
+              <span className="stat-label">
+                {stats?.status === 'pre_departure' || !stats ? 'Countries planned' : 'Countries visited'}
+              </span>
+              <span className="stat-sublabel">
+                {stats?.status === 'pre_departure' || !stats
+                  ? 'USA · AUS · NZ · SE Asia · CAN'
+                  : stats?.current_leg?.name ?? 'Across all legs'}
+              </span>
             </div>
 
             <div className="stat-card reveal">

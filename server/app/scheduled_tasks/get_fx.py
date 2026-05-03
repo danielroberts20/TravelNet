@@ -57,7 +57,7 @@ def backup_fx(response: dict, path) -> str:
     return str(path)
 
 
-@flow(name="Get FX", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Get FX", on_failure=[notify_on_completion])
 def get_fx_flow(date: datetime | None = None):
     if date is None:
         date = datetime.now(timezone.utc) - timedelta(days=2)

@@ -29,7 +29,7 @@ def create_db_snapshot(prefix=None, suffix=None) -> dict:
 
 
 @task
-def prune_old_db_backups(days: int = 28) -> int:
+def prune_old_db_backups(days: int = 10) -> int:
     logger = get_run_logger()
     cutoff = datetime.now() - timedelta(days=days)
     deleted = 0
@@ -45,10 +45,10 @@ def prune_old_db_backups(days: int = 28) -> int:
     return deleted
 
 
-@flow(name="Backup DB", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Backup DB", on_failure=[notify_on_completion])
 def backup_db_flow(prefix: str | None = None, suffix: str | None = None):
     snapshot = create_db_snapshot(prefix, suffix)
-    pruned = prune_old_db_backups(28)
+    pruned = prune_old_db_backups(10)
     result = {
         "backup_path": snapshot["backup_path"],
         "size_mb": snapshot["size_mb"],

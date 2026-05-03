@@ -20,6 +20,7 @@ class WatchdogHeartbeatRecord:
     internet_ok: int|bool
     tailscale_ok: int|bool      
     api_ok: int|bool
+    prefect_ok: int|bool
     consecutive_failures: int = 0
  
  
@@ -36,6 +37,7 @@ class WatchdogHeartbeatTable(BaseTable[WatchdogHeartbeatRecord]):
                 internet_ok  INTEGER NOT NULL,
                 tailscale_ok INTEGER NOT NULL,
                 api_ok       INTEGER NOT NULL,
+                prefect_ok   INTEGER NOT NULL,
                 consecutive_failures INTEGER NOT NULL DEFAULT 0
             )""")
 
@@ -53,13 +55,14 @@ class WatchdogHeartbeatTable(BaseTable[WatchdogHeartbeatRecord]):
         with get_conn() as conn:
             conn.execute("""
                 INSERT OR REPLACE INTO watchdog_heartbeat
-                    (timestamp, internet_ok, tailscale_ok, api_ok, consecutive_failures)
-                VALUES (?, ?, ?, ?, ?)
+                    (timestamp, internet_ok, tailscale_ok, api_ok, prefect_ok, consecutive_failures)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 record.timestamp,
                 int(record.internet_ok),
                 int(record.tailscale_ok),
                 int(record.api_ok),
+                int(record.prefect_ok),
                 record.consecutive_failures
             ))
 

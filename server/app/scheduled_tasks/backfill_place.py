@@ -209,7 +209,7 @@ def backfill_all_places() -> dict:
     }
 
 
-@flow(name="Backfill Place", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Backfill Place", on_failure=[notify_on_completion])
 def backfill_place_flow():
     result = backfill_all_places()
     record_flow_result(result)

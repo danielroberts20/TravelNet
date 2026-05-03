@@ -167,13 +167,13 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
                             id, source, bank, timestamp, amount, currency,
                             amount_gbp, description, payment_reference, payer,
                             payee, merchant, fees, transaction_type, transaction_detail,
-                            state, is_internal, is_interest, running_balance, raw, place_id
+                            state, is_internal, is_interest, running_balance, raw, place_id,
                             col_id, amount_normalised
                         ) VALUES (
                             :id, :source, :bank, :timestamp, :amount, :currency,
                             :amount_gbp, :description, :payment_reference, :payer,
                             :payee, :merchant, :fees, :transaction_type, :transaction_detail,
-                            :state, :is_internal, :is_interest, :running_balance, :raw, :place_id
+                            :state, :is_internal, :is_interest, :running_balance, :raw, :place_id,
                             :col_id, :amount_normalised
                         )
                     """, row | {"place_id": place_id, 

@@ -33,6 +33,8 @@ class PhotoMetadataRecord:
     camera_model: Optional[str] = None
     album: Optional[str] = None
     raw_exif: Optional[str] = None
+    sentiment_score: Optional[float] = None
+    dominant_emotion: Optional[str] = None
 
 
 class PhotoMetadataTable(BaseTable[PhotoMetadataRecord]):
@@ -67,6 +69,8 @@ class PhotoMetadataTable(BaseTable[PhotoMetadataRecord]):
                     camera_model        TEXT,
                     album               TEXT,
                     raw_exif            TEXT,
+                    sentiment_score     REAL,
+                    dominant_emotion    TEXT,
                     created_at          TEXT NOT NULL
                         DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
                     UNIQUE(file_path)

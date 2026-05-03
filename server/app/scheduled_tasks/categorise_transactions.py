@@ -132,7 +132,7 @@ def update_transaction_categories(classified_data):
     return len(update_payload)
 
 
-@flow(name="Categorise Transactions", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Categorise Transactions", on_failure=[notify_on_completion])
 async def categorise_transactions_flow():
     logger = get_run_logger()
 

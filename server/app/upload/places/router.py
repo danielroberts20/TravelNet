@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 class PlaceRequest(BaseModel):
     place_id: int
     label: str
+    notes: str
 
 @router.get("/list-null", dependencies=[Depends(require_upload_token)])
 async def list_null_places():
@@ -33,12 +34,13 @@ async def list_null_places():
 @router.post("/update-label", dependencies=[Depends(require_upload_token)])
 async def update_place_label(request: PlaceRequest):
     """Update the label for a given place_id"""
+    notes = None if request.notes == '' else request.notes
     with get_conn() as conn:
         result = conn.execute("""
             UPDATE known_places
-            SET label = ?
+            SET label = ?, notes = ?
             WHERE id = ?
-        """, (request.label, request.place_id))
+        """, (request.label, notes, request.place_id))
         if result.rowcount == 0:
             return {"status": "error", "message": "Place ID not found"}
     return {"status": "success"}

@@ -13,6 +13,10 @@ export const TREVOR_REPO = 'https://github.com/danielroberts20/Trevor-For-Travel
 export const DOCS_URL = 'https://docs.travelnet.dev';
 export const PERSONAL_SITE = 'https://danielroberts20.github.io';
 
+// Derived from travel.yml — last leg's cumulative figures
+export const PLANNED_COUNTRIES = 9;
+export const PLANNED_KM = 48_000;
+
 export interface Leg {
   id: string;
   name: string;

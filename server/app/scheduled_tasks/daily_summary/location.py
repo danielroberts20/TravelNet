@@ -29,6 +29,9 @@ def compute_location_data(conn, ctx: dict) -> dict:
     data = {}
     data.update(_dominant_place(conn, ctx))
     data.update(_movement(conn, ctx))
+    data.update(_movement_entropy(conn, ctx))
+    data.update(_settling_day(conn, ctx))
+    data.update({"novelty_score": None})
     return data
 
 
@@ -151,6 +154,49 @@ def _movement(conn, ctx: dict) -> dict:
     }
 
 
+def _movement_entropy(conn, ctx: dict) -> dict:
+    """
+    Shannon entropy of GPS point distribution across distinct place_ids.
+    Higher entropy = more dispersed movement; lower = concentrated at one place.
+    Returns None if fewer than 10 points exist (insufficient data).
+    """
+    import math
+    rows = conn.execute("""
+        SELECT place_id, COUNT(*) AS n
+        FROM location_overland_cleaned
+        WHERE timestamp >= ? AND timestamp < ?
+          AND place_id IS NOT NULL
+        GROUP BY place_id
+    """, (ctx["utc_start"], ctx["utc_end"])).fetchall()
+
+    counts = [r["n"] for r in rows]
+    total = sum(counts)
+    if total < 10:
+        return {"movement_entropy": None}
+
+    entropy = -sum((c / total) * math.log2(c / total) for c in counts if c > 0)
+    return {"movement_entropy": round(entropy, 4)}
+
+
+def _settling_day(conn, ctx: dict) -> dict:
+    """
+    Days since the most recent country transition entry before this date.
+    Day 0 = the day of entry. NULL if country_transitions is empty.
+    """
+    row = conn.execute("""
+        SELECT entered_at FROM country_transitions
+        WHERE entered_at <= ?
+        ORDER BY entered_at DESC LIMIT 1
+    """, (ctx["utc_end"],)).fetchone()
+
+    if not row:
+        return {"settling_day": None}
+
+    entered_date = datetime.strptime(row["entered_at"][:10], "%Y-%m-%d").date()
+    current_date = datetime.strptime(ctx["date"], "%Y-%m-%d").date()
+    return {"settling_day": (current_date - entered_date).days}
+
+
 def _shift_utc(utc_ts: str, hours: int) -> str:
     dt = datetime.fromisoformat(utc_ts.replace("Z", "+00:00"))
     return (dt + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -164,9 +210,10 @@ LOCATION_DOMAIN = Domain(
     name="location",
     columns=frozenset({
         "country_code", "country", "region", "city", "dominant_place_id",
-        "dominant_known_place_id", "location_points", "overland_points", 
-        "overland_coverage_pct", "distinct_places", "new_places_visited", 
+        "dominant_known_place_id", "location_points", "overland_points",
+        "overland_coverage_pct", "distinct_places", "new_places_visited",
         "was_in_transit",
+        "movement_entropy", "settling_day", "novelty_score",
     }),
     completeness_flag="location_complete",
     compute_fn=compute_location_data,

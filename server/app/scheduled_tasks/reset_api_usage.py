@@ -30,7 +30,7 @@ def reset_all_api_counters() -> list[dict]:
     return results
 
 
-@flow(name="Reset API Usage", on_completion=[notify_on_completion], on_failure=[notify_on_completion])
+@flow(name="Reset API Usage", on_failure=[notify_on_completion])
 def reset_api_usage_flow():
     results = reset_all_api_counters()
     result = {r["service"]: {"old_count": r["old_count"], "old_month": r["old_month"]} for r in results}

@@ -1,1 +1,0 @@
-from public.router import router as public_router  # type: ignore

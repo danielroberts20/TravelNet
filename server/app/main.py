@@ -16,6 +16,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI  # type: ignore
+import requests
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -23,6 +24,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from config.logging import configure_logging
 from config.editable import load_overrides
+from config.settings import settings
 
 # Must run before any module that uses logging or reads editable config
 configure_logging()
@@ -58,6 +60,14 @@ async def lifespan(app: FastAPI):
     yield
 
     send_notification(title="TravelNet", body="❌ Server offline", use_prefix=False, time_sensitive=False)
+
+    try:
+        requests.post(
+            settings.watchdog_maintenance_url,
+            timeout=5,
+        )
+    except Exception:
+        pass
 
 
 app = FastAPI(title="TravelNet API", version="1.0.1", lifespan=lifespan)

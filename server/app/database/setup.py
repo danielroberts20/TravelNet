@@ -9,11 +9,12 @@ TABLE_REGISTRY lists every BaseTable instance in dependency order:
 - known_places must precede place_visits (FK)
 - The unified view is initialised last via location_table.init_unified_view()
 """
-
 from config.editable import log_config_summary
 from database.base import BaseTable
 from models.telemetry import Log
 
+
+from database.connection import get_conn
 from database.places.table import table as places_table
 from database.cellular.table import table as cellular_table, CellularRecord
 from database.exchange.table import table as fx_table
@@ -36,6 +37,10 @@ from database.weather.table import table as weather_table
 from database.logging.digest.table import table as log_digest_table
 from database.logging.daily.table import table as daily_cron_table
 from database.ml.table import table as ml_table
+from database.ml.location_segments import table as ml_location_segments_table
+from database.ml.day_embeddings import table as ml_day_embeddings_table
+from database.ml.destination_profiles import table as ml_destination_profiles_table
+from database.ml.causal_graph import table as ml_causal_graph_table
 from database.watchdog.table import table as watchdog_table
 from database.power.table import table as power_table
 from database.photos.table import table as photo_table
@@ -62,6 +67,10 @@ TABLE_REGISTRY: list[BaseTable] = [
     log_digest_table,
     daily_cron_table,
     ml_table,
+    ml_location_segments_table,
+    ml_day_embeddings_table,
+    ml_destination_profiles_table,
+    ml_causal_graph_table,
     noise_table,
     transition_timezone_table,
     transition_country_table,
@@ -88,6 +97,14 @@ def init_db() -> None:
     daily_summary_table.init_complete_view()
 
     log_config_summary()
+
+    # In transition_timezone table init(), after CREATE TABLE:
+    with get_conn() as conn:
+        conn.execute("""
+            INSERT OR IGNORE INTO transition_timezone 
+                (transitioned_at, from_tz, to_tz, from_offset, to_offset)
+            VALUES ('2020-01-01T00:00:00Z', NULL, 'Europe/London', NULL, '+01:00')
+        """)
 
 
 def insert_log(log: Log) -> None:

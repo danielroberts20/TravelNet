@@ -97,6 +97,7 @@ def db():
         CREATE TABLE known_places (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             label            TEXT,
+            notes            TEXT,
             latitude         REAL NOT NULL,
             longitude        REAL NOT NULL,
             place_id         INTEGER,
