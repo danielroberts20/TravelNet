@@ -13,6 +13,7 @@ class HeartbeatPayload(BaseModel):
     internet_ok: bool
     tailscale_ok: bool
     api_ok: bool
+    prefect_ok: bool
     consecutive_failures: int = 0
 
 def insert_heartbeat(payload: HeartbeatPayload) -> None:
@@ -21,6 +22,7 @@ def insert_heartbeat(payload: HeartbeatPayload) -> None:
         internet_ok=payload.internet_ok,
         tailscale_ok=payload.tailscale_ok,
         api_ok=payload.api_ok,
+        prefect_ok=payload.prefect_ok,
         consecutive_failures=payload.consecutive_failures))
     
 
