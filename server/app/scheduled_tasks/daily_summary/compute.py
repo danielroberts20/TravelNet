@@ -43,35 +43,41 @@ def _get_current_timezone(conn) -> str:
     
 @task
 def get_dates_to_compute() -> list[str]:
-    """
-    Return dates to process on this run:
-      - Always yesterday in the current local timezone (primary target)
-      - Any date in the last RECOMPUTE_WINDOW_DAYS where a daily-cadence
-        completeness flag (health/location/pi) is still 0
-      - Any local date with source data but no daily_summary row yet
-    """
     with get_conn(read_only=True) as conn:
-        tz = _get_current_timezone(conn)
-        yesterday_local = datetime.now(ZoneInfo(tz)).date() - timedelta(days=1)
+        tz_name = _get_current_timezone(conn)
+        tz = ZoneInfo(tz_name)
+        yesterday_local = datetime.now(tz).date() - timedelta(days=1)
         window_start = yesterday_local - timedelta(days=RECOMPUTE_WINDOW_DAYS)
+
+        # Compute utc_end for yesterday — local midnight tonight converted to UTC
+        yesterday_midnight_local = datetime(
+            yesterday_local.year, yesterday_local.month, yesterday_local.day,
+            tzinfo=tz
+        )
+        yesterday_utc_end = (
+            yesterday_midnight_local + timedelta(days=1)
+        ).astimezone(dt_timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         dates = set()
         dates.add(yesterday_local.isoformat())
 
         rows = conn.execute("""
             SELECT date FROM daily_summary
-            WHERE date >= ?
+            WHERE date >= ? AND date <= ?
               AND (health_complete = 0
                 OR location_complete = 0
                 OR pi_complete = 0)
-        """, (window_start.isoformat(),)).fetchall()
+        """, (window_start.isoformat(), yesterday_local.isoformat())).fetchall()
         dates.update(r["date"] for r in rows)
 
         rows = conn.execute("""
             SELECT DISTINCT substr(timestamp, 1, 10) AS d
             FROM location_unified
-            WHERE timestamp >= ?
-        """, (window_start.isoformat() + "T00:00:00Z",)).fetchall()
+            WHERE timestamp >= ? AND timestamp < ?
+        """, (
+            window_start.isoformat() + "T00:00:00Z",
+            yesterday_utc_end,
+        )).fetchall()
         dates.update(r["d"] for r in rows)
 
     return sorted(dates)

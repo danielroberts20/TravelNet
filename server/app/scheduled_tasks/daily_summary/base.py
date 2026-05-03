@@ -101,9 +101,21 @@ def get_date_context(conn, local_date: str) -> dict:
         ORDER BY transitioned_at DESC LIMIT 1
     """, (f"{local_date}T23:59:59Z",)).fetchone()
 
-    tz_name    = row["to_tz"]     if row else "UTC"
-    utc_offset = row["to_offset"] if row else "+00:00"
-    tz         = ZoneInfo(tz_name)
+    if row:
+        tz_name    = row["to_tz"]
+        utc_offset = row["to_offset"]
+    else:
+        # No transition recorded yet — infer from system timezone.
+        # Pre-departure the Pi is in London, so this is correct.
+        # Post-departure, transition_timezone will always have a row.
+        import zoneinfo
+        system_tz = datetime.now().astimezone().tzinfo
+        # Use a known default rather than relying on system tzinfo name
+        tz_name    = "Europe/London"
+        utc_offset = datetime.now(ZoneInfo("Europe/London")).strftime("%z")
+        utc_offset = f"{utc_offset[:3]}:{utc_offset[3:]}"
+    
+    tz = ZoneInfo(tz_name)
 
     local_midnight = datetime.strptime(local_date, "%Y-%m-%d").replace(tzinfo=tz)
     next_midnight  = local_midnight + timedelta(days=1)
