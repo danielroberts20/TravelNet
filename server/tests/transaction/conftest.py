@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     amount              REAL NOT NULL,
     currency            TEXT NOT NULL,
     amount_gbp          REAL,
+    amount_normalised   REAL,
     description         TEXT,
     payment_reference   TEXT,
     payer               TEXT,
@@ -50,6 +51,10 @@ CREATE TABLE IF NOT EXISTS transactions (
     is_interest         INTEGER DEFAULT 0,
     running_balance     REAL,
     place_id            INTEGER,
+    col_id              INTEGER,
+    category            TEXT,
+    sub_category        TEXT,
+    confidence          REAL,
     raw                 TEXT NOT NULL,
     PRIMARY KEY (id, currency, source)
 );
