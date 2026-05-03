@@ -376,6 +376,8 @@ TRANSACTION_SUBCATEGORIES = {
 # Health
 # ---------------------------------------------------------------------------
 
+THRESHOLD_HR_BPM = editable("THRESHOLD_HR_BPM", "Lactate threshold heart rate in BPM for TSS calculation", group="Health")(170)
+
 INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation", group="Health")(5)
 
 HEALTH_GAP_LOOKBACK_DAYS = editable("HEALTH_GAP_LOOKBACK_DAYS", "Days of history to analyse for gap detection", group="Health")(30)
