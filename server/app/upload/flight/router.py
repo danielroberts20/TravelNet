@@ -23,7 +23,8 @@ from pydantic import BaseModel, field_validator  # type: ignore
 from timezonefinder import TimezoneFinder  # type: ignore
 
 from auth import require_upload_token
-from database.flights.table import table as flights_table, FlightRecord, haversine_km
+from database.flights.table import table as flights_table, FlightRecord
+from util import haversine_km
 
 router = APIRouter()
 
@@ -34,13 +35,6 @@ _tf = TimezoneFinder()
 def _get_airport(iata: str) -> dict | None:
     return _airports.get(iata.upper())
 
-
-def _compute_distance_km(origin_iata: str, destination_iata: str) -> float | None:
-    o = _get_airport(origin_iata)
-    d = _get_airport(destination_iata)
-    if o and d:
-        return round(haversine_km(o["lat"], o["lon"], d["lat"], d["lon"]), 1)
-    return None
 
 
 class FlightUpload(BaseModel):

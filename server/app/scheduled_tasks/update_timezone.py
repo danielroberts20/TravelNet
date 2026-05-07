@@ -5,10 +5,6 @@ import subprocess
 from zoneinfo import ZoneInfo
 from datetime import datetime, timezone as dt_timezone
 
-from datetime import datetime, timezone as dt_timezone
-from zoneinfo import ZoneInfo
-import subprocess
-
 # Each entry: (local_hour, local_minute, day_of_month, grep_pattern, command)
 _CRON_JOBS = [
     (

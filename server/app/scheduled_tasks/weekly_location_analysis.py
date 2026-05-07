@@ -28,8 +28,8 @@ from scheduled_tasks.update_timezone import update_timezones_flow
 
 
 @task
-def get_current_timezone() -> str | None:
-    """Return the to_tz of the most recent row in timezone_transitions, or None if empty."""
+def get_current_timezone() -> str:
+    """Return the to_tz of the most recent row in timezone_transitions, or UTC if none recorded."""
     logger = get_run_logger()
     with get_conn(read_only=True) as conn:
         row = conn.execute("""
@@ -37,11 +37,9 @@ def get_current_timezone() -> str | None:
             ORDER BY transitioned_at DESC
             LIMIT 1
         """).fetchone()
-    if row:
-        logger.info("Current timezone: %s", row["to_tz"])
-        return row["to_tz"]
-    logger.info("No timezone transitions recorded yet — skipping deployment schedule update")
-    return None
+    tz = row["to_tz"] if row else "UTC"
+    logger.info("Current timezone: %s", tz)
+    return tz
 
 
 @flow(name="Weekly Location Analysis", on_failure=[notify_on_completion])
@@ -62,9 +60,8 @@ def weekly_location_analysis_flow():
     logger.info("detect_flights complete: %s", flight_result)
 
     current_tz = get_current_timezone()
-    if current_tz:
-        update_timezones_flow(timezone=current_tz)
-        logger.info("Deployment schedules updated to %s", current_tz)
+    update_timezones_flow(timezone=current_tz)
+    logger.info("Deployment schedules updated to %s", current_tz)
 
     result = {
         "geocoded": geocode_result,

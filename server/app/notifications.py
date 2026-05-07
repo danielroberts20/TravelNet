@@ -450,7 +450,6 @@ def _format_duration(seconds: float) -> str:
 
 def _record_cron_run(job: str, success: bool, detail: str = "") -> None:
     """Write last-run status to /data/cron_runs.json for the dashboard."""
-    import json
     import time
     from config.general import DATA_DIR
 

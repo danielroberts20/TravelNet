@@ -39,6 +39,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /home/dan/services/Dashboard:/app
       - /home/dan/services/TravelNet/server:/travelnet-server:ro
+      - /home/dan/services/codex:/docs:ro
     depends_on:
       - ingest
     networks:

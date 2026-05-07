@@ -75,8 +75,9 @@ async def get_config():
         try:
             with open(OVERRIDES_PATH) as f:
                 overrides = json.load(f)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("Failed to read config overrides file: %s", exc)
+            raise HTTPException(status_code=500, detail="Config overrides file is corrupt or unreadable")
     result = {}
     for key, entry in editable.items():
         result[key] = {
@@ -103,8 +104,9 @@ async def update_config(update: ConfigUpdate):
         try:
             with open(OVERRIDES_PATH) as f:
                 overrides = json.load(f)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("Failed to read config overrides file: %s", exc)
+            raise HTTPException(status_code=500, detail="Config overrides file is corrupt or unreadable")
 
     old_value = overrides.get(update.key, editable[update.key]["default"])
     default_value = editable[update.key]["default"]

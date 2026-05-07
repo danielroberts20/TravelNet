@@ -27,6 +27,10 @@ from database.connection import get_conn, to_iso_str
 
 logger = logging.getLogger(__name__)
 
+GEOCODE_BACKOFF_BASE_S = 60
+GEOCODE_BACKOFF_MAX_S  = 480
+GEOCODE_MAX_RETRIES    = 4
+
 
 # ---------------------------------------------------------------------------
 # Preference chains for Nominatim's variable address structure
@@ -78,43 +82,60 @@ def _pick(address: dict, keys: tuple[str, ...]) -> str | None:
 # Nominatim API calls
 # ---------------------------------------------------------------------------
 
-def reverse_geocode(lat: float, lon: float) -> dict:
-    resp = requests.get(
-        "https://nominatim.openstreetmap.org/reverse",
-        params={"lat": lat, "lon": lon, "format": "jsonv2"},
-        headers={"User-Agent": "TravelNet/1.0 dan@travelnet.dev"},  # required
-        timeout=10,
-    )
-    resp.raise_for_status()
-    return resp.json()
+def reverse_geocode(lat: float, lon: float) -> dict | None:
+    for attempt in range(GEOCODE_MAX_RETRIES + 1):
+        try:
+            response = requests.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={"lat": lat, "lon": lon, "format": "jsonv2"},
+                headers={"User-Agent": "TravelNet/1.0 dan@travelnet.dev"},  # required
+                timeout=10,
+            )
+            if response.status_code == 429:
+                if attempt < GEOCODE_MAX_RETRIES:
+                    wait = min(GEOCODE_BACKOFF_BASE_S * (2 ** attempt), GEOCODE_BACKOFF_MAX_S)
+                    logger.warning(
+                        f"Nominatim 429 for ({lat}, {lon}). "
+                        f"Attempt {attempt + 1}/{GEOCODE_MAX_RETRIES + 1}. "
+                        f"Waiting {wait}s."
+                    )
+                    time.sleep(wait)
+                    continue
+                else:
+                    logger.warning(
+                        f"Nominatim 429 for ({lat}, {lon}) after "
+                        f"{GEOCODE_MAX_RETRIES + 1} attempts. Skipping."
+                    )
+                    return None
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as exc:
+            if attempt < GEOCODE_MAX_RETRIES:
+                wait = min(GEOCODE_BACKOFF_BASE_S * (2 ** attempt), GEOCODE_BACKOFF_MAX_S)
+                logger.warning(
+                    f"Nominatim request error for ({lat}, {lon}): {exc}. "
+                    f"Attempt {attempt + 1}/{GEOCODE_MAX_RETRIES + 1}. "
+                    f"Waiting {wait}s."
+                )
+                time.sleep(wait)
+            else:
+                logger.warning(
+                    f"Nominatim failed for ({lat}, {lon}) after "
+                    f"{GEOCODE_MAX_RETRIES + 1} attempts: {exc}. Skipping."
+                )
+                return None
 
 
 def batch_geocode(coords: list[tuple[float, float]]) -> list[dict]:
     locations = []
     errors = []
     for lat, lon in coords:
-        try:
-            loc = reverse_geocode(lat, lon)
+        loc = reverse_geocode(lat, lon)
+        if loc is not None:
             locations.append(loc)
             time.sleep(1.5)
-        except requests.exceptions.HTTPError as e:
-            if e.response is not None and e.response.status_code == 429:
-                logger.warning(f"Rate limited at ({lat}, {lon}), backing off 60s")
-                time.sleep(60)
-                # Retry once after backoff
-                try:
-                    loc = reverse_geocode(lat, lon)
-                    locations.append(loc)
-                    time.sleep(1)
-                except Exception as retry_e:
-                    logger.error(f"Retry failed for {lat}, {lon}: {retry_e}")
-                    errors.append({"lat": lat, "lon": lon, "error": retry_e})
-            else:
-                logger.error(f"Error geocoding {lat}, {lon}: {e}")
-                errors.append({"lat": lat, "lon": lon, "error": e})
-        except Exception as e:
-            logger.error(f"Error geocoding {lat}, {lon}: {e}")
-            errors.append({"lat": lat, "lon": lon, "error": e})
+        else:
+            errors.append({"lat": lat, "lon": lon, "error": "geocoding failed after retries"})
     return locations, errors
 
 
