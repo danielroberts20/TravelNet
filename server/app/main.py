@@ -43,10 +43,18 @@ from public.router import router as public_router
 
 logger = logging.getLogger(__name__)
 
+_PLACEHOLDER_TOKENS = {"", "changeme", "your-token-here", "secret", "token"}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: initialise DB, schedule departure backups, send online notification."""
+    if not settings.upload_token or settings.upload_token.lower() in _PLACEHOLDER_TOKENS:
+        raise RuntimeError(
+            "UPLOAD_TOKEN is not configured or is a placeholder value. "
+            "Set a strong token in .env before starting the server."
+        )
+
     init_app_uptime()
     init_db()
     logger.info("Database initialized.")
@@ -66,8 +74,8 @@ async def lifespan(app: FastAPI):
             settings.watchdog_maintenance_url,
             timeout=5,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Watchdog maintenance ping failed: %s", exc)
 
 
 app = FastAPI(title="TravelNet API", version="1.0.1", lifespan=lifespan)

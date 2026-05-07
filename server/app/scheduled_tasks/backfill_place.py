@@ -7,9 +7,6 @@ from prefect import task, flow
 from prefect.logging import get_run_logger
 
 from database.connection import get_conn, to_iso_str
-from notifications import notify_on_completion
-
-
 
 _NEAREST_PLACE_SQL = """
     SELECT lu.place_id FROM location_unified lu

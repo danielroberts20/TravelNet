@@ -22,12 +22,15 @@ Timezone input formats accepted
 - Common abbreviations: "EST", "JST", "AEST" — see ABBREV_TO_IANA
 """
 
+import logging
 import os
 import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+logger = logging.getLogger(__name__)
 
 # When set, read_crontab/write_crontab use this file directly instead of the
 # `crontab` subprocess. Used inside Docker where the host crontab is
@@ -53,7 +56,7 @@ def _read_last_offset() -> int | None:
         try:
             return int(path.read_text().strip())
         except ValueError:
-            pass
+            logger.debug("Malformed .last_tz file at %s — ignoring cached offset", path)
     return None
 
 
@@ -136,7 +139,7 @@ def resolve_timezone(tz_str: str) -> tuple[str, int]:
         sign_char = '+' if offset_min >= 0 else '-'
         label = f"{iana_name} (UTC{sign_char}{h:02d}:{mm:02d})"
         return label, offset_min
-    except (ZoneInfoNotFoundError, Exception):
+    except Exception:
         pass
 
     raise ValueError(

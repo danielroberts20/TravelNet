@@ -99,8 +99,8 @@ def _resolve_source_app(item: PhotoItem) -> str | None:
                     for app in ("snapchat", "instagram", "whatsapp", "vsco"):
                         if app in decoded:
                             return app
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Failed to decode EXIF UserComment for %s: %s", item.filename, exc)
         return "unknown"
 
     return "camera"
