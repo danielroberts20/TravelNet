@@ -33,6 +33,7 @@ from scheduled_tasks.daily_summary.pi import compute_pi_flow
 from scheduled_tasks.daily_summary.transactions import backfill_transactions_in_summary_flow
 from scheduled_tasks.daily_summary.weather import backfill_weather_in_summary_flow
 from scheduled_tasks.categorise_transactions import categorise_transactions_flow
+from scheduled_tasks.sleep_reminder import sleep_reminder_notify_flow, sleep_reminder_schedule_flow
 
 
 FLOW_REGISTRY = {
@@ -66,6 +67,8 @@ FLOW_REGISTRY = {
     "daily-summary-transactions":  backfill_transactions_in_summary_flow,
     "daily-summary-weather":       backfill_weather_in_summary_flow,
     "categorise-transactions":     categorise_transactions_flow,
+    "sleep-reminder-schedule":     sleep_reminder_schedule_flow,
+    "sleep-reminder-notify":       sleep_reminder_notify_flow,
 }
 
 
