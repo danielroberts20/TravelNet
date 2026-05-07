@@ -64,6 +64,14 @@ PAGE_SIZE = editable("PAGE_SIZE", "Number of records to fetch at a time", group=
 
 
 # ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+SLEEP_REMINDER_LOOKBACK_DAYS = editable("SLEEP_REMINDER_LOOKBACK_DAYS", "Number of past nights used to predict tonight's sleep onset time. Higher values smooth out unusual nights but are slower to adapt after a major timezone change.", group="Notifications")(14)
+SLEEP_REMINDER_LEAD_MINUTES = editable("SLEEP_REMINDER_LEAD_MINUTES", "How many minutes before your predicted sleep onset to send the reminder. 30 minutes gives time to wind down and get the watch on.", group="Notifications")(30)
+SLEEP_REMINDER_FALLBACK_TIME = editable("Sleep Reminder: Fallback Time (HH:MM)", "Reminder time used when fewer than SLEEP_REMINDER_MIN_DATA_NIGHTS nights of sleep data are available (e.g. first days after arrival). 24h format.", group="Notifications")("22:30")
+SLEEP_REMINDER_MIN_DATA_NIGHTS = editable("Sleep Reminder: Minimum Data Nights", "Minimum number of sleep onset records required before the model is used. Below this threshold the fallback time is used instead.", group="Notifications")(3)
+
+# ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
 
@@ -116,6 +124,8 @@ COUNTRY_DEPARTURE_DATES = editable("COUNTRY_DEPARTURE_DATES", "Dates", group="Tr
     "USA": datetime(year=2026, month=9, day=2)
 })
 
+# Derived from COUNTRY_DEPARTURE_DATES["UK"]; re-synced by _refresh_derived() after
+# a runtime override. Consumed by data-filter logic (Trevor, public stats, etc.).
 TRAVEL_START_DATE = COUNTRY_DEPARTURE_DATES.get("UK")
 TRAVEL_START_DATE_TIMESTAMP = int(TRAVEL_START_DATE.timestamp())
 
@@ -176,27 +186,35 @@ DWELL_MIN_POINTS = editable(key="DWELL_MIN_POINTS",
 # ---------------------------------------------------------------------------
 
 OPEN_METEO_URL = (URL("https://archive-api.open-meteo.com/v1/archive"))
-
+OPEN_METEO_FORECAST_URL = (URL("https://historical-forecast-api.open-meteo.com/v1/forecast"))
 HOURLY_VARS = editable("HOURLY_VARS", "OpenMeteo API variables that are per hour", group="Weather")([
     "temperature_2m",
     "apparent_temperature",
+    "relative_humidity_2m",
+    "dewpoint_2m",
     "precipitation",
     "windspeed_10m",
     "winddirection_10m",
+    "windgusts_10m",
     "weathercode",
-    "uv_index",
     "cloudcover",
-    "is_day"
-    ])
+    "surface_pressure",
+    "shortwave_radiation",
+    "is_day",
+])
 
 DAILY_VARS = editable("DAILY_VARS", "OpenMeteo API variables that are per day", group="Weather")([
     "sunrise",
     "sunset",
+    "temperature_2m_max",
+    "temperature_2m_min",
     "precipitation_sum",
     "precipitation_hours",
     "snowfall_sum",
     "wind_speed_10m_max",
-    "wind_gusts_10m_max"
+    "wind_gusts_10m_max",
+    "daylight_duration",
+    "sunshine_duration",
 ])
 
 # Coordinate rounding resolution — matches Open-Meteo's ~10 km grid
@@ -206,15 +224,19 @@ COORD_PRECISION = editable("COORD_PRECISION", "Number of decimal places to round
 REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMeteo request.\nPolite not to spam a free service", group="Weather")(0.5)
 
 
+WEATHER_LOOKBACK_DAYS = editable("Weather: Lookback Days", "Number of days of weather data to fetch per run.", group="Weather")(14)
+
+
+WEATHER_LAG_DAYS = editable("Weather: Lag Days", "How many days behind today to end the fetch window. Open-Meteo's archive endpoint requires at least 1-2 days lag.", group="Weather")(3)
+
 # ---------------------------------------------------------------------------
 # Foreign Exchange / Financial
 # ---------------------------------------------------------------------------
 
 COL_CITY_RADIUS_KM = editable("COL_CITY_RADIUS_KM", "Radius from the centre of a city to consider when matching for cost of living", group="Financial")(50)
 TRANSACTION_COL_BATCH_SIZE = editable("TRANSACTION_COL_BATCH_SIZE", "Batch size for computing cost of living for transactions when inserting them in to the daily summaries", group="Financial")(500)
-FX_BASE_URL = URL("https://api.exchangerate.host")
-FX_TIMEFRAME_URL = FX_BASE_URL / "timeframe"
-FX_DATE_URL = FX_BASE_URL / "historical"
+FX_TIMEFRAME_URL = URL("https://api.exchangerate.host/timeframe")
+FX_DATE_URL      = URL("https://api.exchangerate.host/historical")
 SELF_NAMES = editable("SELF_NAMES", "Names that may appear on transactions as you. NOT case sensitive", group="Financial")([
     "dan roberts",
     "daniel roberts",

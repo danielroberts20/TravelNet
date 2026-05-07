@@ -103,6 +103,7 @@ class DailySummaryRecord:
     temp_min_c:       Optional[float] = None
     precipitation_mm: Optional[float] = None
     weathercode:      Optional[int]   = None
+    uv_index_max:     Optional[float] = None
 
     # Pi
     photo_count:                   Optional[int]   = None
@@ -207,6 +208,7 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                     temp_min_c                    REAL,
                     precipitation_mm              REAL,
                     weathercode                   INTEGER,
+                    uv_index_max                  REAL,
 
                     photo_count                   INTEGER,
                     watchdog_heartbeats_received  INTEGER,
@@ -241,6 +243,10 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                 "CREATE INDEX IF NOT EXISTS idx_daily_summary_country "
                 "ON daily_summary(country_code)"
             )
+            try:
+                conn.execute("ALTER TABLE daily_summary ADD COLUMN uv_index_max REAL")
+            except Exception:
+                pass  # Column already exists
     
     def init_complete_view(self):
         with get_conn() as conn:

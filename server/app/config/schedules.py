@@ -31,7 +31,7 @@ SCHEDULE_CONFIGS = {
     "detect-flights":                   (None,                      "Manual: detect flight gaps from location history"),
 
     # Weather
-    "get-weather":                      ("0 4 14 * *",              "Retroactive weather fetch for previous 40 days"),
+    "get-weather":                      ("30 5 * * *",              "Retroactive weather fetch for previous days (configurable)."),
 
     # Transactions & finance
     "backfill-gbp":                     ("30 2 * * *",              "Daily backfill of NULL amount_gbp values using stored FX rates"),
@@ -64,8 +64,12 @@ SCHEDULE_CONFIGS = {
     # Daily summary
     "compute-daily-summary":            ("0 8 * * *",               "Compute health, location and Pi domains for the daily summary"),
     "daily-summary-transactions":       ("30 8 4 * *",              "Compute & backfill transaction domain for the daily summary"),
-    "daily-summary-weather":            ("30 5 14 * *",             "Compute & backfill weather domain for the daily summary"),
+    "daily-summary-weather":            ("0 6 * * *",             "Compute & backfill weather domain for the daily summary"),
     "daily-summary-health":             (None,                      "Manual: Compute health domain for the daily summary"),
     "daily-summary-location":           (None,                      "Manual: Compute location domain for the daily summary"),
     "daily-summary-pi":                 (None,                      "Manual: Compute Pi domain for the daily summary"),
+
+    # Sleep reminder
+    "sleep-reminder-schedule":          ("0 12 * * *",              "Calculate and schedule sleep reminder for tonight"),
+    "sleep-reminder-notify":            (None,                      "Manual: Send sleep reminder. Scheduled by the schedule flow")
 }

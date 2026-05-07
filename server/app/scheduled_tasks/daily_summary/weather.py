@@ -4,19 +4,17 @@ scheduled_tasks/daily_summary/weather.py
 
 Owns the weather columns of daily_summary.
 
-Weather fetch happens monthly on the 14th for the previous ~40 days, so
-this domain also runs monthly in a backfill mode. Explicitly sets
-weather_complete = 1 after each pass (not based on calendar age).
+Weather fetch happens daily at 05:30. This summary flow runs daily at
+06:00, processing only dates where weather_complete = 0 and weather
+data is available in weather_hourly.
 """
 from config.editable import load_overrides
 load_overrides()
 
-from datetime import datetime, timedelta, timezone as dt_timezone
-
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from config.general import COORD_PRECISION, BACKFILL_DAYS
+from config.general import COORD_PRECISION
 from database.connection import get_conn
 from notifications import notify_on_completion, record_flow_result
 from scheduled_tasks.daily_summary.base import Domain, never_auto_close
@@ -34,10 +32,17 @@ def compute_weather_data(conn, ctx: dict) -> dict:
     if lat is None or lon is None:
         # No dominant location means no weather — return all NULLs
         return {
-            "temp_max_c":       None,
-            "temp_min_c":       None,
-            "precipitation_mm": None,
-            "weathercode":      None,
+            "temp_max_c":                  None,
+            "temp_min_c":                  None,
+            "precipitation_mm":            None,
+            "weathercode":                 None,
+            "uv_index_max":                None,
+            "temp_avg_c":                  None,
+            "shortwave_radiation_avg_wm2": None,
+            "relative_humidity_avg_pct":   None,
+            "surface_pressure_avg_hpa":    None,
+            "daylight_duration_s":         None,
+            "sunshine_duration_s":         None,
         }
     return _weather(conn, ctx, lat, lon)
 
@@ -56,16 +61,10 @@ def _dominant_coords(conn, local_date: str) -> tuple:
 
 
 def _weather(conn, ctx: dict, lat: float, lon: float) -> dict:
-    """Temp extremes from hourly; precipitation from daily; wcode: most frequent hourly."""
-    hr = conn.execute("""
-        SELECT MAX(temperature_c) AS max_c, MIN(temperature_c) AS min_c
-        FROM weather_hourly
-        WHERE timestamp >= ? AND timestamp < ?
-          AND latitude = ? AND longitude = ?
-    """, (ctx["utc_start"], ctx["utc_end"], lat, lon)).fetchone()
-
+    """Temp extremes and daily fields from weather_daily; aggregates from hourly."""
     dl = conn.execute("""
-        SELECT precipitation_sum_mm
+        SELECT precipitation_sum_mm, temp_max_c, temp_min_c,
+               daylight_duration_s, sunshine_duration_s
         FROM weather_daily
         WHERE date = ? AND latitude = ? AND longitude = ?
     """, (ctx["date"], lat, lon)).fetchone()
@@ -73,16 +72,39 @@ def _weather(conn, ctx: dict, lat: float, lon: float) -> dict:
     wcode_row = conn.execute("""
         SELECT weathercode, COUNT(*) AS n FROM weather_hourly
         WHERE timestamp >= ? AND timestamp < ?
-          AND latitude = ? AND longitude = ?
+          AND ROUND(latitude,  ?) = ? AND ROUND(longitude, ?) = ?
           AND weathercode IS NOT NULL
         GROUP BY weathercode ORDER BY n DESC LIMIT 1
-    """, (ctx["utc_start"], ctx["utc_end"], lat, lon)).fetchone()
+    """, (ctx["utc_start"], ctx["utc_end"],
+          COORD_PRECISION, lat, COORD_PRECISION, lon)).fetchone()
+
+    agg_row = conn.execute("""
+        SELECT MAX(uv_index)                AS uv_max,
+               AVG(temperature_c)           AS temp_avg,
+               AVG(shortwave_radiation_wm2) AS sw_avg,
+               AVG(relative_humidity_pct)   AS rh_avg,
+               AVG(surface_pressure_hpa)    AS sp_avg
+        FROM weather_hourly
+        WHERE timestamp >= ? AND timestamp < ?
+          AND ROUND(latitude,  ?) = ? AND ROUND(longitude, ?) = ?
+    """, (ctx["utc_start"], ctx["utc_end"],
+          COORD_PRECISION, lat, COORD_PRECISION, lon)).fetchone()
+
+    def _r(val):
+        return round(val, 2) if val is not None else None
 
     return {
-        "temp_max_c":       round(hr["max_c"], 2) if hr and hr["max_c"] is not None else None,
-        "temp_min_c":       round(hr["min_c"], 2) if hr and hr["min_c"] is not None else None,
-        "precipitation_mm": dl["precipitation_sum_mm"] if dl else None,
-        "weathercode":      wcode_row["weathercode"]   if wcode_row else None,
+        "temp_max_c":                  _r(dl["temp_max_c"])    if dl else None,
+        "temp_min_c":                  _r(dl["temp_min_c"])    if dl else None,
+        "precipitation_mm":            dl["precipitation_sum_mm"] if dl else None,
+        "weathercode":                 wcode_row["weathercode"] if wcode_row else None,
+        "uv_index_max":                _r(agg_row["uv_max"])   if agg_row else None,
+        "temp_avg_c":                  _r(agg_row["temp_avg"]) if agg_row else None,
+        "shortwave_radiation_avg_wm2": _r(agg_row["sw_avg"])   if agg_row else None,
+        "relative_humidity_avg_pct":   _r(agg_row["rh_avg"])   if agg_row else None,
+        "surface_pressure_avg_hpa":    _r(agg_row["sp_avg"])   if agg_row else None,
+        "daylight_duration_s":         dl["daylight_duration_s"]  if dl else None,
+        "sunshine_duration_s":         dl["sunshine_duration_s"]  if dl else None,
     }
 
 
@@ -93,7 +115,9 @@ def _weather(conn, ctx: dict, lat: float, lon: float) -> dict:
 WEATHER_DOMAIN = Domain(
     name="weather",
     columns=frozenset({
-        "temp_max_c", "temp_min_c", "precipitation_mm", "weathercode",
+        "temp_max_c", "temp_min_c", "precipitation_mm", "weathercode", "uv_index_max",
+        "temp_avg_c", "shortwave_radiation_avg_wm2", "relative_humidity_avg_pct",
+        "surface_pressure_avg_hpa", "daylight_duration_s", "sunshine_duration_s",
     }),
     completeness_flag="weather_complete",
     compute_fn=compute_weather_data,
@@ -124,11 +148,17 @@ def compute_weather_flow(local_date: str) -> dict:
 
 @task
 def find_dates_in_window() -> list[str]:
-    cutoff = (datetime.now(dt_timezone.utc).date() - timedelta(days=BACKFILL_DAYS))
     with get_conn(read_only=True) as conn:
         rows = conn.execute("""
-            SELECT date FROM daily_summary WHERE date >= ? ORDER BY date ASC
-        """, (cutoff.isoformat(),)).fetchall()
+            SELECT ds.date
+            FROM daily_summary ds
+            WHERE ds.weather_complete = 0
+              AND EXISTS (
+                  SELECT 1 FROM weather_hourly wh
+                  WHERE DATE(wh.timestamp) = ds.date
+              )
+            ORDER BY ds.date ASC
+        """).fetchall()
     return [r["date"] for r in rows]
 
 
@@ -139,9 +169,9 @@ def find_dates_in_window() -> list[str]:
 )
 def backfill_weather_in_summary_flow():
     """
-    Monthly: recompute weather columns for every date in the last
-    BACKFILL_DAYS days and mark weather_complete = 1.
-    Scheduled: 14th of each month at 04:30 (30 min after the weather fetch).
+    Daily: compute weather columns for any date where weather_complete = 0
+    and weather data exists. Marks weather_complete = 1 on success.
+    Scheduled: daily at 06:00 (30 min after the weather fetch at 05:30).
     """
     logger = get_run_logger()
     dates  = find_dates_in_window()
