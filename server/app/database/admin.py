@@ -186,8 +186,12 @@ def list_r2_backups():
 def _restore_stream(filename: str, live: bool) -> Generator[str, None, None]:
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        encrypted = tmp_path / filename
-        decrypted = tmp_path / filename.removesuffix(".age")
+        
+        remote_path = Path(filename)          # can be "dir/name.db.age"
+        local_name = remote_path.name         # always "name.db.age"
+
+        encrypted = tmp_path / local_name
+        decrypted = tmp_path / Path(local_name).with_suffix("")
 
         # Step 1: Download
         yield _sse(f"── Step 1: Downloading {filename} from R2…")

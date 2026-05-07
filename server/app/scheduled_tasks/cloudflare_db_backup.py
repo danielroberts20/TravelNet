@@ -92,11 +92,11 @@ def _encrypt(src: Path, dest: Path, key_path: str) -> None:
     ])
 
 
-def _upload_to_r2(path: Path) -> None:
+def _upload_to_r2(path: Path, dir: str) -> None:
     _run([
         "rclone", "copy",
         str(path),
-        f"{settings.rclone_remote}:{settings.rclone_bucket}/",
+        f"{settings.rclone_remote}:{settings.rclone_bucket}/{dir}/",
     ], timeout=180)
 
 
@@ -121,6 +121,7 @@ def _verify_upload(filename: str) -> int:
 def cloudflare_backup_db_flow(
     prefix: str | None = None,
     suffix: str | None = None,
+    directory: str = "travelnet-backup"
 ):
     logger = get_run_logger()
 
@@ -159,11 +160,11 @@ def cloudflare_backup_db_flow(
 
         # Step 4 — upload
         logger.info("Uploading to R2…")
-        _upload_to_r2(encrypted_path)
+        _upload_to_r2(encrypted_path, directory)
 
         # Step 5 — verify upload
         logger.info("Verifying upload…")
-        uploaded_bytes = _verify_upload(age_filename)
+        uploaded_bytes = _verify_upload(f"{directory}/{age_filename}")
         local_bytes = encrypted_path.stat().st_size
         if uploaded_bytes != local_bytes:
             raise RuntimeError(
