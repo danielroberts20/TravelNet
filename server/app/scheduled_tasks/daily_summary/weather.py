@@ -132,7 +132,6 @@ WEATHER_DOMAIN = Domain(
 
 @flow(
     name="Compute Daily Summary — Weather",
-    on_completion=[notify_on_completion],
     on_failure=[notify_on_completion],
 )
 def compute_weather_flow(local_date: str) -> dict:
@@ -164,7 +163,6 @@ def find_dates_in_window() -> list[str]:
 
 @flow(
     name="Backfill Weather in Summary",
-    on_completion=[notify_on_completion],
     on_failure=[notify_on_completion],
 )
 def backfill_weather_in_summary_flow():

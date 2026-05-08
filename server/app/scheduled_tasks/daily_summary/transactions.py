@@ -124,7 +124,6 @@ TRANSACTIONS_DOMAIN = Domain(
 
 @flow(
     name="Compute Daily Summary — Transactions",
-    on_completion=[notify_on_completion],
     on_failure=[notify_on_completion],
 )
 def compute_transactions_flow(local_date: str) -> dict:
@@ -253,7 +252,6 @@ def backfill_col_normalisation(force: bool = False) -> dict:
 
 @flow(
     name="Backfill Transactions in Summary",
-    on_completion=[notify_on_completion],
     on_failure=[notify_on_completion],
 )
 def backfill_transactions_in_summary_flow(force_col: bool = False):

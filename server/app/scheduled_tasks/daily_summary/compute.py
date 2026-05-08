@@ -88,7 +88,6 @@ def get_dates_to_compute() -> list[str]:
 
 @flow(
     name="Compute Daily Summary",
-    on_completion=[notify_on_completion],
     on_failure=[notify_on_completion],
 )
 def compute_daily_summary_flow():
