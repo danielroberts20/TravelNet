@@ -115,7 +115,6 @@ def _verify_upload(filename: str) -> int:
 
 @flow(
     name="Cloudflare DB Backup",
-    on_completion=[notify_on_completion],
     on_failure=[notify_on_completion],
 )
 def cloudflare_backup_db_flow(

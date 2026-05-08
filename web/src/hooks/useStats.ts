@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 const LIVE_URL = 'https://public.travelnet.dev/public/stats';
-const FALLBACK_URL = '/public_stats.json';
+const FALLBACK_URL = 'https://danielroberts20.github.io/TravelNet/public_stats.json';
 const TIMEOUT_MS = 5000;
 
 export interface CurrentLeg {
