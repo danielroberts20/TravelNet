@@ -4,8 +4,8 @@ scheduled_tasks/push_public_stats.py
 Daily cron (7am) — queries the DB, builds the public stats payload,
 and pushes docs/public_stats.json to the TravelNet GitHub repo.
 
-The committed JSON acts as a warm cache for the docs site — it falls
-back to this file if the live endpoint is unreachable.
+This file is served via GitHub Pages and acts as a warm cache for the
+demo website fallback when the live endpoint is unreachable.
 """
 from config.editable import load_overrides
 load_overrides()
@@ -28,12 +28,7 @@ TARGET_PATH = "docs/public_stats.json"
 TARGET_BRANCH = "main"
 
 
-def _get_current_sha(headers: dict, logger) -> str | None:
-    """
-    Get the current blob SHA of docs/public_stats.json from GitHub.
-    Required by the GitHub Contents API to update an existing file.
-    Returns None if the file doesn't exist yet (first run).
-    """
+def _get_current_sha(headers: dict) -> str | None:
     url = f"{GITHUB_API}/repos/{settings.github_repo}/contents/{TARGET_PATH}"
     resp = requests.get(url, headers=headers, timeout=10, params={"ref": TARGET_BRANCH})
     if resp.status_code == 200:
@@ -64,7 +59,7 @@ def push_stats_to_github(payload: dict) -> str:
     content = json.dumps(payload, indent=2, ensure_ascii=False)
     encoded = base64.b64encode(content.encode()).decode()
 
-    sha = _get_current_sha(headers, logger)
+    sha = _get_current_sha(headers)
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     body = {
