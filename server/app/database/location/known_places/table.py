@@ -56,7 +56,8 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
                     known_place_id INTEGER NOT NULL REFERENCES known_places(id) ON DELETE CASCADE,
                     arrived_at     TEXT NOT NULL,
                     departed_at    TEXT,
-                    duration_mins  INTEGER
+                    duration_mins  INTEGER,
+                    notes          TEXT
                 );
             """)
 
