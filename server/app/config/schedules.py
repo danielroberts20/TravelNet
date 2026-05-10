@@ -23,7 +23,7 @@ SCHEDULE_CONFIGS = {
     "retroactive-location-scan":        ("15 3 */2 * *",            "Every other night: retroactive scan for missed location stays"),
 
     # Weekly location analysis (Sunday)
-    "weekly-location-analysis":         ("45 4 * * 0",              "Weekly: geocode new places then detect timezone/country transitions and flights"),
+    "weekly-location-analysis":         ("45 3 * * 0",              "Weekly: geocode new places then detect timezone/country transitions and flights"),
 
     # Manual-only subflow re-runs
     "detect-country-transitions":       (None,                      "Manual: detect country crossings from location history"),

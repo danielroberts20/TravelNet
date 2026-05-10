@@ -13,7 +13,9 @@ import json
 import logging
 from dataclasses import dataclass
 from typing import Optional
+from datetime import datetime, timedelta
 
+from notifications import send_notification
 from config.general import LOCATION_NOISE_ACCURACY_THRESHOLD
 from database.location.noise.table import table as noise_table, LocationNoiseRecord
 from database.base import BaseTable
@@ -22,6 +24,12 @@ from database.location.overland.util import _normalise_ts
 from models.telemetry import OverlandPayload
 
 logger = logging.getLogger(__name__)
+
+
+NOISE_COUNTER_THRESHOLD = 5 # Threshold of noise batches before triggering an alert
+NOISE_BATCH_THRESHOLD = 2 # Number of noise points in a single batch to increment the noise counter
+NOISE_BATCH_BYPASS_THRESHOLD = 8 # Number of noise points in a single batch that triggers an alert regardless of counter state
+NOISE_RESET_WINDOW = timedelta(hours=1) # Number of recent batches to consider for noise counter. If the noise counter has not increased in the last X batches, reset it to 0. This prevents stale noise counters from triggering alerts after a long period of quiet.
 
 
 @dataclass
@@ -95,6 +103,9 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
             CREATE INDEX IF NOT EXISTS idx_overland_place
                 ON location_overland(place_id);
             """)
+        
+        self.noise_counter = 0
+        self.last_noisy_at = None
 
     def insert(self, record: OverlandRecord) -> None:
         """Insert a single Overland location row. Idempotent on (device_id, timestamp)."""
@@ -235,11 +246,22 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
                 f"{ts} ({lat}, {lon}). Inserted to noise table as tier 1 noise."
             )
 
+        if len(pending_noise) >= NOISE_BATCH_BYPASS_THRESHOLD:
+            send_notification(title="⚠️ Location Noise", body=f"Detected {len(pending_noise)} noise points in latest batch.")
+        elif len(pending_noise) >= NOISE_BATCH_THRESHOLD:
+            if self.last_noisy_at and (datetime.now() - self.last_noisy_at) > NOISE_RESET_WINDOW:
+                self.noise_counter = 0
+                logger.info(f"No noisy batch in {NOISE_RESET_WINDOW}. Resetting noise counter.")
+            self.noise_counter += 1
+            self.last_noisy_at = datetime.now()
+            if self.noise_counter >= NOISE_COUNTER_THRESHOLD:
+                send_notification(title="⚠️ Location Noise", body=f"Detected {self.noise_counter} noisy batches. Latest had {len(pending_noise)} noise points.")
+
         logger.info(
             f"Overland batch: {len(payload.locations)} received, "
             f"{inserted} inserted, {skipped} skipped (duplicates/errors)"
         )
-
+        
         return inserted, skipped
 
 
