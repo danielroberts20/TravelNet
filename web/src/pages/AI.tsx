@@ -197,54 +197,52 @@ export default function AI() {
           <p className="section-eyebrow reveal">Agent 2 of 4</p>
           <h2 className="section-title reveal">Multi-Agent Travel Analyst</h2>
           <p style={{ color: 'var(--accent-orange)', fontStyle: 'italic', marginBottom: 'var(--space-5)' }} className="reveal">
-            &ldquo;Specialist agents working in parallel to answer questions no single query could.&rdquo;
+            &ldquo;Specialist agents as tools — deeper domain reasoning within Trevor&apos;s existing architecture.&rdquo;
           </p>
 
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 'var(--space-4)' }} className="reveal">
-            Trevor handles straightforward queries well. But some questions are genuinely cross-domain:
-            &ldquo;Was Melbourne my most expensive city, adjusted for what I was actually doing there?&rdquo; requires
-            reasoning over spend, activity type, location clusters, and ML destination profiles simultaneously.
+            Trevor handles cross-domain queries by calling multiple SQL tools in a single turn — this works
+            well for most questions. But some queries require more than fetching data: they require reasoning
+            across several variables within a domain before synthesis is possible. &ldquo;Was Melbourne my most
+            expensive city, adjusted for what I was actually doing there?&rdquo; isn&apos;t answered by a single
+            query — it requires joining transactions, CoL normalisation, accommodation type, and interpreting
+            the result as a domain-level conclusion.
           </p>
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 'var(--space-5)' }} className="reveal">
-            The Multi-Agent Analyst is a LangGraph <span className="mono" style={{ fontSize: '0.9em' }}>StateGraph</span> that
-            Trevor can escalate complex queries to. An orchestrator agent reads the query, decomposes it, and dispatches
-            to specialist sub-agents that run in parallel. Results are collected and synthesised into a single coherent answer.
+            The multi-agent pattern solves this by adding agent tools to Trevor&apos;s existing tool list. Each
+            agent is a LangGraph sub-graph that receives a natural language query, makes multiple tool calls
+            within its domain, reasons about what it finds, and returns a structured conclusion. From Trevor&apos;s
+            perspective, calling an agent tool is identical to calling a SQL tool — Trevor&apos;s LLM decides
+            which is appropriate. Trevor&apos;s system prompt is extended to describe when agents are available
+            and when to prefer them; no separate routing layer or escalation mechanism is needed.
           </p>
 
           <div className="reveal">
-            <AgentGraph lines={`User query (via Trevor)
+            <AgentGraph lines={`Trevor receives query
         ↓
-  Orchestrator Agent
-  (decomposes query, selects relevant sub-agents)
-        ↓ (parallel dispatch via LangGraph send())
-┌──────────────────┬──────────────────┬──────────────────┐
-│   BudgetAgent    │  ActivityAgent   │   HealthAgent    │
-│  (transactions,  │  (workouts,      │  (daily_summary, │
-│   CoL norm,      │   movement,      │   HRV, sleep,    │
-│   spend cols)    │   location       │   training load) │
-│                  │   clusters)      │                  │
-└──────────────────┴──────────────────┴──────────────────┘
-        ↓ (collect)
-  Narrative Agent
-  (synthesises sub-agent outputs into final answer)
+  Trevor's LLM (existing tool-calling turn)
+  ├── Direct SQL tools (simple lookups — unchanged)
+  └── Agent tools (when domain reasoning needed)
         ↓
-  Trevor response`} />
+  ┌─────────────────┬─────────────────┬─────────────────┐
+  │  BudgetAgent    │  HealthAgent    │  ActivityAgent  │
+  │  (internal      │  (internal      │  (internal      │
+  │  LangGraph      │  LangGraph      │  LangGraph      │
+  │  sub-graph)     │  sub-graph)     │  sub-graph)     │
+  └─────────────────┴─────────────────┴─────────────────┘
+        ↓
+  Domain conclusions returned as tool results
+        ↓
+  Trevor synthesises final answer`} />
           </div>
-
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, marginTop: 'var(--space-5)', marginBottom: 'var(--space-5)' }} className="reveal">
-            Each sub-agent is constrained to tool calls only — it cannot speculate without querying data.
-            This prevents hallucination by design: if the data doesn&apos;t exist, the agent returns{' '}
-            <span className="mono" style={{ fontSize: '0.9em' }}>null</span> for that domain rather than
-            fabricating an answer. The narrative agent is only as confident as the data it receives.
-          </p>
 
           <div className="reveal">
             <TechTable rows={[
-              ['Orchestration', 'LangGraph StateGraph with typed AgentState'],
-              ['Parallelism',   'LangGraph send() API for concurrent sub-agent execution'],
-              ['Tools',         'SQLite query tools per domain, read-only'],
-              ['LLM',           'Claude Haiku 3.5 for sub-agents (speed), Claude Sonnet for narrative'],
-              ['Integration',   'Trevor /analyse endpoint triggers the graph'],
+              ['Pattern',           'Agent-as-tool (LangGraph sub-graph exposed as a LangChain tool)'],
+              ['Orchestration',     "Trevor's existing LLM turn — no separate routing layer"],
+              ['LLM stack',         'ChatOpenAI / ChatAnthropic via LangChain (same graph, swappable model)'],
+              ['Agent internals',   'LangGraph StateGraph, multiple tool calls, domain-level synthesis'],
+              ['Integration point', "Trevor's tool list + system prompt addition"],
             ]} />
           </div>
 
