@@ -26,7 +26,7 @@ def test_happy_path_inserts_row(db):
         "Amount": "-10.00", "Currency": "USD", "Description": "Starbucks",
         "State": "COMPLETED", "Fee": "0.0", "Balance": "90.00",
     }])
-    inserted, skipped, errors = run_insert(db, csv_content)
+    inserted, upgraded, skipped, errors = run_insert(db, csv_content)
     assert inserted == 1
     assert skipped == 0
     assert errors == 0
@@ -69,7 +69,7 @@ def test_deduplication_same_csv_uploaded_twice(db):
         "State": "COMPLETED", "Fee": "0.0", "Balance": "90.00",
     }])
     run_insert(db, csv_content)
-    inserted2, skipped2, _ = run_insert(db, csv_content)
+    inserted2, _, skipped2, _ = run_insert(db, csv_content)
     assert inserted2 == 0
     assert skipped2 == 1
     assert row_count(db) == 1
@@ -83,7 +83,7 @@ def test_deduplication_same_merchant_same_second(db):
         "State": "COMPLETED", "Fee": "0.0", "Balance": "90.00",
     }
     csv_content = make_revolut_csv([row, row])
-    inserted, skipped, errors = run_insert(db, csv_content)
+    inserted, upgraded, skipped, errors = run_insert(db, csv_content)
     assert inserted == 1
     assert skipped == 1
     assert row_count(db) == 1
@@ -94,7 +94,7 @@ def test_skips_row_missing_started_date(db):
         "Type": "CARD PAYMENT", "Started Date": "",
         "Amount": "-10.00", "Currency": "USD", "Description": "Starbucks",
     }])
-    inserted, skipped, errors = run_insert(db, csv_content)
+    inserted, upgraded, skipped, errors = run_insert(db, csv_content)
     assert inserted == 0
     assert skipped == 1
 
@@ -104,7 +104,7 @@ def test_skips_row_missing_amount(db):
         "Type": "CARD PAYMENT", "Started Date": "2026-03-01 10:00:00",
         "Amount": "", "Currency": "USD", "Description": "Starbucks",
     }])
-    inserted, skipped, errors = run_insert(db, csv_content)
+    inserted, upgraded, skipped, errors = run_insert(db, csv_content)
     assert inserted == 0
     assert skipped == 1
 
@@ -153,13 +153,13 @@ def test_multiple_rows_inserted(db):
          "State": "COMPLETED", "Fee": "2.0", "Balance": "40.00"},
     ]
     csv_content = make_revolut_csv(rows)
-    inserted, skipped, errors = run_insert(db, csv_content)
+    inserted, upgraded, skipped, errors = run_insert(db, csv_content)
     assert inserted == 2
     assert row_count(db) == 2
 
 
 def test_empty_csv_inserts_nothing(db):
     csv_content = make_revolut_csv([])
-    inserted, skipped, errors = run_insert(db, csv_content)
+    inserted, upgraded, skipped, errors = run_insert(db, csv_content)
     assert inserted == 0
     assert row_count(db) == 0
