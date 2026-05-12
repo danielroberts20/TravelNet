@@ -10,8 +10,8 @@ import AI from './pages/AI';
 import Trevor from './pages/Trevor';
 
 function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const { pathname, hash } = useLocation();
+  useEffect(() => { if (!hash) window.scrollTo(0, 0); }, [pathname, hash]);
   return null;
 }
 
