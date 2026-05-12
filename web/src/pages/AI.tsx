@@ -197,53 +197,25 @@ export default function AI() {
           <p className="section-eyebrow reveal">Agent 2 of 4</p>
           <h2 className="section-title reveal">Multi-Agent Travel Analyst</h2>
           <p style={{ color: 'var(--accent-orange)', fontStyle: 'italic', marginBottom: 'var(--space-5)' }} className="reveal">
-            &ldquo;Specialist agents as tools — deeper domain reasoning within Trevor&apos;s existing architecture.&rdquo;
+            &ldquo;Specialist sub-agents extending Trevor&apos;s existing architecture.&rdquo;
           </p>
 
           <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 'var(--space-4)' }} className="reveal">
-            Trevor handles cross-domain queries by calling multiple SQL tools in a single turn — this works
-            well for most questions. But some queries require more than fetching data: they require reasoning
-            across several variables within a domain before synthesis is possible. &ldquo;Was Melbourne my most
-            expensive city, adjusted for what I was actually doing there?&rdquo; isn&apos;t answered by a single
-            query — it requires joining transactions, CoL normalisation, accommodation type, and interpreting
-            the result as a domain-level conclusion.
+            Trevor is already a RAG-based multi-agent system — it retrieves journal context from a vector
+            store, queries structured data via SQL tools, and synthesises across both. The planned extension
+            adds specialist sub-agents to Trevor&apos;s tool list: a BudgetAgent, HealthAgent, and ActivityAgent,
+            each running a LangGraph sub-graph that does deep domain reasoning before returning a conclusion
+            Trevor can use.
           </p>
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 'var(--space-5)' }} className="reveal">
-            The multi-agent pattern solves this by adding agent tools to Trevor&apos;s existing tool list. Each
-            agent is a LangGraph sub-graph that receives a natural language query, makes multiple tool calls
-            within its domain, reasons about what it finds, and returns a structured conclusion. From Trevor&apos;s
-            perspective, calling an agent tool is identical to calling a SQL tool — Trevor&apos;s LLM decides
-            which is appropriate. Trevor&apos;s system prompt is extended to describe when agents are available
-            and when to prefer them; no separate routing layer or escalation mechanism is needed.
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 'var(--space-4)' }} className="reveal">
+            The full architecture — how Trevor works, where the sub-agents fit, and how the system prompt
+            is extended to describe them — is documented on the Trevor page.
           </p>
 
-          <div className="reveal">
-            <AgentGraph lines={`Trevor receives query
-        ↓
-  Trevor's LLM (existing tool-calling turn)
-  ├── Direct SQL tools (simple lookups — unchanged)
-  └── Agent tools (when domain reasoning needed)
-        ↓
-  ┌─────────────────┬─────────────────┬─────────────────┐
-  │  BudgetAgent    │  HealthAgent    │  ActivityAgent  │
-  │  (internal      │  (internal      │  (internal      │
-  │  LangGraph      │  LangGraph      │  LangGraph      │
-  │  sub-graph)     │  sub-graph)     │  sub-graph)     │
-  └─────────────────┴─────────────────┴─────────────────┘
-        ↓
-  Domain conclusions returned as tool results
-        ↓
-  Trevor synthesises final answer`} />
-          </div>
-
-          <div className="reveal">
-            <TechTable rows={[
-              ['Pattern',           'Agent-as-tool (LangGraph sub-graph exposed as a LangChain tool)'],
-              ['Orchestration',     "Trevor's existing LLM turn — no separate routing layer"],
-              ['LLM stack',         'ChatOpenAI / ChatAnthropic via LangChain (same graph, swappable model)'],
-              ['Agent internals',   'LangGraph StateGraph, multiple tool calls, domain-level synthesis'],
-              ['Integration point', "Trevor's tool list + system prompt addition"],
-            ]} />
+          <div className="reveal" style={{ marginBottom: 'var(--space-5)' }}>
+            <Link to="/trevor" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 500 }}>
+              → See Trevor&apos;s architecture
+            </Link>
           </div>
 
           <div className="reveal">

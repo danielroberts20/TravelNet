@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { TREVOR_REPO, GITHUB_REPO } from '../data/travel';
 
 function useReveal() {
@@ -48,6 +49,84 @@ const ARCH_STEPS = [
     title: 'Hybrid Retrieval',
     text: 'Both tools in a single turn for cross-stream questions. The LLM decides what to call — no hardcoded router.',
   },
+];
+
+function TechTable({ rows }: { rows: [string, string][] }) {
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '1px',
+      background: 'var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden',
+      marginTop: 'var(--space-4)',
+    }}>
+      {rows.map(([label, detail]) => (
+        <div key={label} style={{ display: 'contents' }}>
+          <div style={{
+            background: 'var(--bg-sunken)', padding: 'var(--space-2) var(--space-4)',
+            fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)',
+            fontWeight: 600, whiteSpace: 'nowrap',
+          }}>{label}</div>
+          <div style={{
+            background: 'var(--surface)', padding: 'var(--space-2) var(--space-4)',
+            fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5,
+          }}>{detail}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AgentGraph({ lines }: { lines: string }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-secondary)',
+      background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)',
+      padding: 'var(--space-4) var(--space-5)', lineHeight: 1.8,
+      overflowX: 'auto', marginTop: 'var(--space-6)', whiteSpace: 'pre',
+    }}>{lines}</div>
+  );
+}
+
+const RAG_CARDS = [
+  {
+    icon: '🔍',
+    label: 'retrieval',
+    title: 'Retrieval',
+    text: 'Journal entries are embedded at ingestion time and stored in a Chroma vector store. When a query arrives, Trevor performs semantic search to retrieve the most relevant entries — matching by meaning, not keywords. Structured data (health, spend, location, weather) is retrieved via SQL tool calls against TravelNet\'s SQLite database.',
+  },
+  {
+    icon: '🔀',
+    label: 'orchestration',
+    title: 'Orchestration',
+    text: 'Trevor\'s LLM decides which tools to call based on the query. For a question about a specific day it might call one SQL tool. For a complex cross-domain question it might call several — or delegate to a specialist sub-agent. The number of steps is not fixed; the model determines the path at runtime.',
+  },
+  {
+    icon: '✦',
+    label: 'generation',
+    title: 'Generation',
+    text: 'Once Trevor has retrieved sufficient context, it generates an answer grounded in the actual data. Responses cite specific dates, amounts, and journal excerpts rather than generalisations. If the data doesn\'t support a confident answer, Trevor says so.',
+  },
+];
+
+const AGENT_DIAGRAM = `User query
+     ↓
+Trevor (orchestrator agent)
+     ├── Semantic search  →  Chroma vector store (journal entries)
+     ├── SQL tools        →  TravelNet SQLite (health, spend, location, weather)
+     └── Sub-agent tools (when deep domain reasoning needed)
+           ├── BudgetAgent   — spending, CoL normalisation, budget trajectory
+           ├── HealthAgent   — HRV, sleep, training load, recovery
+           └── ActivityAgent — movement, location clusters, transport modes
+     ↓
+Synthesised answer grounded in retrieved data`;
+
+const TECH_STACK: [string, string][] = [
+  ['Vector store',       'Chroma (persistent, Docker volume)'],
+  ['Embeddings',         'OpenAI text-embedding-3-small'],
+  ['LLM',               'GPT-4o-mini (swappable — Haiku 3.5 planned)'],
+  ['Framework',         'FastAPI, LangChain tool-calling'],
+  ['Sub-agents',        'LangGraph StateGraph (planned)'],
+  ['Data access',       'Direct SQLite read-only bind mount'],
+  ['Ingestion trigger', 'iOS Shortcut → TravelNet API → Trevor pipeline'],
 ];
 
 const FEATURES = [
@@ -215,8 +294,68 @@ export default function Trevor() {
         </div>
       </section>
 
-      {/* ── Features ──────────────────────────────────────── */}
+      {/* ── Multi-agent architecture ──────────────────────── */}
       <section>
+        <div className="section-inner">
+          <p className="section-eyebrow reveal">How It Works</p>
+          <h2 className="section-title reveal">A RAG-Based Multi-Agent System</h2>
+          <p className="section-subtitle reveal">
+            Trevor is not a wrapper around an LLM. It is a multi-agent system: an orchestrator agent
+            that retrieves relevant context from two sources &mdash; a Chroma vector store for journal
+            entries, and TravelNet&apos;s SQLite database for structured telemetry &mdash; then
+            synthesises across both to answer a question. The retrieval step is what makes it RAG
+            (Retrieval-Augmented Generation): rather than asking the LLM to recall facts from
+            training, Trevor fetches the actual data and puts it in context.
+          </p>
+
+          <div className="trevor-arch-steps" style={{ marginTop: 'var(--space-7)' }}>
+            {RAG_CARDS.map(step => (
+              <div key={step.label} className="trevor-arch-step reveal">
+                <div className="trevor-arch-step-icon">{step.icon}</div>
+                <div className="trevor-arch-step-label">{step.label}</div>
+                <div className="trevor-arch-step-title">{step.title}</div>
+                <p className="trevor-arch-step-text">{step.text}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="reveal">
+            <AgentGraph lines={AGENT_DIAGRAM} />
+          </div>
+
+          <div className="reveal" style={{
+            marginTop: 'var(--space-7)', paddingTop: 'var(--space-6)',
+            borderTop: '1px solid var(--border)',
+          }}>
+            <p style={{
+              fontSize: 11, color: 'var(--accent-purple)', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.1em',
+              marginBottom: 'var(--space-3)',
+            }}>Planned Extension &mdash; Specialist Sub-Agents</p>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, maxWidth: 680 }}>
+              Trevor&apos;s tool list is designed to be extended with sub-agents for queries that
+              require more than fetching a value. Each sub-agent is a LangGraph sub-graph that
+              receives a natural language query, makes multiple tool calls within its domain, and
+              returns a domain-level conclusion &mdash; for example, &ldquo;Melbourne was 1.4&times;
+              your trip average spend, but 0.9&times; when adjusted for accommodation type and cost
+              of living.&rdquo; Trevor&apos;s system prompt describes when to prefer a sub-agent over
+              a direct SQL tool.
+            </p>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, maxWidth: 680, marginTop: 'var(--space-3)' }}>
+              This is the agent-as-tool pattern: from Trevor&apos;s perspective, calling a sub-agent
+              is identical to calling a SQL tool. The complexity is encapsulated inside the sub-graph.
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 'var(--space-4)' }}>
+              <Link to="/ai" style={{ color: 'var(--accent-purple)', textDecoration: 'none' }}>
+                &rarr; See the AI Features page for implementation detail
+              </Link>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features ──────────────────────────────────────── */}
+      <section style={{ background: 'var(--bg-sunken)' }}>
         <div className="section-inner">
           <p className="section-eyebrow reveal">Capabilities</p>
           <h2 className="section-title reveal">What Trevor does.</h2>
@@ -231,6 +370,20 @@ export default function Trevor() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Tech stack ────────────────────────────────────── */}
+      <section>
+        <div className="section-inner">
+          <p className="section-eyebrow reveal">Stack</p>
+          <h2 className="section-title reveal">Built on.</h2>
+          <p className="section-subtitle reveal">
+            The components that make Trevor&apos;s retrieval and generation pipeline work.
+          </p>
+          <div className="reveal">
+            <TechTable rows={TECH_STACK} />
           </div>
         </div>
       </section>
