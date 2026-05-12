@@ -148,6 +148,8 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
                 return results, errors
 
             inserted = 0
+            upgraded = 0
+            skipped = 0
 
             with get_conn() as conn:
                 cursor = conn.cursor()
@@ -162,7 +164,8 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
                     col_id = cost_of_living["id"] if cost_of_living else None
                     amount_normalised = row["amount_gbp"] * (get_uk_col_index(conn) / cost_of_living["col_index"]) if cost_of_living else None
                     
-                    result = cursor.execute("""
+                    result = cursor.execute(
+                        """
                         INSERT OR IGNORE INTO transactions (
                             id, source, bank, timestamp, amount, currency,
                             amount_gbp, description, payment_reference, payer,
@@ -176,13 +179,39 @@ def insert(zf: ZipFile, csv_filename: str, source: str = "unknown"):
                             :state, :is_internal, :is_interest, :running_balance, :raw, :place_id,
                             :col_id, :amount_normalised
                         )
-                    """, row | {"place_id": place_id, 
-                                "amount_normalised": amount_normalised,
-                                "col_id": col_id})
-                    inserted += result.rowcount
+                        """,
+                        row | {"place_id": place_id, "amount_normalised": amount_normalised, "col_id": col_id},
+                    )
+                    if result.rowcount == 1:
+                        inserted += 1
+                    else:
+                        merged = row | {"place_id": place_id, "amount_normalised": amount_normalised, "col_id": col_id}
+                        upgrade = cursor.execute(
+                            """
+                            UPDATE transactions SET
+                                state      = :state,
+                                amount_gbp = COALESCE(:amount_gbp, amount_gbp),
+                                raw        = :raw
+                            WHERE id = :id AND currency = :currency AND source = :source
+                            AND :state = 'COMPLETED'
+                            AND state != 'COMPLETED'
+                            """,
+                            merged,
+                        )
+                        if upgrade.rowcount == 1:
+                            upgraded += 1
+                            logger.info(f"State upgraded to COMPLETED: {merged['id']} ({merged['currency']})")
+                        else:
+                            skipped += 1
 
                 conn.commit()
-            results.append({"file": csv_filename, "inserted": inserted, "parsed": len(rows)})
+            results.append({
+                "file": csv_filename,
+                "inserted": inserted,
+                "upgraded": upgraded,
+                "skipped": skipped,
+                "parsed": len(rows),
+            })
             logger.info(f"Inserting {inserted} transactions from Wise-{source} ({WISE_SOURCE_MAP[source]})...")
     except Exception as e:
         errors.append({"file": csv_filename, "error": str(e)})

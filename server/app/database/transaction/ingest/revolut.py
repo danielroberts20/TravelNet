@@ -85,12 +85,14 @@ def _parse_timestamp(dt_str: str) -> str:
 def insert(csv_text: str, source: str = "revolut"):
     """Parse and upsert all rows from a Revolut CSV export.
 
-    Uses INSERT OR IGNORE so re-uploading the same file is safe.  Sends a
-    Pushcut notification with a row count summary on completion.
+    Re-uploading the same file is safe — duplicates are silently skipped.
+    A pending transaction will be upgraded to COMPLETED if a later export
+    contains a completed version of the same composite ID.
 
-    :returns: (inserted, skipped, errors) counts.
+    :returns: (inserted, upgraded, skipped, errors) counts.
     """
     inserted = 0
+    upgraded = 0
     skipped = 0
     errors = 0
 
@@ -171,7 +173,6 @@ def insert(csv_text: str, source: str = "revolut"):
                     "amount_normalised": amount_normalised,
                 }
                 cleaned_txn_dict = maybe_mark_internal(txn_dict)
-
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO transactions (
@@ -180,20 +181,37 @@ def insert(csv_text: str, source: str = "revolut"):
                         fees, transaction_type, transaction_detail, state,
                         is_internal, is_interest, running_balance, raw, place_id,
                         col_id, amount_normalised
-                    ) VALUES (:id, :source, :bank, :timestamp, 
-                    :amount, :currency, :amount_gbp, :description, 
-                    :payment_reference, :payer, :payee, :merchant, 
-                    :fees, :transaction_type, :transaction_detail, 
-                    :state, :is_internal, :is_interest, :running_balance, 
-                    :raw, :place_id, :col_id, :amount_normalised)
+                    ) VALUES (:id, :source, :bank, :timestamp,
+                        :amount, :currency, :amount_gbp, :description,
+                        :payment_reference, :payer, :payee, :merchant,
+                        :fees, :transaction_type, :transaction_detail,
+                        :state, :is_internal, :is_interest, :running_balance,
+                        :raw, :place_id, :col_id, :amount_normalised)
                     """,
                     cleaned_txn_dict,
                 )
                 if cursor.rowcount == 1:
                     inserted += 1
                 else:
-                    logger.info(f"Duplicate transaction ID. Skipping... {tx_id} ({currency}) ({description[:40]})")
-                    skipped += 1
+                    # Row already exists — attempt state upgrade if incoming is COMPLETED
+                    cursor.execute(
+                        """
+                        UPDATE transactions SET
+                            state      = :state,
+                            amount_gbp = COALESCE(:amount_gbp, amount_gbp),
+                            raw        = :raw
+                        WHERE id = :id AND currency = :currency AND source = :source
+                        AND :state = 'COMPLETED'
+                        AND state != 'COMPLETED'
+                        """,
+                        cleaned_txn_dict,
+                    )
+                    if cursor.rowcount == 1:
+                        upgraded += 1
+                        logger.info(f"State upgraded to COMPLETED: {tx_id} ({currency}) ({description[:40]})")
+                    else:
+                        skipped += 1
+                        logger.info(f"Duplicate transaction. Skipping... {tx_id} ({currency}) ({description[:40]})")
 
             except Exception as e:
                 logger.error(f"Error when processing transaction {row}: {str(e)}")
@@ -201,8 +219,10 @@ def insert(csv_text: str, source: str = "revolut"):
 
         conn.commit()
         
-    send_notification(title="Revolut", 
-                      body=f"💵 {len(rows)} rows received | {inserted} inserted | {skipped} skipped",
-                      time_sensitive=False)
-    
-    return inserted, skipped, errors
+    send_notification(
+        title="Revolut",
+        body=f"💵 {len(rows)} rows received | {inserted} inserted | {upgraded} upgraded | {skipped} skipped",
+        time_sensitive=False,
+    )
+
+    return inserted, upgraded, skipped, errors
