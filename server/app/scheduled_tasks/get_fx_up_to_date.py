@@ -121,7 +121,7 @@ def store_fx_and_backup(response: dict) -> dict:
 @flow(name="Backfill FX", on_failure=[notify_on_completion])
 def get_fx_up_to_date_flow(target_date: date | None = None):
     logger = get_run_logger()
-    target_date = target_date or date.today() - timedelta(days=2)
+    target_date = target_date or date.today() - timedelta(days=14)
 
     check_fx_api_quota()
 
