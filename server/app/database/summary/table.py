@@ -129,6 +129,11 @@ class DailySummaryRecord:
     spend_complete:    int = 0
     weather_complete:  int = 0
 
+    # Data-presence flags (distinct from completeness: 1 = key metrics are non-NULL)
+    # health_complete = 1 means the window is closed (stop retrying).
+    # health_data_ok  = 1 means steps and resting_hr were actually received.
+    health_data_ok: int = 0
+
 
 class DailySummaryTable(BaseTable[DailySummaryRecord]):
 
@@ -230,6 +235,7 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                     pi_complete                   INTEGER NOT NULL DEFAULT 0,
                     spend_complete                INTEGER NOT NULL DEFAULT 0,
                     weather_complete              INTEGER NOT NULL DEFAULT 0,
+                    health_data_ok               INTEGER NOT NULL DEFAULT 0,
 
                     computed_at                   TEXT NOT NULL
                         DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
@@ -245,6 +251,12 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
             )
             try:
                 conn.execute("ALTER TABLE daily_summary ADD COLUMN uv_index_max REAL")
+            except Exception:
+                pass  # Column already exists
+            try:
+                conn.execute(
+                    "ALTER TABLE daily_summary ADD COLUMN health_data_ok INTEGER NOT NULL DEFAULT 0"
+                )
             except Exception:
                 pass  # Column already exists
     

@@ -60,6 +60,12 @@ def compute_health_data(conn, ctx: dict) -> dict:
     data.update(_atl_ctl(conn, ctx, tss_data.get("workout_tss")))
     data.update(_sleep_midpoint(conn, ctx))
     data.update(_mood_classification(conn, ctx))
+    # Data-presence flag: distinct from health_complete (retry gate).
+    # 1 only when the two key metrics actually arrived.
+    data["health_data_ok"] = (
+        1 if (data.get("steps") is not None and data.get("resting_hr") is not None)
+        else 0
+    )
     return data
 
 
@@ -388,6 +394,8 @@ HEALTH_DOMAIN = Domain(
         "sleep_midpoint_hr",
         # Mood
         "avg_valence", "mood_entries", "mood_classification",
+        # Data-presence (distinct from health_complete retry gate)
+        "health_data_ok",
     }),
     completeness_flag="health_complete",
     compute_fn=compute_health_data,
