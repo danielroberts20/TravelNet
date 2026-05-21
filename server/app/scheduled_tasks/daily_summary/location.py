@@ -180,8 +180,13 @@ def _movement_entropy(conn, ctx: dict) -> dict:
 
 def _settling_day(conn, ctx: dict) -> dict:
     """
-    Days since the most recent country transition entry before this date.
-    Day 0 = the day of entry. NULL if country_transitions is empty.
+    Days since the first location_complete=1 day on or after the most recent
+    country entry. Day 1 = that first complete day. NULL if no transition exists.
+
+    Counts from the first day with real GPS coverage rather than from
+    entered_at directly, so border crossings where early GPS data is sparse
+    (Overland not yet configured, first day in-transit, etc.) don't produce
+    an inflated settling_day on subsequent days.
     """
     row = conn.execute("""
         SELECT entered_at FROM country_transitions
@@ -192,9 +197,21 @@ def _settling_day(conn, ctx: dict) -> dict:
     if not row:
         return {"settling_day": None}
 
-    entered_date = datetime.strptime(row["entered_at"][:10], "%Y-%m-%d").date()
+    entered_date_str = row["entered_at"][:10]
+
+    # Find the first day in daily_summary with real location data on or after entry
+    anchor = conn.execute("""
+        SELECT MIN(date) AS first_complete
+        FROM daily_summary
+        WHERE date >= ? AND location_complete = 1
+    """, (entered_date_str,)).fetchone()
+
+    if not anchor or not anchor["first_complete"]:
+        return {"settling_day": None}
+
+    anchor_date  = datetime.strptime(anchor["first_complete"], "%Y-%m-%d").date()
     current_date = datetime.strptime(ctx["date"], "%Y-%m-%d").date()
-    return {"settling_day": (current_date - entered_date).days}
+    return {"settling_day": (current_date - anchor_date).days + 1}
 
 
 def _shift_utc(utc_ts: str, hours: int) -> str:
