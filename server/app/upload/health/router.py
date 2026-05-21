@@ -6,12 +6,19 @@ from typing import Any
 from database.health.mood.table import table as mood_table
 from upload.health.workouts import handle_workout_upload
 from auth import require_upload_token
-from config.general import HEALTH_BACKUP_DIR, WORKOUT_BACKUP_DIR
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends  # type: ignore
+from config.general import HEALTH_BACKUP_DIR, WORKOUT_BACKUP_DIR, MOOD_BACKUP_DIR
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
 from upload.health.processing import handle_health_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _append_backup(directory, data: dict) -> None:
+    """Append a JSON payload as a single line to today's JSONL backup file."""
+    path = directory / f"{datetime.now().strftime('%Y-%m-%d')}.jsonl"
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(data, ensure_ascii=False) + "\n")
 
 
 @router.post("/data", dependencies=[Depends(require_upload_token)])
@@ -24,11 +31,7 @@ async def upload_health(
     Returns HTTP 422 if the payload contains no metrics — this prevents the
     HAE sync window from advancing when an empty upload is received.
     """
-    now = datetime.now()
-
-    backup_path = HEALTH_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"
-    with open(backup_path, "w+", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    _append_backup(HEALTH_BACKUP_DIR, data)
 
     health_data = data.get("data", {})
     metric_count = len(health_data.get("metrics", []))
@@ -38,12 +41,8 @@ async def upload_health(
         raise HTTPException(status_code=422, detail="Empty payload")
 
     background_tasks.add_task(handle_health_upload, health_data)
-
     logger.info(f"Successfully received health upload with {metric_count} metrics.")
-    return {
-        "status": "success",
-        "metrics_received": metric_count,
-    }
+    return {"status": "success", "metrics_received": metric_count}
 
 
 @router.post("/workout", dependencies=[Depends(require_upload_token)])
@@ -56,11 +55,7 @@ async def upload_workout(
     Returns HTTP 422 if the payload contains no workouts — this prevents the
     HAE sync window from advancing when an empty upload is received.
     """
-    now = datetime.now()
-
-    backup_path = WORKOUT_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"
-    with open(backup_path, "w+", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    _append_backup(WORKOUT_BACKUP_DIR, data)
 
     workout_data = data.get("data", {})
     workout_count = len(workout_data.get("workouts", []))
@@ -70,18 +65,17 @@ async def upload_workout(
         raise HTTPException(status_code=422, detail="Empty payload")
 
     background_tasks.add_task(handle_workout_upload, workout_data)
-
     logger.info(f"Successfully received workout upload with {workout_count} workouts.")
-    return {
-        "status": "success",
-        "workouts_received": workout_count,
-    }
+    return {"status": "success", "workouts_received": workout_count}
+
 
 @router.post("/mood", dependencies=[Depends(require_upload_token)])
 async def upload_mood(
     data: dict[str, Any],
     background_tasks: BackgroundTasks,
 ):
+    _append_backup(MOOD_BACKUP_DIR, data)
+
     entries = data.get("data", {}).get("stateOfMind", [])
     if not entries:
         raise HTTPException(status_code=422, detail="No stateOfMind entries found")

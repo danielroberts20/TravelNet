@@ -30,6 +30,7 @@ UPLOADS_BACKUP_DIR = DATA_BACKUP_DIR / "uploads"
 FX_BACKUP_DIR = UPLOADS_BACKUP_DIR / "fx"
 HEALTH_BACKUP_DIR = UPLOADS_BACKUP_DIR / "health"
 WORKOUT_BACKUP_DIR = HEALTH_BACKUP_DIR / "workouts"
+MOOD_BACKUP_DIR = HEALTH_BACKUP_DIR / "mood"
 LOCATION_BACKUP_DIR = UPLOADS_BACKUP_DIR / "location"
 LOCATION_SHORTCUTS_BACKUP_DIR = LOCATION_BACKUP_DIR / "shortcuts"
 LOCATION_OVERLAND_BACKUP_DIR = LOCATION_BACKUP_DIR / "overland"
@@ -400,19 +401,23 @@ TRANSACTION_SUBCATEGORIES = {
 # Health
 # ---------------------------------------------------------------------------
 
+HEALTH_STALE_ALERT_FILE = DATA_DIR / "health_stale_alert.json"
+
 THRESHOLD_HR_BPM = editable("THRESHOLD_HR_BPM", "Lactate threshold heart rate in BPM for TSS calculation", group="Health")(170)
 
 INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Shortcut location entries.\nAlso used for health metric aggregation", group="Health")(5)
 
-HEALTH_GAP_LOOKBACK_DAYS = editable("HEALTH_GAP_LOOKBACK_DAYS", "Days of history to analyse for gap detection", group="Health")(30)
+HEALTH_GAP_LOOKBACK_DAYS = editable("HEALTH_GAP_LOOKBACK_DAYS", "Days of history to analyse for gap detection", group="Health")(7)
 
 HEALTH_GAP_MULTIPLIER = editable("HEALTH_GAP_MULTIPLIER", "Gap must exceed N× median cadence to be flagged", group="Health")(3.0)
 
-HEALTH_GAP_MIN_HOURS = editable("HEALTH_GAP_MIN_HOURS", "Absolute floor (hours) — gaps shorter than this are never flagged", group="Health")(10.0)
+HEALTH_GAP_MIN_HOURS = editable("HEALTH_GAP_MIN_HOURS", "Absolute floor (hours) — gaps shorter than this are never flagged", group="Health")(24.0)
 
 HEALTH_MIN_HISTORY_POINTS = editable("HEALTH_MIN_HISTORY_POINTS", "Minimum points needed to compute a reliable median cadence", group="Health")(10)
 
 HEALTH_MIN_POINTS_AFTER = editable("HEALTH_MIN_POINTS_AFTER", "Fewer than this many records after a gap → marked tentative", group="Health")(5)
+
+HEALTH_UPLOAD_STALE_HOURS = editable("HEALTH_UPLOAD_STALE_HOURS", "Number of hours after which a health upload is considered stale", group="Health")(10)
 
 # ---------------------------------------------------------------------------
 # Journal
