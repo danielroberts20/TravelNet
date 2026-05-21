@@ -8,7 +8,7 @@ get_col_entry()  — resolve the best CoL row for a given country + coordinates,
                    using a geofence match on city center coordinates with
                    country-level fallback. Also returns which index field to use.
 
-get_uk_col_index() — fetch the UK country-level col_index, used as the
+get_uk_col_index() — fetch the UK country-level col_plus_rent, used as the
                      normalisation baseline for spend_normalised.
 """
 
@@ -133,7 +133,10 @@ _UK_COL_CACHE: float | None = None
 
 def get_uk_col_index(conn: sqlite3.Connection) -> float | None:
     """
-    Return the UK country-level col_index, used as the normalisation baseline.
+    Return the UK country-level col_plus_rent, used as the normalisation baseline.
+    Must match the index_field used by get_col_entry() for country-level GB rows
+    (col_plus_rent for all non-US countries). Using col_index here caused a
+    systematic ~1.306x inflation on all normalised spend values.
     Result is module-level cached after first DB read (value rarely changes).
     """
     global _UK_COL_CACHE
@@ -141,12 +144,12 @@ def get_uk_col_index(conn: sqlite3.Connection) -> float | None:
         return _UK_COL_CACHE
 
     row = conn.execute("""
-        SELECT col_index FROM cost_of_living
+        SELECT col_plus_rent FROM cost_of_living
         WHERE country_code = 'GB' AND city = ''
         LIMIT 1
     """).fetchone()
 
-    if row and row["col_index"]:
-        _UK_COL_CACHE = row["col_index"]
+    if row and row["col_plus_rent"]:
+        _UK_COL_CACHE = row["col_plus_rent"]
 
     return _UK_COL_CACHE
