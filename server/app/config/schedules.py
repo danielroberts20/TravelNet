@@ -39,7 +39,7 @@ SCHEDULE_CONFIGS = {
     "categorise-transactions":          ("0 3 3,10,17,24 * *",               "Use LLM-based classification to add categories to transaction data"),
 
     # Health
-    "check-health-gaps":                ("50 5 * * 1",              "Weekly check for missing or partial health metric days"),
+    "check-health-gaps":                ("0 9 * * *",               "Daily check for missing or partial health metric days"),
 
     # Journal
     "check-journal-staleness":          ("0 */4 * * *",             "Every 4 hours: send push notification if journal is stale"),

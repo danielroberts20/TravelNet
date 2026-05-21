@@ -1,31 +1,25 @@
 """
-Scheduled task: scan health tables for significant data gaps.
+Daily health data gap detection and upload recency check.
+Scheduled: Every day at 09:00.
 
-Algorithm (per metric / table):
-  1. Compute the *median* inter-arrival time as the "normal cadence".
-  2. Set threshold = max(HEALTH_GAP_MIN_HOURS, HEALTH_GAP_MULTIPLIER × median).
-     The 10-hour default floor means overnight sleep gaps (~8h) are never flagged
-     for high-frequency metrics (step count, heart rate, etc.).
-  3. Flag every gap above the threshold.
-  4. Also flag a *trailing gap* from the last record to now (always tentative).
-  5. Mark a gap as *tentative* if fewer than HEALTH_MIN_POINTS_AFTER records exist
-     after it — a small tail suggests the data feed has only just resumed and more
-     is incoming (or the upload is mid-flight).
-
-Sleep uses separate logic: aggregate per night-date, flag calendar nights with no
-records at all; a night is only flagged if it pre-dates today.
-
-Registered in deployments.py — no __main__ block.
+  - Checks whether any health data has landed in the DB in the last
+    HEALTH_UPLOAD_STALE_HOURS hours. Fires a Pushcut ERROR notification
+    on first detection and again every 24h if still stale.
+  - Scans health_quantity, health_heart_rate, and health_sleep for
+    significant gaps using adaptive median-cadence thresholds.
+  - Sends a plain-text email report if any gaps are found.
+  - Silent if everything is healthy.
 """
 
 from __future__ import annotations
 
+import json
 import statistics
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 from prefect import flow, task, get_run_logger
-
 from config.editable import load_overrides
 
 load_overrides()
@@ -36,10 +30,12 @@ from config.general import (
     HEALTH_GAP_MULTIPLIER,
     HEALTH_MIN_HISTORY_POINTS,
     HEALTH_MIN_POINTS_AFTER,
+    HEALTH_UPLOAD_STALE_HOURS,
+    HEALTH_STALE_ALERT_FILE,
 )
 from config.settings import settings
 from database.connection import get_conn
-from notifications import send_email
+from notifications import error_notification, notify_on_completion, record_flow_result, send_email
 
 
 # ---------------------------------------------------------------------------
@@ -48,15 +44,15 @@ from notifications import send_email
 
 @dataclass
 class GapFinding:
-    domain: str            # "quantity:<metric>", "heart_rate", "sleep"
-    gap_start: str         # ISO 8601 UTC
-    gap_end: str           # ISO 8601 UTC — "now" for trailing gaps
+    domain: str
+    gap_start: str
+    gap_end: str
     gap_hours: float
     median_cadence_hours: float
-    ratio: float           # gap_hours / median_cadence_hours
-    tentative: bool        # True = few records follow; data may still be arriving
-    points_after: int      # 0 for trailing gaps, -1 for sleep (not applicable)
-    trailing: bool = False # True = gap extends to the present moment
+    ratio: float
+    tentative: bool
+    points_after: int
+    trailing: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -72,24 +68,16 @@ def _to_dt(ts: str) -> datetime:
 
 
 def _gap_threshold(median_h: float) -> float:
-    """Threshold above which a gap is flagged."""
     return max(HEALTH_GAP_MIN_HOURS, HEALTH_GAP_MULTIPLIER * median_h)
 
 
 def _scan_timestamps(
     timestamps: list[datetime],
     domain: str,
-    count_after_fn,          # callable(gap_end_str) -> int
+    count_after_fn,
     median_h: float,
     now: datetime,
 ) -> list[GapFinding]:
-    """
-    Core gap detection over a sorted list of timestamps for one metric.
-
-    Checks:
-      - Gaps between consecutive records.
-      - Trailing gap from the last record to *now*.
-    """
     findings: list[GapFinding] = []
     threshold_h = _gap_threshold(median_h)
 
@@ -111,19 +99,17 @@ def _scan_timestamps(
             points_after=points_after,
         ))
 
-    # Trailing gap: last record → now
     if timestamps:
         trailing_h = (now - timestamps[-1]).total_seconds() / 3600
         if trailing_h >= threshold_h:
-            gap_start_str = timestamps[-1].strftime("%Y-%m-%dT%H:%M:%SZ")
             findings.append(GapFinding(
                 domain=domain,
-                gap_start=gap_start_str,
+                gap_start=timestamps[-1].strftime("%Y-%m-%dT%H:%M:%SZ"),
                 gap_end=_now_str(),
                 gap_hours=round(trailing_h, 2),
                 median_cadence_hours=round(median_h, 3),
                 ratio=round(trailing_h / median_h, 1),
-                tentative=True,   # always tentative — no records can follow yet
+                tentative=True,
                 points_after=0,
                 trailing=True,
             ))
@@ -132,22 +118,93 @@ def _scan_timestamps(
 
 
 # ---------------------------------------------------------------------------
+# Suppression helpers
+# ---------------------------------------------------------------------------
+
+def _load_stale_alert_state(path: Path) -> datetime | None:
+    """Return the timestamp of the last stale alert, or None if never fired."""
+    try:
+        data = json.loads(path.read_text())
+        return _to_dt(data["alerted_at"])
+    except (FileNotFoundError, KeyError, ValueError):
+        return None
+
+
+def _save_stale_alert_state(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"alerted_at": _now_str()}))
+
+
+def _clear_stale_alert_state(path: Path) -> None:
+    path.unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------------------
 # Tasks
 # ---------------------------------------------------------------------------
 
+@task(name="check_health_upload_recency")
+def check_health_upload_recency() -> dict:
+    """Fire a Pushcut ERROR if no health data has landed recently.
+
+    Suppressed for 24h after first alert to avoid repeated notifications
+    for the same outage. Re-fires every 24h if still stale.
+    """
+    log = get_run_logger()
+    now = datetime.now(timezone.utc)
+
+    conn = get_conn(read_only=True)
+    try:
+        latest_quantity = conn.execute(
+            "SELECT MAX(timestamp) FROM health_quantity"
+        ).fetchone()[0]
+        latest_hr = conn.execute(
+            "SELECT MAX(timestamp) FROM health_heart_rate"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+    candidates = [ts for ts in (latest_quantity, latest_hr) if ts]
+    if not candidates:
+        stale_hours = None
+        stale = True
+        log.warning("No health data in DB at all")
+    else:
+        latest = max(_to_dt(ts) for ts in candidates)
+        stale_hours = round((now - latest).total_seconds() / 3600, 1)
+        stale = stale_hours > HEALTH_UPLOAD_STALE_HOURS
+        log.info("Most recent health data: %s (%.1fh ago)", latest.isoformat(), stale_hours)
+
+    if stale:
+        last_alerted = _load_stale_alert_state(HEALTH_STALE_ALERT_FILE)
+        suppress = (
+            last_alerted is not None
+            and (now - last_alerted).total_seconds() < 86400
+        )
+        if not suppress:
+            msg = (
+                f"No health data received for {stale_hours:.1f}h — HAE may have stopped uploading."
+                if stale_hours is not None
+                else "No health data in DB at all."
+            )
+            error_notification(msg)
+            _save_stale_alert_state(HEALTH_STALE_ALERT_FILE)
+            log.warning("Stale upload alert fired: %s", msg)
+        else:
+            hours_since = round((now - last_alerted).total_seconds() / 3600, 1)
+            log.info("Stale upload suppressed — last alert was %.1fh ago", hours_since)
+    else:
+        _clear_stale_alert_state(HEALTH_STALE_ALERT_FILE)
+
+    return {"stale": stale, "stale_hours": stale_hours}
+
+
 @task(name="scan_quantity_gaps")
 def scan_quantity_gaps() -> list[GapFinding]:
-    """
-    Scan health_quantity for gaps, grouped by (metric, source).
-
-    Metrics with fewer than HEALTH_MIN_HISTORY_POINTS rows in the lookback
-    window are skipped — not enough history to estimate a reliable cadence.
-    """
     log = get_run_logger()
     now = datetime.now(timezone.utc)
     cutoff_str = (now - timedelta(days=HEALTH_GAP_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # --- single read: fetch all rows in the lookback window ---
     conn = get_conn(read_only=True)
     try:
         rows = conn.execute(
@@ -162,23 +219,19 @@ def scan_quantity_gaps() -> list[GapFinding]:
     finally:
         conn.close()
 
-    # Group by (metric, source)
     from collections import defaultdict
     groups: dict[tuple[str, str], list[datetime]] = defaultdict(list)
     for row in rows:
         try:
             groups[(row["metric"], row["source"])].append(_to_dt(row["timestamp"]))
         except ValueError:
-            pass  # malformed timestamp — skip silently
+            pass
 
     all_findings: list[GapFinding] = []
 
     for (metric, source), timestamps in groups.items():
         if len(timestamps) < HEALTH_MIN_HISTORY_POINTS:
-            log.debug(
-                "Skipping %r/%r: only %d points in lookback window",
-                metric, source, len(timestamps),
-            )
+            log.debug("Skipping %r/%r: only %d points in lookback window", metric, source, len(timestamps))
             continue
 
         timestamps.sort()
@@ -187,13 +240,8 @@ def scan_quantity_gaps() -> list[GapFinding]:
             for i in range(1, len(timestamps))
         ]
         median_h = statistics.median(diffs_h)
-
         if median_h < 1e-4:
-            # Guard against near-zero cadence (duplicate timestamps after dedup)
             continue
-
-        # Domain uses metric name; if multiple sources produce gaps, both appear in the report
-        domain = f"quantity:{metric}"
 
         def count_after(gap_end_str: str, _metric=metric) -> int:
             c = get_conn(read_only=True)
@@ -205,8 +253,7 @@ def scan_quantity_gaps() -> list[GapFinding]:
             finally:
                 c.close()
 
-        findings = _scan_timestamps(timestamps, domain, count_after, median_h, now)
-        all_findings.extend(findings)
+        all_findings.extend(_scan_timestamps(timestamps, f"quantity:{metric}", count_after, median_h, now))
 
     log.info("Quantity: %d gap(s) found across all metrics", len(all_findings))
     return all_findings
@@ -214,7 +261,6 @@ def scan_quantity_gaps() -> list[GapFinding]:
 
 @task(name="scan_heart_rate_gaps")
 def scan_heart_rate_gaps() -> list[GapFinding]:
-    """Scan health_heart_rate for significant gaps."""
     log = get_run_logger()
     now = datetime.now(timezone.utc)
     cutoff_str = (now - timedelta(days=HEALTH_GAP_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -229,7 +275,7 @@ def scan_heart_rate_gaps() -> list[GapFinding]:
         conn.close()
 
     if len(rows) < HEALTH_MIN_HISTORY_POINTS:
-        log.info("Heart rate: only %d points in lookback window — skipping", len(rows))
+        get_run_logger().info("Heart rate: only %d points in lookback window — skipping", len(rows))
         return []
 
     timestamps = []
@@ -253,24 +299,12 @@ def scan_heart_rate_gaps() -> list[GapFinding]:
             c.close()
 
     findings = _scan_timestamps(timestamps, "heart_rate", count_after, median_h, now)
-    log.info("Heart rate: %d gap(s) found", len(findings))
+    get_run_logger().info("Heart rate: %d gap(s) found", len(findings))
     return findings
 
 
 @task(name="scan_sleep_gaps")
 def scan_sleep_gaps() -> list[GapFinding]:
-    """
-    Detect calendar nights with no sleep data at all.
-
-    Sleep records are per-stage (many rows per night), so we aggregate to
-    night-dates and look for missing nights in the continuous range.  Tonight
-    is never flagged — sleep data for the current calendar day may not have
-    been uploaded yet.
-
-    A "night" is defined as the calendar date of the start_ts. This means a
-    session starting at 23:00 on the 15th and ending at 06:30 on the 16th
-    counts as the night of the 15th.
-    """
     log = get_run_logger()
     now = datetime.now(timezone.utc)
     today = now.date()
@@ -306,24 +340,18 @@ def scan_sleep_gaps() -> list[GapFinding]:
     findings: list[GapFinding] = []
     first_night = min(recorded_nights)
     last_night = max(recorded_nights)
-
-    # Walk every calendar night in the recorded range and flag missing ones.
-    # We intentionally do not flag trailing missing nights (after last recorded)
-    # unless they were expected: this is conservative because sleep data often
-    # arrives the morning after the night.
     gap_start: date | None = None
     night = first_night
+
     while night <= last_night:
         if night not in recorded_nights and night < today:
             if gap_start is None:
                 gap_start = night
         else:
             if gap_start is not None:
-                # Close this run of missing nights
                 gap_start_dt = datetime(gap_start.year, gap_start.month, gap_start.day, tzinfo=timezone.utc)
                 gap_end_dt = datetime(night.year, night.month, night.day, tzinfo=timezone.utc)
                 gap_h = (gap_end_dt - gap_start_dt).total_seconds() / 3600
-                nights_missing = (night - gap_start).days
                 findings.append(GapFinding(
                     domain="sleep",
                     gap_start=gap_start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -345,14 +373,16 @@ def scan_sleep_gaps() -> list[GapFinding]:
 # Flow
 # ---------------------------------------------------------------------------
 
-@flow(name="Detect Health Gaps")
-def check_health_gaps_flow() -> None:
+@flow(name="Check Health Gaps", on_failure=[notify_on_completion])
+def check_health_gaps_flow() -> dict:
     """
-    Weekly health gap audit.  Runs three independent scans, aggregates findings,
-    and sends a plain-text email report.  Silent (no email) if no gaps are found.
+    Daily health monitor. Checks upload recency first, then scans for gaps.
+    Pushcut alert if HAE has stopped uploading. Email report if gaps are found.
+    Silent if everything is healthy.
     """
     log = get_run_logger()
 
+    recency = check_health_upload_recency()
     quantity_findings = scan_quantity_gaps()
     hr_findings = scan_heart_rate_gaps()
     sleep_findings = scan_sleep_gaps()
@@ -360,14 +390,19 @@ def check_health_gaps_flow() -> None:
     all_findings: list[GapFinding] = quantity_findings + hr_findings + sleep_findings
     all_findings.sort(key=lambda f: f.gap_hours, reverse=True)
 
+    result = {
+        "upload_stale": recency["stale"],
+        "stale_hours": recency["stale_hours"],
+        "gaps_found": len(all_findings),
+    }
+
     if not all_findings:
         log.info("No health gaps detected — no email sent")
-        return
+        record_flow_result(result)
+        return result
 
     confirmed = [f for f in all_findings if not f.tentative]
     tentative = [f for f in all_findings if f.tentative]
-
-    # ---- build report ----
 
     def _fmt(f: GapFinding) -> str:
         tag_parts = []
@@ -416,3 +451,6 @@ def check_health_gaps_flow() -> None:
     )
     send_email(subject=subject, body=body, **settings.smtp_config)
     log.info("Gap report sent (%d total findings)", len(all_findings))
+
+    record_flow_result(result)
+    return result
