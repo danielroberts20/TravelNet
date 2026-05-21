@@ -35,8 +35,12 @@ def compute_transaction_data(conn, ctx: dict) -> dict:
 
 def _transactions(conn, ctx: dict) -> dict:
     """
-    Aggregate transactions for the UTC window, excluding internal/interest/failed.
- 
+    Aggregate transactions for the UTC window, excluding internal/interest/failed/credits.
+
+    Only negative-amount rows (debits/spending) are included. Positive-amount rows
+    (credits, refunds, incoming transfers) are excluded via `amount_gbp < 0` /
+    `amount < 0` to prevent credits from inflating spend totals.
+
     amount_normalised is populated by the monthly backfill flow — it will be
     NULL for any transactions that have not yet been through that flow, so
     spend_normalised may be NULL or partial until backfill has run.
@@ -54,6 +58,7 @@ def _transactions(conn, ctx: dict) -> dict:
           AND is_interest = 0
           AND (state != 'FAILED' OR state IS NULL)
           AND amount_gbp IS NOT NULL
+          AND amount_gbp < 0
     """, (ctx["utc_start"], ctx["utc_end"])).fetchone()
  
     count        = row["n"] or 0
@@ -84,6 +89,7 @@ def _transactions(conn, ctx: dict) -> dict:
           AND is_internal = 0
           AND is_interest = 0
           AND (state != 'FAILED' OR state IS NULL)
+          AND amount < 0
         GROUP BY currency
         ORDER BY n DESC
         LIMIT 1
