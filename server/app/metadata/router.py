@@ -7,6 +7,7 @@ from database.connection import get_conn
 from config.editable import get_editable, get_value, coerce_value
 from fastapi import APIRouter, Query, HTTPException, Body, Depends  # type: ignore
 from fastapi.responses import Response  # type: ignore
+import socket as _socket
 
 from auth import require_upload_token
 from database.exchange.fx import get_api_usage
@@ -15,6 +16,7 @@ from metadata.system import get_db_stats, get_pending_digest_count, get_uptime, 
 from metadata.uploads import get_fx_latest_date, get_last_uploads, get_last_watchdog_heartbeat, get_row_counts
 from metadata.backups import get_local_backups, get_remote_backups
 from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES, LOG_FILE, OVERRIDES_PATH, STALE_DAYS
+from config.settings import settings
 from notifications import send_notification
 from pydantic import BaseModel  # type: ignore
 from datetime import datetime
@@ -27,6 +29,36 @@ from scheduled_tasks.update_timezone import update_timezones_flow
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+def _push_to_pico(payload: dict) -> bool:
+    """Send a UDP push message to the Pico display. Non-fatal on failure."""
+    try:
+        data = json.dumps(payload).encode()
+        sock = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        sock.sendto(data, (settings.pico_ip, settings.pico_udp_port))
+        sock.close()
+        logger.info(f"Pico push sent: {payload}")
+        return True
+    except Exception as e:
+        logger.warning(f"Pico push failed (non-fatal): {e}")
+        return False
+
+
+class DisplayMessageRequest(BaseModel):
+    text: str
+
+@router.post("/display/message", dependencies=[Depends(require_upload_token)])
+async def push_display_message(body: DisplayMessageRequest):
+    """Push a short message to the home Pico display (from Dan, anywhere in world)."""
+    text = body.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text cannot be empty")
+    if len(text) > 200:
+        raise HTTPException(status_code=400, detail="text must be ≤200 characters")
+    sent = _push_to_pico({"type": "message", "text": text})
+    if not sent:
+        raise HTTPException(status_code=503, detail="Could not reach Pico display")
+    return {"status": "sent", "text": text}
+    
 
 @router.get("/logs", dependencies=[Depends(require_upload_token)])
 async def get_logs(lines: int = Query(200, ge=1, le=1000)):
@@ -63,8 +95,6 @@ class ConfigUpdate(BaseModel):
 
     key: str
     value: Any
-
-
 
 
 @router.get("/config", dependencies=[Depends(require_upload_token)])

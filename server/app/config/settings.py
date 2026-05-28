@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     trevor_url: str = Field(alias="TREVOR_URL", default="http://trevor:8300")
     trevor_api_key: str = Field(alias="TREVOR_API_KEY")
 
+    pico_ip: str = Field(alias="PICO_IP")
+    pico_udp_port: int = Field(alias="PICO_UDP_PORT")
+
     model_config = {
         "env_file": Path(__file__).parent.parent.parent / ".env",  # → server/.env
         "populate_by_name": True,
