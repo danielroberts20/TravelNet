@@ -99,6 +99,7 @@ def _make_feature(lon=2.3522, lat=48.8566, ts="2024-06-15T09:00:00+00:00",
             "speed": speed,
             "horizontal_accuracy": h_acc,
             "vertical_accuracy": v_acc,
+            "device_id": "iphone",
         },
     }
 
@@ -116,14 +117,14 @@ class TestInsertPayload:
     def test_single_point_inserted(self, tbl):
         t, db = tbl
         payload = _make_payload([_make_feature()])
-        inserted, skipped = t.insert_payload(payload, "iphone")
+        inserted, skipped = t.insert_payload(payload)
         assert inserted == 1
         assert skipped == 0
 
     def test_empty_payload(self, tbl):
         t, db = tbl
         payload = _make_payload([])
-        inserted, skipped = t.insert_payload(payload, "iphone")
+        inserted, skipped = t.insert_payload(payload)
         assert inserted == 0
         assert skipped == 0
 
@@ -131,8 +132,8 @@ class TestInsertPayload:
         t, db = tbl
         feature = _make_feature()
         payload = _make_payload([feature])
-        i1, s1 = t.insert_payload(payload, "iphone")
-        i2, s2 = t.insert_payload(payload, "iphone")
+        i1, s1 = t.insert_payload(payload)
+        i2, s2 = t.insert_payload(payload)
         assert i1 == 1 and s1 == 0
         assert i2 == 0 and s2 == 1
 
@@ -141,7 +142,7 @@ class TestInsertPayload:
         t, db = tbl
         lon, lat = 2.3522, 48.8566
         payload = _make_payload([_make_feature(lon=lon, lat=lat)])
-        t.insert_payload(payload, "iphone")
+        t.insert_payload(payload)
         row = db.execute("SELECT latitude, longitude FROM location_overland LIMIT 1").fetchone()
         assert row["latitude"] == pytest.approx(lat)
         assert row["longitude"] == pytest.approx(lon)
@@ -150,7 +151,7 @@ class TestInsertPayload:
         """place_id is assigned from the places table using grid-snapped coords."""
         t, db = tbl
         payload = _make_payload([_make_feature(lon=2.3522, lat=48.8566)])
-        t.insert_payload(payload, "iphone")
+        t.insert_payload(payload)
 
         row = db.execute("SELECT place_id FROM location_overland LIMIT 1").fetchone()
         assert row["place_id"] is not None
@@ -169,7 +170,7 @@ class TestInsertPayload:
             _make_feature(lon=2.3521, lat=48.8561, ts="2024-06-15T09:00:00+00:00"),
             _make_feature(lon=2.3524, lat=48.8564, ts="2024-06-15T10:00:00+00:00"),
         ])
-        t.insert_payload(payload, "iphone")
+        t.insert_payload(payload)
 
         place_count = db.execute("SELECT COUNT(*) FROM places").fetchone()[0]
         assert place_count == 1  # both snap to 48.856, 2.352
@@ -178,7 +179,7 @@ class TestInsertPayload:
         """horizontal_accuracy > THRESHOLD (100) → inserted into location_noise tier 1."""
         t, db = tbl
         payload = _make_payload([_make_feature(h_acc=150.0)])  # > 100
-        t.insert_payload(payload, "iphone")
+        t.insert_payload(payload)
 
         overland_id = db.execute("SELECT id FROM location_overland LIMIT 1").fetchone()["id"]
         noise_row = db.execute(
@@ -192,7 +193,7 @@ class TestInsertPayload:
         """horizontal_accuracy ≤ THRESHOLD → not in noise table."""
         t, db = tbl
         payload = _make_payload([_make_feature(h_acc=50.0)])  # ≤ 100
-        t.insert_payload(payload, "iphone")
+        t.insert_payload(payload)
 
         count = db.execute("SELECT COUNT(*) FROM location_noise").fetchone()[0]
         assert count == 0
@@ -201,7 +202,7 @@ class TestInsertPayload:
         """No horizontal_accuracy → noise check skipped, no noise row."""
         t, db = tbl
         payload = _make_payload([_make_feature(h_acc=None)])
-        t.insert_payload(payload, "iphone")
+        t.insert_payload(payload)
 
         count = db.execute("SELECT COUNT(*) FROM location_noise").fetchone()[0]
         assert count == 0
@@ -214,6 +215,6 @@ class TestInsertPayload:
             _make_feature(ts="2024-06-15T11:00:00+00:00"),
         ]
         payload = _make_payload(features)
-        inserted, skipped = t.insert_payload(payload, "iphone")
+        inserted, skipped = t.insert_payload(payload)
         assert inserted == 3
         assert skipped == 0

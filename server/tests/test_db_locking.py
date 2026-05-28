@@ -110,7 +110,7 @@ def _make_feature(lon=2.3522, lat=48.8566, ts="2024-06-15T09:00:00+00:00",
     return {
         "type": "Feature",
         "geometry": {"type": "Point", "coordinates": [lon, lat]},
-        "properties": {"timestamp": ts, "horizontal_accuracy": h_acc},
+        "properties": {"timestamp": ts, "horizontal_accuracy": h_acc, "device_id": "iphone"},
     }
 
 
@@ -483,7 +483,7 @@ class TestNestedWriteConnection:
 
         with patch("database.location.overland.table.get_conn", side_effect=make_file_conn), \
              patch("database.location.noise.table.get_conn", side_effect=make_file_conn):
-            inserted, skipped = tbl.insert_payload(payload, "iphone")
+            inserted, skipped = tbl.insert_payload(payload)
 
         assert inserted == 1
 
@@ -514,7 +514,7 @@ class TestNestedWriteConnection:
 
         with patch("database.location.overland.table.get_conn", return_value=db), \
              patch("database.location.noise.table.get_conn", return_value=db):
-            inserted, skipped = tbl.insert_payload(payload, "iphone")
+            inserted, skipped = tbl.insert_payload(payload)
 
         assert inserted == 1
         noise_count = db.execute("SELECT COUNT(*) FROM location_noise").fetchone()[0]

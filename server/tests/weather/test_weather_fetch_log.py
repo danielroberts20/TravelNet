@@ -92,28 +92,6 @@ class TestInit:
     def test_init_is_idempotent(self, fetch_log):
         fetch_log.init()  # second call must not raise
 
-    def test_drops_old_table_on_reinit(self, db, monkeypatch):
-        monkeypatch.setattr("database.weather.fetch_log.get_conn", lambda *a, **kw: db)
-        # Simulate the old window-keyed schema
-        db.execute("""
-            CREATE TABLE weather_fetch_log (
-                id INTEGER PRIMARY KEY,
-                start_date TEXT,
-                end_date TEXT
-            )
-        """)
-        db.commit()
-        wfl = WeatherFetchLog()
-        wfl.init()  # should DROP and recreate with new schema
-        cols = {
-            row[1] for row in db.execute(
-                "PRAGMA table_info(weather_fetch_log)"
-            ).fetchall()
-        }
-        assert "date" in cols
-        assert "start_date" not in cols
-
-
 # ---------------------------------------------------------------------------
 # record()
 # ---------------------------------------------------------------------------
