@@ -1,6 +1,7 @@
 from datetime import datetime
 import io
 import logging
+from pydantic import ValidationError
 
 from fastapi import APIRouter, Query, UploadFile, File, HTTPException, status, Depends, BackgroundTasks  # type: ignore
 from config.general import LOCATION_SHORTCUTS_BACKUP_DIR
@@ -53,14 +54,24 @@ async def upload_csv(
     dependencies=[Depends(verify_overland_token)],
 )
 async def upload_overland(
-        payload: OverlandPayload,
-        background_tasks: BackgroundTasks,
-        device_id: str = Query(default="unknown"),
+    payload: OverlandPayload,
+    background_tasks: BackgroundTasks,
 ):
-    """Accept an Overland GPS payload, append it to the daily JSONL buffer, and queue DB insert."""
-    logger.info(f"Received Overland payload with {len(payload.locations)} entries.")
-    background_tasks.add_task(append_to_daily_buffer, payload)
-    background_tasks.add_task(overland_table.insert_payload, payload, device_id)
+    visits = [f for f in payload.locations if f.properties.is_visit]
+    points = [f for f in payload.locations if not f.properties.is_visit]
+
+    if visits:
+        logger.important(f"Received {len(visits)} visit events in Overland payload.")
+        for visit in visits:
+            logger.important(f"""Arrival: {visit.properties.arrival_time}
+            Departure: {visit.properties.departure_time}
+            Coordinates ([lon,lat]): {visit.geometry.coordinates}""")
+
+    if points:
+        point_payload = OverlandPayload(locations=points)
+        background_tasks.add_task(append_to_daily_buffer, point_payload)
+        background_tasks.add_task(overland_table.insert_payload, point_payload)
+
     background_tasks.add_task(location_change.run)
     return {"result": "ok"}
 

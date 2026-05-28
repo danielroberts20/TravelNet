@@ -106,6 +106,13 @@ class OverlandProperties(BaseModel):
     battery_state: Optional[str] = None   # "charging" | "full" | "unplugged"
     battery_level: Optional[float] = None  # 0.0–1.0
 
+    arrival_time: Optional[str] = None
+    departure_time: Optional[str] = None
+
+    @property
+    def is_visit(self) -> bool:
+        return self.arrival_time is not None or self.departure_time is not None
+
     @field_validator("speed", "vertical_accuracy", mode="before")
     @classmethod
     def negative_to_none(cls, v):

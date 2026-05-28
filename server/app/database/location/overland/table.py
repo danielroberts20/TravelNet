@@ -146,7 +146,7 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
                 "place_id":            record.place_id,
             })
 
-    def insert_payload(self, payload: OverlandPayload, device_id: str) -> tuple[int, int]:
+    def insert_payload(self, payload: OverlandPayload) -> tuple[int, int]:
         """Insert all location points from an Overland payload.
 
         Unpacks each GeoJSON feature, resolves a place_id via the places table,
@@ -198,7 +198,7 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
                             :raw_json, :place_id
                         )
                     """, {
-                        "device_id":           device_id,
+                        "device_id":           props.device_id,
                         "timestamp":           ts,
                         "latitude":            lat,
                         "longitude":           lon,
@@ -225,7 +225,7 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
                         skipped += 1
                         row = conn.execute(
                             "SELECT id FROM location_overland WHERE device_id = ? AND timestamp = ?",
-                            (device_id, ts),
+                            (props.device_id, ts),
                         ).fetchone()
                         overland_id = row[0] if row else None
 
