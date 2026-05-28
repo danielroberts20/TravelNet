@@ -12,7 +12,7 @@ from auth import require_upload_token
 from database.exchange.fx import get_api_usage
 from database.location.gap_annotations.table import table as gap_annotations_table, GapAnnotationRecord
 from metadata.system import get_db_stats, get_pending_digest_count, get_uptime, read_last_lines_efficient
-from metadata.uploads import get_fx_latest_date, get_last_uploads
+from metadata.uploads import get_fx_latest_date, get_last_uploads, get_last_watchdog_heartbeat, get_row_counts
 from metadata.backups import get_local_backups, get_remote_backups
 from config.general import GAP_ANNOTATION_TOLERANCE_MINUTES, LOG_FILE, OVERRIDES_PATH, STALE_DAYS
 from notifications import send_notification
@@ -45,11 +45,12 @@ async def get_watchdog():
 
 @router.get("/status")
 async def get_status():
-    """Return a live system status snapshot (uptime, DB stats, last uploads, FX info)."""
     return {
         "uptime": get_uptime(),
         "db": get_db_stats(),
         "last_upload": get_last_uploads(),
+        "last_watchdog_heartbeat": get_last_watchdog_heartbeat(),
+        "row_counts": get_row_counts(),
         "fx_latest_date": get_fx_latest_date(),
         "fx_api_usage": get_api_usage("exchangerate.host"),
         "pending_digest_records": get_pending_digest_count(),

@@ -45,3 +45,21 @@ def get_fx_latest_date() -> str | None:
     with get_conn(read_only=True) as conn:
         row = conn.execute("SELECT MAX(date) FROM fx_rates").fetchone()
         return row[0] if row and row[0] else None
+
+
+def get_last_watchdog_heartbeat() -> str | None:
+    with get_conn(read_only=True) as conn:
+        row = conn.execute(
+            "SELECT received_at FROM watchdog_heartbeat "
+            "ORDER BY received_at DESC LIMIT 1"
+        ).fetchone()
+        return row["received_at"] if row else None
+
+
+def get_row_counts() -> dict:
+    tables = ["location_overland", "health_quantity", "transactions"]
+    with get_conn(read_only=True) as conn:
+        return {
+            t: conn.execute(f"SELECT COUNT(*) AS n FROM {t}").fetchone()["n"]
+            for t in tables
+        }
