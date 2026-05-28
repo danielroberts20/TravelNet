@@ -20,9 +20,10 @@ from yarl import URL # type: ignore
 # Storage & Backups
 # ---------------------------------------------------------------------------
 
-DATA_DIR = Path("/data")
+DATA_DIR = Path("/data") # Path("/hdd")
+#SSD_DIR = Path("/ssd")
 
-DB_FILE = DATA_DIR / "travel.db"
+DB_FILE = DATA_DIR / "travel.db" # SSD_DIR / "travel.db"
 
 DATA_BACKUP_DIR = DATA_DIR / "backups"
 DATABASE_BACKUP_DIR = DATA_BACKUP_DIR / "db"
