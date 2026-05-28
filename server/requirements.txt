@@ -4,6 +4,7 @@ python-multipart
 pandas
 yarl
 requests
+tenacity==9.0.0
 pytest
 pydantic
 pydantic-settings

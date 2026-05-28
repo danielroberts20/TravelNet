@@ -45,6 +45,7 @@ BACKUP_DIRS = [
     FX_BACKUP_DIR,
     HEALTH_BACKUP_DIR,
     WORKOUT_BACKUP_DIR,
+    MOOD_BACKUP_DIR,
     LOCATION_BACKUP_DIR,
     LOCATION_SHORTCUTS_BACKUP_DIR,
     LOCATION_OVERLAND_BACKUP_DIR,
@@ -221,9 +222,11 @@ DAILY_VARS = editable("DAILY_VARS", "OpenMeteo API variables that are per day", 
 # Coordinate rounding resolution — matches Open-Meteo's ~10 km grid
 COORD_PRECISION = editable("COORD_PRECISION", "Number of decimal places to round lat/lon coordinates for OpenMeteo requests", group="Weather")(1)
 
-# Seconds between API requests — be a polite free-tier citizen
-REQUEST_DELAY = editable("REQUEST_DELAY","Number of seconds between each OpenMeteo request.\nPolite not to spam a free service", group="Weather")(0.5)
+WEATHER_MAX_RPS = editable("WEATHER_MAX_RPS", "Maximum Open-Meteo requests per second (heavy load ceiling)", group="Weather")(5.0)
 
+WEATHER_WORKERS = editable("WEATHER_WORKERS", "Number of concurrent worker threads for weather fetching", group="Weather")(5)
+
+WEATHER_FETCH_TIMEOUT: int = 10  # seconds per request; replaces the old 30 s timeout
 
 WEATHER_LOOKBACK_DAYS = editable("Weather: Lookback Days", "Number of days of weather data to fetch per run.", group="Weather")(14)
 

@@ -270,8 +270,8 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
     def insert_hourly_batch(self, data: dict, lat: float, lon: float) -> int:
         """Insert hourly rows from an Open-Meteo API response dict.
 
-        Unpacks the parallel arrays in data['hourly'] and inserts each row in a
-        single connection. Returns count of newly inserted rows.
+        Builds all rows upfront and inserts via a single executemany call.
+        Returns count of newly inserted rows.
         """
         hourly = data.get("hourly", {})
         times                 = hourly.get("time", [])
@@ -290,73 +290,74 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
         shortwave_radiations  = hourly.get("shortwave_radiation", [])
         is_days               = hourly.get("is_day", [])
 
+        if not times:
+            return 0
+
+        def _get(lst, i):
+            return lst[i] if i < len(lst) else None
+
         fetched_at = to_iso_str(datetime.now(timezone.utc))
-        inserted = 0
+        rows = []
+        for i, ts in enumerate(times):
+            raw = {
+                "temperature_2m":        _get(temperatures, i),
+                "apparent_temperature":  _get(apparent_temperatures, i),
+                "relative_humidity_2m":  _get(relative_humidities, i),
+                "dewpoint_2m":           _get(dewpoints, i),
+                "precipitation":         _get(precipitations, i),
+                "windspeed_10m":         _get(windspeeds, i),
+                "winddirection_10m":     _get(winddirections, i),
+                "windgusts_10m":         _get(windgusts, i),
+                "weathercode":           _get(weathercodes, i),
+                "uv_index":              _get(uv_indices, i),
+                "cloudcover":            _get(cloudcovers, i),
+                "surface_pressure":      _get(surface_pressures, i),
+                "shortwave_radiation":   _get(shortwave_radiations, i),
+                "is_day":                _get(is_days, i),
+            }
+            rows.append((
+                fetched_at,
+                to_iso_str(ts),
+                lat,
+                lon,
+                raw["temperature_2m"],
+                raw["apparent_temperature"],
+                raw["precipitation"],
+                raw["windspeed_10m"],
+                raw["winddirection_10m"],
+                raw["uv_index"],
+                raw["cloudcover"],
+                raw["is_day"],
+                raw["weathercode"],
+                json.dumps(raw),
+                raw["relative_humidity_2m"],
+                raw["dewpoint_2m"],
+                raw["windgusts_10m"],
+                raw["surface_pressure"],
+                raw["shortwave_radiation"],
+            ))
 
         with get_conn() as conn:
-            for i, ts in enumerate(times):
-                raw = {
-                    "temperature_2m":        temperatures[i]         if i < len(temperatures)         else None,
-                    "apparent_temperature":  apparent_temperatures[i] if i < len(apparent_temperatures) else None,
-                    "relative_humidity_2m":  relative_humidities[i]  if i < len(relative_humidities)  else None,
-                    "dewpoint_2m":           dewpoints[i]             if i < len(dewpoints)             else None,
-                    "precipitation":         precipitations[i]        if i < len(precipitations)        else None,
-                    "windspeed_10m":         windspeeds[i]            if i < len(windspeeds)            else None,
-                    "winddirection_10m":     winddirections[i]        if i < len(winddirections)        else None,
-                    "windgusts_10m":         windgusts[i]             if i < len(windgusts)             else None,
-                    "weathercode":           weathercodes[i]          if i < len(weathercodes)          else None,
-                    "uv_index":              uv_indices[i]            if i < len(uv_indices)            else None,
-                    "cloudcover":            cloudcovers[i]           if i < len(cloudcovers)           else None,
-                    "surface_pressure":      surface_pressures[i]     if i < len(surface_pressures)     else None,
-                    "shortwave_radiation":   shortwave_radiations[i]  if i < len(shortwave_radiations)  else None,
-                    "is_day":                is_days[i]               if i < len(is_days)               else None,
-                }
-                cursor = conn.execute(
-                    """
-                    INSERT OR IGNORE INTO weather_hourly
-                        (fetched_at, timestamp, latitude, longitude,
-                         temperature_c, apparent_temperature_c, precipitation_mm,
-                         windspeed_kmh, winddirection_deg, uv_index, cloudcover_pct,
-                         is_day, weathercode, raw_json,
-                         relative_humidity_pct, dewpoint_c, windgusts_kmh,
-                         surface_pressure_hpa, shortwave_radiation_wm2)
-                    VALUES
-                        (:fetched_at, :timestamp, :lat, :lon,
-                         :temp, :apparent_temp, :precip,
-                         :wind, :winddir, :uv, :cloud,
-                         :is_day, :code, :raw,
-                         :rh, :dewpoint, :windgusts,
-                         :surface_pressure, :shortwave)
-                    """,
-                    {
-                        "fetched_at":       fetched_at,
-                        "timestamp":        to_iso_str(ts),
-                        "lat":              lat,
-                        "lon":              lon,
-                        "temp":             raw["temperature_2m"],
-                        "apparent_temp":    raw["apparent_temperature"],
-                        "precip":           raw["precipitation"],
-                        "wind":             raw["windspeed_10m"],
-                        "winddir":          raw["winddirection_10m"],
-                        "uv":               raw["uv_index"],
-                        "cloud":            raw["cloudcover"],
-                        "is_day":           raw["is_day"],
-                        "code":             raw["weathercode"],
-                        "raw":              json.dumps(raw),
-                        "rh":               raw["relative_humidity_2m"],
-                        "dewpoint":         raw["dewpoint_2m"],
-                        "windgusts":        raw["windgusts_10m"],
-                        "surface_pressure": raw["surface_pressure"],
-                        "shortwave":        raw["shortwave_radiation"],
-                    },
-                )
-                inserted += cursor.rowcount
+            cursor = conn.executemany(
+                """
+                INSERT OR IGNORE INTO weather_hourly
+                    (fetched_at, timestamp, latitude, longitude,
+                    temperature_c, apparent_temperature_c, precipitation_mm,
+                    windspeed_kmh, winddirection_deg, uv_index, cloudcover_pct,
+                    is_day, weathercode, raw_json,
+                    relative_humidity_pct, dewpoint_c, windgusts_kmh,
+                    surface_pressure_hpa, shortwave_radiation_wm2)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+        return cursor.rowcount
 
-        return inserted
 
     def insert_daily_batch(self, data: dict, lat: float, lon: float) -> int:
         """Insert daily rows from an Open-Meteo API response dict.
 
+        Builds all rows upfront and inserts via a single executemany call.
         Returns count of newly inserted rows.
         """
         daily = data.get("daily", {})
@@ -373,59 +374,60 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
         daylight_durations = daily.get("daylight_duration", [])
         sunshine_durations = daily.get("sunshine_duration", [])
 
+        if not dates:
+            return 0
+
+        def _get(lst, i):
+            return lst[i] if i < len(lst) else None
+
         fetched_at = to_iso_str(datetime.now(timezone.utc))
-        inserted = 0
+        rows = []
+        for i, d in enumerate(dates):
+            raw = {
+                "sunrise":             _get(sunrises, i),
+                "sunset":              _get(sunsets, i),
+                "temperature_2m_max":  _get(temp_maxes, i),
+                "temperature_2m_min":  _get(temp_mins, i),
+                "precipitation_sum":   _get(precip_sums, i),
+                "precipitation_hours": _get(precip_hours, i),
+                "snowfall_sum":        _get(snowfall_sums, i),
+                "wind_speed_10m_max":  _get(windspeed_maxes, i),
+                "wind_gusts_10m_max":  _get(windgust_maxes, i),
+                "daylight_duration":   _get(daylight_durations, i),
+                "sunshine_duration":   _get(sunshine_durations, i),
+            }
+            rows.append((
+                fetched_at,
+                d,
+                lat,
+                lon,
+                raw["sunrise"],
+                raw["sunset"],
+                raw["precipitation_sum"],
+                raw["precipitation_hours"],
+                raw["snowfall_sum"],
+                raw["wind_speed_10m_max"],
+                raw["wind_gusts_10m_max"],
+                json.dumps(raw),
+                raw["temperature_2m_max"],
+                raw["temperature_2m_min"],
+                raw["daylight_duration"],
+                raw["sunshine_duration"],
+            ))
 
         with get_conn() as conn:
-            for i, d in enumerate(dates):
-                raw = {
-                    "sunrise":             sunrises[i]           if i < len(sunrises)           else None,
-                    "sunset":              sunsets[i]            if i < len(sunsets)            else None,
-                    "temperature_2m_max":  temp_maxes[i]         if i < len(temp_maxes)         else None,
-                    "temperature_2m_min":  temp_mins[i]          if i < len(temp_mins)          else None,
-                    "precipitation_sum":   precip_sums[i]        if i < len(precip_sums)        else None,
-                    "precipitation_hours": precip_hours[i]       if i < len(precip_hours)       else None,
-                    "snowfall_sum":        snowfall_sums[i]      if i < len(snowfall_sums)      else None,
-                    "wind_speed_10m_max":  windspeed_maxes[i]    if i < len(windspeed_maxes)    else None,
-                    "wind_gusts_10m_max":  windgust_maxes[i]     if i < len(windgust_maxes)     else None,
-                    "daylight_duration":   daylight_durations[i] if i < len(daylight_durations) else None,
-                    "sunshine_duration":   sunshine_durations[i] if i < len(sunshine_durations) else None,
-                }
-                cursor = conn.execute(
-                    """
-                    INSERT OR IGNORE INTO weather_daily
-                        (fetched_at, date, latitude, longitude,
-                         sunrise, sunset, precipitation_sum_mm, precipitation_hours,
-                         snowfall_sum_cm, windspeed_max_kmh, windgusts_max_kmh, raw_json,
-                         temp_max_c, temp_min_c, daylight_duration_s, sunshine_duration_s)
-                    VALUES
-                        (:fetched_at, :date, :lat, :lon,
-                         :sunrise, :sunset, :precip_sum, :precip_hours,
-                         :snowfall, :windspeed_max, :windgusts_max, :raw,
-                         :temp_max, :temp_min, :daylight, :sunshine)
-                    """,
-                    {
-                        "fetched_at":    fetched_at,
-                        "date":          d,
-                        "lat":           lat,
-                        "lon":           lon,
-                        "sunrise":       raw["sunrise"],
-                        "sunset":        raw["sunset"],
-                        "precip_sum":    raw["precipitation_sum"],
-                        "precip_hours":  raw["precipitation_hours"],
-                        "snowfall":      raw["snowfall_sum"],
-                        "windspeed_max": raw["wind_speed_10m_max"],
-                        "windgusts_max": raw["wind_gusts_10m_max"],
-                        "raw":           json.dumps(raw),
-                        "temp_max":      raw["temperature_2m_max"],
-                        "temp_min":      raw["temperature_2m_min"],
-                        "daylight":      raw["daylight_duration"],
-                        "sunshine":      raw["sunshine_duration"],
-                    },
-                )
-                inserted += cursor.rowcount
-
-        return inserted
+            cursor = conn.executemany(
+                """
+                INSERT OR IGNORE INTO weather_daily
+                    (fetched_at, date, latitude, longitude,
+                    sunrise, sunset, precipitation_sum_mm, precipitation_hours,
+                    snowfall_sum_cm, windspeed_max_kmh, windgusts_max_kmh, raw_json,
+                    temp_max_c, temp_min_c, daylight_duration_s, sunshine_duration_s)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+        return cursor.rowcount
 
 
 table = WeatherTable()
