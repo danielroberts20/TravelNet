@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 def _append_backup(directory, data: dict) -> None:
     """Append a JSON payload as a single line to today's JSONL backup file."""
     path = directory / f"{datetime.now().strftime('%Y-%m-%d')}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)  # <-- add this
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(data, ensure_ascii=False) + "\n")
 
