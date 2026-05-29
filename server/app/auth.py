@@ -29,16 +29,20 @@ from config.settings import settings
 def require_upload_token(authorization: str = Header(None)) -> None:
     """FastAPI dependency: enforce the UPLOAD_TOKEN bearer check.
 
+    Raises HTTP 500 if UPLOAD_TOKEN is not configured (misconfigured deployment).
     Raises HTTP 401 if the Authorization header is absent or does not match
-    'Bearer <UPLOAD_TOKEN>'.  If UPLOAD_TOKEN is not configured, every request
-    passes (useful for local development without a .env file).
+    'Bearer <UPLOAD_TOKEN>'.
     """
-    if settings.upload_token:
-        if not authorization or authorization != f"Bearer {settings.upload_token}":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unauthorized",
-            )
+    if not settings.upload_token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server misconfiguration: UPLOAD_TOKEN is not set",
+        )
+    if not authorization or authorization != f"Bearer {settings.upload_token}":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized",
+        )
 
 def require_watchdog_token(authorization: str = Header(...)) -> None:
     if settings.watchdog_token:

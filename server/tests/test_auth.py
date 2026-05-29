@@ -2,7 +2,7 @@
 test_auth.py — Unit tests for auth.py dependency functions.
 
 Covers require_upload_token():
-  - Falsy settings.upload_token → request always passes (dev bypass)
+  - UPLOAD_TOKEN not configured → HTTPException(500)
   - Correct "Bearer <token>" header → passes
   - Wrong token value → HTTPException(401)
   - Missing header (None) → HTTPException(401)
@@ -35,14 +35,18 @@ def _settings(upload_token="", overland_token=""):
 
 class TestRequireUploadToken:
 
-    def test_falsy_token_bypasses_check(self):
-        """No token configured → any request passes (dev mode)."""
+    def test_empty_token_raises_500(self):
+        """No token configured → HTTP 500 (fail-closed, not fail-open)."""
         with patch("auth.settings", _settings(upload_token="")):
-            require_upload_token(authorization=None)  # no exception
+            with pytest.raises(HTTPException) as exc_info:
+                require_upload_token(authorization=None)
+        assert exc_info.value.status_code == 500
 
-    def test_none_token_bypasses_check(self):
+    def test_none_token_raises_500(self):
         with patch("auth.settings", _settings(upload_token=None)):
-            require_upload_token(authorization=None)
+            with pytest.raises(HTTPException) as exc_info:
+                require_upload_token(authorization=None)
+        assert exc_info.value.status_code == 500
 
     def test_correct_bearer_token_passes(self):
         with patch("auth.settings", _settings(upload_token="secret")):
