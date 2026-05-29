@@ -18,7 +18,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI  # type: ignore
 import requests
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.cors import CORSMiddleware
 
@@ -34,7 +33,7 @@ from config.runtime import initialise as init_app_uptime # records the timestamp
 
 from compute.router import router as compute_router
 from database.setup import init_db
-from middleware import PublicPathFilterMiddleware
+from middleware import PublicPathFilterMiddleware, get_rate_limit_key
 from notifications import send_notification
 from upload.router import router as uploads_router
 from database.admin import router as db_router
@@ -81,7 +80,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="TravelNet API", version="1.0.1", lifespan=lifespan)
 
 # --- Rate limiting ---
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_rate_limit_key)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

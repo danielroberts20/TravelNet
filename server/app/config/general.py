@@ -115,7 +115,8 @@ FLIGHT_DISTANCE_MIN_KM = editable("FLIGHT_DISTANCE_MIN_KM", description="Minimum
 # API & Access Control
 # ---------------------------------------------------------------------------
 
-PUBLIC_ALLOWED_PREFIXES = ["/public/"]
+PUBLIC_ALLOWED_PREFIXES: list[str] = ["/public/"]
+API_ALLOWED_PREFIXES: list[str] = ["/upload/", "/metadata/status", "/metadata/deployment_tz"]
 
 
 # ---------------------------------------------------------------------------
