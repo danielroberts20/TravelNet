@@ -3,14 +3,16 @@ services:
     build: .
     image: travelnet:latest
     container_name: travelnet
+    init: true
     env_file: .env
     environment:
       CRONTAB_FILE: "/var/spool/cron/crontabs/dan"
       PREFECT_API_URL: "http://travelnet.tail186ff8.ts.net:4200/api"
     volumes:
-      - /mnt/linux/docker/services/travelnet/data:/data
+      - /mnt/ssd/docker/services/travelnet/data:/data
+      - /mnt/linux/docker/services/travelnet/data/backups:/data/backups
       - ./app:/app
-      - /home/dan/.config/rclone:/root/.config/rclone:ro 
+      - /home/dan/.config/rclone:/root/.config/rclone:ro
       - /var/spool/cron/crontabs/dan:/var/spool/cron/crontabs/dan
       - /home/dan/services/TravelNet/travel.yml:/travel.yml:ro
     ports:
@@ -34,8 +36,10 @@ services:
       TREVOR_CONTAINER_NAME: "trevor"
       TREVOR_URL:            "${TREVOR_URL}"
       TREVOR_API_KEY:        "${TREVOR_API_KEY}"
+      WATCHDOG_IP: "${WATCHDOG_IP}"
     volumes:
-      - /mnt/linux/docker/services/travelnet/data:/data:ro
+      - /mnt/ssd/docker/services/travelnet/data:/data:ro
+      - /mnt/linux/docker/services/travelnet/data/backups:/data/backups:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /home/dan/services/Dashboard:/app
       - /home/dan/services/TravelNet/server:/travelnet-server:ro
@@ -60,23 +64,27 @@ services:
       - dashboard
     networks:
       - travelnet
-  
+
   prefect-worker:
     build: .
     image: travelnet:latest
     command: python -m deployments
+    init: true
     env_file: .env
     environment:
       - PREFECT_API_URL=http://travelnet.tail186ff8.ts.net:4200/api
     volumes:
-      - /mnt/linux/docker/services/travelnet/data:/data
+      - /mnt/ssd/docker/services/travelnet/data:/data
+      - /mnt/linux/docker/services/travelnet/data/backups:/data/backups
       - ./app:/app
-      - /mnt/linux/docker/services/travelnet/data/backup_db_to_cloudflare.sh:/backup_db_to_cloudflare.sh:ro
-      - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/mnt/linux/docker/services/travelnet/.travelnet_backup_key:ro
+      - /mnt/linux/docker/services/travelnet/data/backup_db_to_cloudflare.sh:/backup_db_to_cloudflare.sh:ro  # unchanged (script stays on HDD)
+      - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/backup_key:ro  # FIXED: sane container path
       - /home/dan/.config/rclone:/root/.config/rclone:ro
     restart: unless-stopped
     depends_on:
       - ingest
+    networks:
+      - travelnet
 
 networks:
   travelnet:
