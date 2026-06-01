@@ -21,7 +21,7 @@ meta:
   base_city: "London"
   trip_start: "2026-06-11"    # date of first departure — used for countdown
   display:
-    pill: "Pre-departure · Building TravelNet"
+    pill: "Pre-departure · Testing TravelNet"
     label: "London, UK"
     description: "Hardening TravelNet infrastructure before departure in June 2026."
     location: "London, UK"
@@ -30,6 +30,32 @@ meta:
     lat: 51.5
     label: "UK"
     above: true
+  # Budget normalisation settings — used by ML pipeline and cost-of-living comparisons
+  budget:
+    currency: "GBP"
+    baseline_country: "UK"          # cost-of-living normalisation baseline
+  # ML pipeline configuration — consumed by scheduled_tasks and Trevor
+  ml:
+    phase_1_start_leg: "australia"  # leg id where ML pipeline activates
+    phase_1_day_threshold: 60       # minimum days of data before phase 1 runs
+  departure_airport: "LHR"
+  departure_terminal: "3"
+
+# External URLs — consumed by travel.ts (web build) and Trevor system prompt.
+# Centralised here so downstream files do not hardcode URLs.
+links:
+  github_repo: "https://github.com/danielroberts20/TravelNet"
+  trevor_repo: "https://github.com/danielroberts20/Trevor-For-TravelNet"
+  docs_url: "https://docs.travelnet.dev"
+  demo_url: "https://travelnet.dev"
+  portfolio_url: "https://danielroberts20.github.io"
+  linkedin_url: "https://linkedin.com/in/danielroberts20"
+
+# Portfolio / author metadata — consumed by the demo site and portfolio page.
+portfolio:
+  name: "Dan Roberts"
+  github_handle: "danielroberts20"
+  linkedin_handle: "danielroberts20"
 
 # Ordered list of map stops for the route visualisation.
 # Includes top-level legs and any notable sub-legs (e.g. Seattle).
@@ -86,7 +112,7 @@ legs:
       arrival: "2026-06-11"
       departure: "2026-09-06"
     actual:
-      arrival: null
+      arrival: "2026-06-11"
       departure: null
     notes: "Philadelphia/DC pre-camp, summer camp lifeguard/counsellor (~2 months), post-camp labouring, Seattle mini-trip."
     display:
@@ -101,6 +127,21 @@ legs:
       lat: 37.0
       label: "USA"
       above: true
+    currency: "USD"
+    timezone: "America/New_York"
+    working: true
+    budget_weekly_gbp: 150
+    visa_notes: "J-1 exchange visitor — no freelance work permitted"
+    # Planned inter-leg flights into this leg
+    flights:
+      - from: "LHR"
+        to: "PHL"
+        date_planned: "2026-06-11"
+        notes: "Via American Airlines"
+      - from: "JFK"
+        to: "SEA"
+        date_planned: "2026-08-31"
+        notes: "Not booked yet."
     sub_legs:
       - id: usa_philly
         name: "Philadelphia / DC"
@@ -160,6 +201,17 @@ legs:
       lat: -18.0
       label: "FJI"
       above: true
+    currency: "FJD"
+    timezone: "Pacific/Fiji"
+    working: false
+    budget_weekly_gbp: 300
+    visa_notes: "30-day visitor permit on arrival, extendable to 4 months"
+    # Planned inter-leg flights into this leg
+    flights:
+      - from: "SEA"
+        to: "NAN"
+        date_planned: "2026-09-06"
+        notes: "Via SFO"
     sub_legs: []
 
   - id: australia
@@ -169,10 +221,10 @@ legs:
     visa: "Working Holiday Visa (WHV)"
     stopover: false
     planned:
-      arrival: "2026-09-10"
+      arrival: "2026-09-11"
       departure: "2027-09-10"
     actual:
-      arrival: null
+      arrival: "2026-09-11"
       departure: null
     notes: "First WHV leg. ML pipeline begins here using US data as baseline."
     display:
@@ -187,6 +239,17 @@ legs:
       lat: -25.0
       label: "AUS"
       above: false
+    currency: "AUD"
+    timezone: "Australia/Sydney"
+    working: true
+    budget_weekly_gbp: 250
+    visa_notes: "WHV — 12 months; no more than 6 months with one employer"
+    # Planned inter-leg flights into this leg
+    flights:
+      - from: "NAN"
+        to: "MEL"
+        date_planned: "2026-09-11"
+        notes: null
     sub_legs:
       - id: aus_east_coast
         name: "East Coast"
@@ -222,6 +285,17 @@ legs:
       lat: -41.0
       label: "NZ"
       above: false
+    currency: "NZD"
+    timezone: "Pacific/Auckland"
+    working: true
+    budget_weekly_gbp: 250
+    visa_notes: "WHV — 12 months from entry date"
+    # Planned inter-leg flights into this leg
+    flights:
+      - from: "MEL"
+        to: "AKL"
+        date_planned: "2027-07-01"
+        notes: null
     sub_legs: []
 
   - id: se_asia
@@ -249,6 +323,17 @@ legs:
       lat: 15.0
       label: "SE Asia"
       above: true
+    currency: null
+    timezone: null
+    working: false
+    budget_weekly_gbp: 150
+    visa_notes: "Varies by country — tourist/VOA throughout"
+    # Planned inter-leg flights into this leg
+    flights:
+      - from: "AKL"
+        to: "BKK"
+        date_planned: "2027-12-01"
+        notes: null
     sub_legs: []
 
   - id: canada
@@ -276,4 +361,15 @@ legs:
       lat: 56.0
       label: "CAN"
       above: true
+    currency: "CAD"
+    timezone: null
+    working: true
+    budget_weekly_gbp: 300
+    visa_notes: "IEC WHV — 24 months"
+    # Planned inter-leg flights into this leg — origin country unknown (SE Asia, multiple)
+    flights:
+      - from: null
+        to: "YVR"
+        date_planned: "2028-04-01"
+        notes: null
     sub_legs: []
