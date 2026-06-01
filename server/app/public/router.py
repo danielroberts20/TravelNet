@@ -14,6 +14,7 @@ from slowapi import Limiter  # type: ignore
 from slowapi.util import get_remote_address  # type: ignore
 
 from public.stats import build_public_stats
+from public.widget import build_widget_data
 
 logger = logging.getLogger(__name__)
 
@@ -29,4 +30,13 @@ async def public_stats(request: Request):
     Contains counts and city-level metadata only — no raw location data.
     """
     return build_public_stats()
+
+@router.get("/widget")
+@limiter.limit("30/minute")
+async def public_widget(request: Request):
+    """
+    Public widget endpoint for the Scriptable iOS home screen widget.
+    No auth. Returns system health and current trip context.
+    """
+    return build_widget_data()
 
