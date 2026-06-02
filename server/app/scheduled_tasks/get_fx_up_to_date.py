@@ -14,7 +14,7 @@ from config.general import CURRENCIES, FX_BACKUP_DIR, FX_TIMEFRAME_URL, SOURCE_C
 from config.settings import settings
 from database.exchange.fx import get_api_usage, insert_fx_json
 from database.connection import get_conn, increment_api_usage
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 
 
 
@@ -118,7 +118,7 @@ def store_fx_and_backup(response: dict) -> dict:
     }
 
 
-@flow(name="Backfill FX", on_failure=[notify_on_completion])
+@flow(name="Backfill FX", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def get_fx_up_to_date_flow(target_date: date | None = None):
     logger = get_run_logger()
     target_date = target_date or date.today() - timedelta(days=14)

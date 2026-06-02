@@ -26,7 +26,7 @@ from util import haversine_km
 from config.general import FLIGHT_GAP_MIN_HOURS, FLIGHT_DISTANCE_MIN_KM
 from database.connection import get_conn
 from database.flights.table import table as flights_table, FlightRecord
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 
 
 def _ts_to_dt(ts: str) -> datetime:
@@ -125,7 +125,7 @@ def insert_detected_flights(candidates: list[dict]) -> dict:
     return {"detected": len(candidates), "inserted": inserted}
 
 
-@flow(name="Detect Flights")
+@flow(name="Detect Flights", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def detect_flights_flow():
     logger = get_run_logger()
     candidates = detect_flight_gaps()

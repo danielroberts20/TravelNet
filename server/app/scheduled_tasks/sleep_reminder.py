@@ -34,7 +34,7 @@ load_overrides()
 import config.general as cfg
 from config.settings import settings
 from database.connection import get_conn
-from notifications import notify_on_completion, send_notification
+from notifications import notify_on_completion, log_on_success, send_notification
 
 
 REMINDER_LOCK_FILE = "/data/.sleep_reminder_date"
@@ -286,7 +286,7 @@ def write_lock_file(tz_name: str) -> None:
 
 # ── Flow 1: Scheduler ─────────────────────────────────────────────────────────
 
-@flow(name="Schedule Sleep Reminder", on_failure=[notify_on_completion])
+@flow(name="Schedule Sleep Reminder", on_failure=[notify_on_completion], on_completion=[log_on_success])
 async def sleep_reminder_schedule_flow():
     """
     Runs daily at noon local time.
@@ -315,7 +315,7 @@ async def sleep_reminder_schedule_flow():
 
 # ── Flow 2: Notifier ──────────────────────────────────────────────────────────
 
-@flow(name=NOTIFY_DEPLOYMENT_NAME, on_failure=[notify_on_completion])
+@flow(name=NOTIFY_DEPLOYMENT_NAME, on_failure=[notify_on_completion], on_completion=[log_on_success])
 def sleep_reminder_notify_flow():
     """
     Fires at the time scheduled by sleep_reminder_schedule_flow.

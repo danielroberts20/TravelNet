@@ -6,7 +6,7 @@ from prefect import flow, get_run_logger, task
 from config.general import TRANSACTION_SUBCATEGORIES
 from database.connection import get_conn
 from llm.provider.openai import OpenAIProvider
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 
 BATCH_SIZE = 30
 MINIMUM_CONFIDENCE = 0.5
@@ -132,7 +132,7 @@ def update_transaction_categories(classified_data):
     return len(update_payload)
 
 
-@flow(name="Categorise Transactions", on_failure=[notify_on_completion])
+@flow(name="Categorise Transactions", on_failure=[notify_on_completion], on_completion=[log_on_success])
 async def categorise_transactions_flow():
     logger = get_run_logger()
 

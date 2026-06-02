@@ -12,7 +12,7 @@ from config.general import CURRENCIES, FX_BACKUP_DIR, FX_DATE_URL, SOURCE_CURREN
 from config.settings import settings
 from database.connection import increment_api_usage
 from database.exchange.fx import insert_fx_json
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def backup_fx(response: dict, path) -> str:
     return str(path)
 
 
-@flow(name="Get FX", on_failure=[notify_on_completion])
+@flow(name="Get FX", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def get_fx_flow(date: datetime | None = None):
     if date is None:
         date = datetime.now(timezone.utc) - timedelta(days=2)

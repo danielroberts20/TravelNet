@@ -13,7 +13,7 @@ from datetime import datetime
 from prefect import flow
 from prefect.logging import get_run_logger
 
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 from scheduled_tasks.daily_summary.base import Domain, closed_after
 
 
@@ -107,7 +107,8 @@ PI_DOMAIN = Domain(
 
 
 @flow(
-    name="Compute Daily Summary — Pi"
+    name="Compute Daily Summary — Pi",
+    on_failure=[notify_on_completion], on_completion=[log_on_success]
 )
 def compute_pi_flow(local_date: str) -> dict:
     logger = get_run_logger()

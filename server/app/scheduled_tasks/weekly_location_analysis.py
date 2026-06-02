@@ -18,7 +18,7 @@ load_overrides()
 from prefect import task, flow
 from prefect.logging import get_run_logger
 
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 from database.connection import get_conn
 from scheduled_tasks.geocode_places import geocode_places_flow
 from scheduled_tasks.detect_timezone_transitions import detect_timezone_transitions_flow
@@ -42,7 +42,7 @@ def get_current_timezone() -> str:
     return tz
 
 
-@flow(name="Weekly Location Analysis", on_failure=[notify_on_completion])
+@flow(name="Weekly Location Analysis", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def weekly_location_analysis_flow():
     logger = get_run_logger()
     logger.info("Starting weekly location analysis pipeline")

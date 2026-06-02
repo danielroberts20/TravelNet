@@ -21,7 +21,7 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 
 from database.connection import get_conn
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 from config.general import RECOMPUTE_WINDOW_DAYS
 
 from scheduled_tasks.daily_summary.health   import compute_health_flow
@@ -88,7 +88,7 @@ def get_dates_to_compute() -> list[str]:
 
 @flow(
     name="Compute Daily Summary",
-    on_failure=[notify_on_completion],
+    on_failure=[notify_on_completion], on_completion=[log_on_success],
 )
 def compute_daily_summary_flow():
     logger = get_run_logger()

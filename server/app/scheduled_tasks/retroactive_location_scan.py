@@ -57,7 +57,7 @@ from config.general import (
     LOCATION_DEPARTURE_CONFIRMATION_MINS,
 )
 from database.connection import get_conn
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 from triggers.location_change import (
     check_departure,
     get_nearest_known_place,
@@ -259,7 +259,7 @@ def run_departure_check() -> dict:
     return {"status": "completed"}
 
 
-@flow(name="Retroactive Location Scan")
+@flow(name="Retroactive Location Scan", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def retroactive_location_scan_flow():
     scan_result     = load_and_scan()
     departure_result = run_departure_check()

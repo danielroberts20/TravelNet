@@ -1,6 +1,6 @@
 from prefect import flow, task, get_run_logger
 from database.connection import get_conn
-from notifications import error_notification
+from notifications import error_notification, notify_on_completion, log_on_success
 from datetime import datetime, timezone, timedelta
 from config.runtime import get_app_uptime
 
@@ -46,7 +46,7 @@ def check_staleness(last: dict | None, threshold_minutes: int = 10):
     log.info(f"Last heartbeat: {last['received_at']} ({age.seconds}s ago)")
     return not stale, f"last seen {int(age.total_seconds())}s ago"
 
-@flow(name="Check Watchdog")
+@flow(name="Check Watchdog", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def check_watchdog_flow():
     log = get_run_logger()
 

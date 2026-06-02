@@ -16,7 +16,7 @@ from prefect.logging import get_run_logger
 
 from config.general import COORD_PRECISION
 from database.connection import get_conn
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 from scheduled_tasks.daily_summary.base import Domain, never_auto_close
 
 
@@ -132,7 +132,7 @@ WEATHER_DOMAIN = Domain(
 
 @flow(
     name="Compute Daily Summary — Weather",
-    on_failure=[notify_on_completion],
+    on_failure=[notify_on_completion], on_completion=[log_on_success],
 )
 def compute_weather_flow(local_date: str) -> dict:
     """Ad-hoc single-date weather upsert. Does NOT set weather_complete."""
@@ -163,7 +163,7 @@ def find_dates_in_window() -> list[str]:
 
 @flow(
     name="Backfill Weather in Summary",
-    on_failure=[notify_on_completion],
+    on_failure=[notify_on_completion], on_completion=[log_on_success],
 )
 def backfill_weather_in_summary_flow():
     """

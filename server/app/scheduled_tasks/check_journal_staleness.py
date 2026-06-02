@@ -8,7 +8,7 @@ from prefect import task, flow
 from prefect.logging import get_run_logger
 
 from config.general import DATA_DIR, JOURNAL_STALENESS_HOURS
-from notifications import journal_notification, record_flow_result
+from notifications import journal_notification, record_flow_result, notify_on_completion, log_on_success
 
 JOURNAL_LATEST_FILE = DATA_DIR / "journal_latest.json"
 
@@ -59,7 +59,7 @@ def check_and_notify_journal_staleness() -> dict:
     }
 
 
-@flow(name="Check Journal Staleness")
+@flow(name="Check Journal Staleness", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def check_journal_staleness_flow():
     result = check_and_notify_journal_staleness()
     record_flow_result(result)

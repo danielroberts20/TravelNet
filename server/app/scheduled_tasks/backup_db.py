@@ -13,7 +13,7 @@ from prefect import task, flow
 from prefect.logging import get_run_logger
 from database.connection import backup_db
 from config.general import DATABASE_BACKUP_DIR
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 from upload.health.pruning import prune_health_backups
 
 
@@ -55,7 +55,7 @@ def prune_old_health_backups(days: int = 14) -> dict:
     return result
 
 
-@flow(name="Backup DB", on_failure=[notify_on_completion])
+@flow(name="Backup DB", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def backup_db_flow(prefix: str | None = None, suffix: str | None = None):
     snapshot = create_db_snapshot(prefix, suffix)
     pruned_db = prune_old_db_backups(28)

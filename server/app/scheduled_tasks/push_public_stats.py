@@ -21,7 +21,7 @@ from prefect.logging import get_run_logger
 
 from config.settings import settings
 from public.stats import build_public_stats
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 
 GITHUB_API = "https://api.github.com"
 TARGET_PATH = "docs/public_stats.json"
@@ -79,7 +79,7 @@ def push_stats_to_github(payload: dict) -> str:
     return f"{action} {TARGET_PATH}"
 
 
-@flow(name="Push Public Stats")
+@flow(name="Push Public Stats", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def push_public_stats_flow():
     logger = get_run_logger()
     payload = build_stats_payload()

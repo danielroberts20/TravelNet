@@ -24,6 +24,7 @@ from pathlib import Path
 
 from prefect import task, flow
 from prefect.logging import get_run_logger
+from notifications import notify_on_completion, log_on_success, record_flow_result
 
 
 @task
@@ -69,7 +70,7 @@ def run_pytest_suite() -> dict:
     }
 
 
-@flow(name="run-tests")
+@flow(name="run-tests", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def run_tests_flow():
     logger = get_run_logger()
     results = run_pytest_suite()

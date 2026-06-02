@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from prefect import flow
 from prefect.logging import get_run_logger
 
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 from scheduled_tasks.daily_summary.base import Domain, closed_after
 from config.general import WAKING_HOURS, EXPECTED_POINTS_PER_HOUR
 
@@ -241,7 +241,8 @@ LOCATION_DOMAIN = Domain(
 
 
 @flow(
-    name="Compute Daily Summary — Location"
+    name="Compute Daily Summary — Location",
+    on_failure=[notify_on_completion], on_completion=[log_on_success]
 )
 def compute_location_flow(local_date: str) -> dict:
     logger = get_run_logger()

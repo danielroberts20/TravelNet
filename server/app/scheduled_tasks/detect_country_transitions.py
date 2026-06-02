@@ -19,7 +19,7 @@ from prefect.logging import get_run_logger
 from config.general import DWELL_MIN_POINTS, PAGE_SIZE
 from database.transition.country.table import table as country_transition_table, CountryTransitionRecord
 from database.connection import get_conn
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 
 
 def _detect_transitions(conn, logger) -> dict:
@@ -178,7 +178,7 @@ def run_country_transition_detection() -> dict:
     return results
 
 
-@flow(name="Detect Country Transitions")
+@flow(name="Detect Country Transitions", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def detect_country_transitions_flow():
     result = run_country_transition_detection()
     record_flow_result(result)

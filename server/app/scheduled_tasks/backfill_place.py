@@ -2,7 +2,7 @@ from config.editable import load_overrides
 load_overrides()
 
 from datetime import datetime, timezone, timedelta
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 from prefect import task, flow
 from prefect.logging import get_run_logger
 
@@ -206,7 +206,7 @@ def backfill_all_places() -> dict:
     }
 
 
-@flow(name="Backfill Place", on_failure=[notify_on_completion])
+@flow(name="Backfill Place", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def backfill_place_flow():
     result = backfill_all_places()
     record_flow_result(result)

@@ -13,7 +13,7 @@ from prefect import flow, get_run_logger
 
 from config.general import DB_FILE
 from config.settings import settings
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 
 
 def _run(cmd: list[str], timeout: int = 120) -> subprocess.CompletedProcess:
@@ -115,7 +115,7 @@ def _verify_upload(filename: str) -> int:
 
 @flow(
     name="Cloudflare DB Backup",
-    on_failure=[notify_on_completion],
+    on_failure=[notify_on_completion], on_completion=[log_on_success],
 )
 def cloudflare_backup_db_flow(
     prefix: str | None = None,

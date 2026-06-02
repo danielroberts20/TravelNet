@@ -18,7 +18,7 @@ from prefect.logging import get_run_logger
 from database.transition.timezone.table import table as transition_timezone_table, TransitionTimezoneRecord
 from config.general import PAGE_SIZE
 from database.connection import get_conn
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 
 
 def _utc_offset_str(iana_tz: str, at_utc_iso: str, logger) -> str | None:
@@ -153,7 +153,7 @@ def run_timezone_transition_detection() -> dict:
     return results
 
 
-@flow(name="Detect Timezone Transitions")
+@flow(name="Detect Timezone Transitions", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def detect_timezone_transitions_flow():
     result = run_timezone_transition_detection()
     record_flow_result(result)

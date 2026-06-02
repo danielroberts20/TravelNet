@@ -9,7 +9,7 @@ from prefect import get_run_logger, task, flow
 from config.settings import settings
 from database.connection import get_conn
 from database.location.geocoding import batch_geocode, insert_geocode
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 from itertools import batched
 
 
@@ -56,7 +56,7 @@ def store_geocodes(rows: list[tuple[int, float, float]], geocodes: list[dict]):
 
 
 
-@flow(name="Geocode Places")
+@flow(name="Geocode Places", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def geocode_places_flow():
     logger = get_run_logger()
     rows = fetch_uncoded_places()

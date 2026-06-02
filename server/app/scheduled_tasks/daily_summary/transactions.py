@@ -19,7 +19,7 @@ from prefect.logging import get_run_logger
 
 from database.connection import get_conn
 from database.cost_of_living.queries import get_col_entry, get_uk_col_index
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 from scheduled_tasks.daily_summary.base import Domain, never_auto_close
 from config.general import BACKFILL_MONTHS, TRANSACTION_COL_BATCH_SIZE
 
@@ -130,7 +130,7 @@ TRANSACTIONS_DOMAIN = Domain(
 
 @flow(
     name="Compute Daily Summary — Transactions",
-    on_failure=[notify_on_completion],
+    on_failure=[notify_on_completion], on_completion=[log_on_success],
 )
 def compute_transactions_flow(local_date: str) -> dict:
     """
@@ -258,7 +258,7 @@ def backfill_col_normalisation(force: bool = False) -> dict:
 
 @flow(
     name="Backfill Transactions in Summary",
-    on_failure=[notify_on_completion],
+    on_failure=[notify_on_completion], on_completion=[log_on_success],
 )
 def backfill_transactions_in_summary_flow(force_col: bool = False):
     """

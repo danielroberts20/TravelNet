@@ -35,7 +35,7 @@ from config.general import (
 )
 from config.settings import settings
 from database.connection import get_conn
-from notifications import error_notification, notify_on_completion, record_flow_result, send_email
+from notifications import error_notification, notify_on_completion, log_on_success, record_flow_result, send_email
 
 
 # ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ def scan_sleep_gaps() -> list[GapFinding]:
 # Flow
 # ---------------------------------------------------------------------------
 
-@flow(name="Check Health Gaps", on_failure=[notify_on_completion])
+@flow(name="Check Health Gaps", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def check_health_gaps_flow() -> dict:
     """
     Daily health monitor. Checks upload recency first, then scans for gaps.

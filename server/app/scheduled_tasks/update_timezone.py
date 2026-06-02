@@ -4,6 +4,7 @@ from prefect.client.schemas.schedules import CronSchedule
 import subprocess
 from zoneinfo import ZoneInfo
 from datetime import datetime, timezone as dt_timezone
+from notifications import notify_on_completion, log_on_success
 
 # Each entry: (local_hour, local_minute, day_of_month, grep_pattern, command)
 _CRON_JOBS = [
@@ -79,7 +80,7 @@ def update_reboot_cron(iana_tz: str):
         check=True
     )
 
-@flow(name="Update Deployment Timezones")
+@flow(name="Update Deployment Timezones", on_failure=[notify_on_completion], on_completion=[log_on_success])
 async def update_timezones_flow(timezone: str):
     async with get_client() as client:
         deployments = await client.read_deployments()

@@ -48,7 +48,7 @@ from config.general import (
 from database.connection import get_conn, increment_api_usage
 from database.weather.fetch_log import weather_fetch_log
 from database.weather.table import table as weather_table
-from notifications import notify_on_completion, record_flow_result
+from notifications import notify_on_completion, log_on_success, record_flow_result
 
 _module_logger = stdlib_logging.getLogger(__name__)
 
@@ -413,7 +413,7 @@ def fetch_and_store_all_weather(
     }
 
 
-@flow(name="Get Weather", on_failure=[notify_on_completion])
+@flow(name="Get Weather", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def get_weather_flow():
     logger = get_run_logger()
     today      = date.today()

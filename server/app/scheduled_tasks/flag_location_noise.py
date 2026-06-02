@@ -26,7 +26,7 @@ from config.general import (
 )
 from database.connection import get_conn
 from database.location.noise.table import table as noise_table, LocationNoiseRecord
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 from util import haversine_m, parse_ts
 
 
@@ -126,7 +126,7 @@ def flag_tier2_noise(conn) -> int:
     return flagged
 
 
-@flow(name="Identify Location Noise")
+@flow(name="Identify Location Noise", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def flag_location_noise_flow():
     with get_conn() as conn:
         t1 = flag_tier1_noise(conn)

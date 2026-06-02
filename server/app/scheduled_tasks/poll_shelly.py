@@ -14,6 +14,7 @@ import requests
 
 from config.settings import settings
 from database.power.table import table as power_table, PowerDailyRecord
+from notifications import notify_on_completion, log_on_success
 
 SHELLY_TIMEOUT = 5
 
@@ -87,7 +88,7 @@ def upsert_aggregate(reading: dict, existing: dict | None) -> None:
     log.info(f"Power: min={new_min}W max={new_max}W avg={round(new_avg,2)}W total={record.total_wh}Wh")
 
 
-@flow(name="Get Power Statistics")
+@flow(name="Get Power Statistics", on_failure=[notify_on_completion], on_completion=[log_on_success])
 def poll_shelly_flow():
     log = get_run_logger()
     reading = fetch_shelly_reading()

@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo
 from prefect import flow
 from prefect.logging import get_run_logger
 
-from notifications import record_flow_result
+from notifications import record_flow_result, notify_on_completion, log_on_success
 from database.connection import to_iso_str
 from scheduled_tasks.daily_summary.base import Domain, closed_after
 from config.general import THRESHOLD_HR_BPM
@@ -409,7 +409,8 @@ HEALTH_DOMAIN = Domain(
 # ---------------------------------------------------------------------------
 
 @flow(
-    name="Compute Daily Summary — Health"
+    name="Compute Daily Summary — Health",
+    on_failure=[notify_on_completion], on_completion=[log_on_success]
 )
 def compute_health_flow(local_date: str) -> dict:
     logger = get_run_logger()
