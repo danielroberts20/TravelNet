@@ -28,6 +28,8 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+FLOW_PREFIX = "\033[34m[PREFECT]\033[0m "  # blue prefix for flow-related logs
+
 
 # ---------------------------------------------------------------------------
 # PushCut
@@ -96,6 +98,34 @@ def notify_on_completion(flow, flow_run, state: State):
         title=f"⏳ {flow.name}",
         body=state.message or ("✅ Completed successfully" if state.is_completed() else "❌ Failed"),
         time_sensitive=state.is_failed()
+    )
+
+    message = f"Flow '{flow.name}' failed: {state.message}"
+    requests.post(
+        "http://ingest:8000/internal/log/warning",
+        json={
+            "message": FLOW_PREFIX + message
+        },
+        timeout=5,
+    )
+
+def log_on_success(flow, flow_run, state: State):
+    try:
+        result = state.result()
+    except Exception:
+        result = "(could not deserialise result)"
+
+    if result is None:
+        message = f"Flow '{flow.name}' completed ({flow_run.id})"
+    else:
+        message = f"Flow '{flow.name}' completed with result: {result} ({flow_run.id})"
+
+    requests.post(
+        "http://ingest:8000/internal/log/info",
+        json={
+            "message": FLOW_PREFIX + message
+        },
+        timeout=5,
     )
     
 

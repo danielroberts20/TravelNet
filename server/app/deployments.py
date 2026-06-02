@@ -75,7 +75,7 @@ FLOW_REGISTRY = {
 def _deployment_tags(flow) -> list[str]:
     """Auto-derive tags from the flow object. 'notifies' is added when the
     flow has notify_on_completion registered as a completion or failure hook."""
-    from notifications import notify_on_completion as _notify
+    from notifications import notify_on_completion, log_on_success as _notify
     tags = []
     all_hooks = list(getattr(flow, "on_completion_hooks", None) or []) + \
                 list(getattr(flow, "on_failure_hooks",   None) or [])

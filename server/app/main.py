@@ -39,6 +39,7 @@ from upload.router import router as uploads_router
 from database.admin import router as db_router
 from metadata.router import router as metadata_router
 from public.router import router as public_router
+from internal.router import router as internal_router
 
 logger = logging.getLogger(__name__)
 
@@ -99,3 +100,4 @@ app.include_router(uploads_router, prefix="/upload")
 app.include_router(db_router, prefix="/database")
 app.include_router(metadata_router, prefix="/metadata")
 app.include_router(public_router, prefix="/public")
+app.include_router(internal_router, prefix="/internal")
