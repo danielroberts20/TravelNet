@@ -75,7 +75,7 @@ def get_remote_backups() -> dict | None:
     """Return latest remote backup info from Cloudflare R2 via rclone."""
     try:
         proc = subprocess.run(
-            ["rclone", "lsjson", "travelnet:travelnet"],
+            ["rclone", "lsjson", "travelnet:travelnet/travelnet-backup"],
             capture_output=True,
             text=True,
             timeout=15,
