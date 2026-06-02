@@ -42,7 +42,6 @@ RESETTABLE_TABLES = [
     "ml_segments",
     "photo_metadata",
     "place_visits",
-    "places",
     "transition_timezone",
     "trigger_log",
     "watchdog_heartbeat",
@@ -55,6 +54,10 @@ class PruneRequest(BaseModel):
     cutoff: str
     tables: Optional[list[str]] = None
 
+@router.get("/resettable-tables", dependencies=[Depends(require_upload_token)])
+async def get_resettable_tables():
+    """Return the tables eligible for resetting."""
+    return {"tables": RESETTABLE_TABLES}
 
 @router.get("/prune/tables", dependencies=[Depends(require_upload_token)])
 async def prune_tables_list():

@@ -53,6 +53,7 @@ TABLE_CONFIG: dict[str, Optional[str]] = {
     # ── Weather ─────────────────────────────────────────────────────────────
     "weather_hourly":              "timestamp",
     "weather_daily":               "date",
+    "weather_fetch_log":           "date",
 
     # ── Known places ────────────────────────────────────────────────────────
     "known_places":                "first_seen", # place_visits auto-cascades
@@ -117,6 +118,7 @@ DELETION_ORDER: list[str] = [
     # Weather
     "weather_hourly",
     "weather_daily",
+    "weather_fetch_log",
 
     # Known places
     "known_places",      # place_visits auto-cascades
