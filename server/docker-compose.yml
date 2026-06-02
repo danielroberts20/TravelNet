@@ -15,6 +15,7 @@ services:
       - /home/dan/.config/rclone:/root/.config/rclone:ro
       - /var/spool/cron/crontabs/dan:/var/spool/cron/crontabs/dan
       - /home/dan/services/TravelNet/travel.yml:/travel.yml:rw
+      - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/data/.travelnet_backup_key:ro
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -45,6 +46,7 @@ services:
       - /home/dan/services/TravelNet/server:/travelnet-server:ro
       - /home/dan/services/codex:/docs:ro
       - /home/dan/services/TravelNet/travel.yml:/travel.yml:rw
+      - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/data/.travelnet_backup_key:ro
     depends_on:
       - ingest
     networks:
@@ -79,7 +81,6 @@ services:
       - /mnt/linux/docker/services/travelnet/data/backups:/data/backups
       - ./app:/app
       - /mnt/linux/docker/services/travelnet/data/backup_db_to_cloudflare.sh:/backup_db_to_cloudflare.sh:ro  # unchanged (script stays on HDD)
-      - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/backup_key:ro  # FIXED: sane container path
       - /home/dan/.config/rclone:/root/.config/rclone:ro
     restart: unless-stopped
     depends_on:

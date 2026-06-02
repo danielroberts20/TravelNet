@@ -157,7 +157,7 @@ def _sse(message: str, level: str = "info") -> str:
 
 @router.get("/restore/list", dependencies=[Depends(require_upload_token)])
 def list_r2_backups():
-    """List .db.age backups available in Cloudflare R2."""
+    """List .db.age and .db.zst.age backups available in Cloudflare R2."""
     try:
         result = subprocess.run(
             ["rclone", "ls", f"{settings.rclone_remote}:{settings.rclone_bucket}"],
@@ -169,7 +169,7 @@ def list_r2_backups():
         backups = []
         for line in result.stdout.splitlines():
             parts = line.strip().split(None, 1)
-            if len(parts) == 2 and parts[1].endswith(".db.age"):
+            if len(parts) == 2 and parts[1].endswith(".age"):
                 size_bytes, filename = parts
                 backups.append({
                     "filename": filename.strip(),
@@ -187,14 +187,16 @@ def list_r2_backups():
 
 
 def _restore_stream(filename: str, live: bool) -> Generator[str, None, None]:
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir="/data") as tmp:
         tmp_path = Path(tmp)
         
         remote_path = Path(filename)          # can be "dir/name.db.age"
         local_name = remote_path.name         # always "name.db.age"
 
         encrypted = tmp_path / local_name
-        decrypted = tmp_path / Path(local_name).with_suffix("")
+        after_decrypt = tmp_path / Path(local_name).with_suffix("")   # strips .age
+        is_compressed = after_decrypt.suffix == ".zst"
+        db_path = after_decrypt.with_suffix("") if is_compressed else after_decrypt
 
         # Step 1: Download
         yield _sse(f"── Step 1: Downloading {filename} from R2…")
@@ -213,18 +215,32 @@ def _restore_stream(filename: str, live: bool) -> Generator[str, None, None]:
         yield _sse("── Step 2: Decrypting…")
         r = subprocess.run(
             ["age", "--decrypt", "-i", settings.age_key_path,
-             "-o", str(decrypted), str(encrypted)],
-            capture_output=True, text=True, timeout=60
+             "-o", str(after_decrypt), str(encrypted)],
+            capture_output=True, text=True, timeout=600
         )
         if r.returncode != 0:
             yield _sse(f"✗ Decryption failed: {r.stderr.strip()}", "error")
             return
         yield _sse("    ✓ Decrypted")
 
-        # Step 3: Integrity check
-        yield _sse("── Step 3: Integrity check…")
+        # Step 3: Decompress
+        yield _sse("── Step 3: Decompressing…")
+        if is_compressed:
+            r = subprocess.run(
+                ["zstd", "--decompress", str(after_decrypt), "-o", str(db_path)],
+                capture_output=True, text=True, timeout=120
+            )
+            if r.returncode != 0:
+                yield _sse(f"✗ Decompression failed: {r.stderr.strip()}", "error")
+                return
+            yield _sse("    ✓ Decompressed")
+        else:
+            yield _sse("    ↷ Skipped (not a .zst file)")
+
+        # Step 4: Integrity check
+        yield _sse("── Step 4: Integrity check…")
         try:
-            conn = sqlite3.connect(str(decrypted))
+            conn = sqlite3.connect(str(db_path))
             row = conn.execute("PRAGMA integrity_check;").fetchone()
             conn.close()
             if row[0] != "ok":
@@ -235,10 +251,10 @@ def _restore_stream(filename: str, live: bool) -> Generator[str, None, None]:
             yield _sse(f"✗ Integrity check error: {e}", "error")
             return
 
-        # Step 4: Row counts
-        yield _sse("── Step 4: Row counts…")
+        # Step 5: Row counts
+        yield _sse("── Step 5: Row counts…")
         try:
-            conn = sqlite3.connect(str(decrypted))
+            conn = sqlite3.connect(str(db_path))
             tables = [r[0] for r in conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
             ).fetchall()]
@@ -262,20 +278,20 @@ def _restore_stream(filename: str, live: bool) -> Generator[str, None, None]:
             )
             return
 
-        # Step 5: Replace live database
-        yield _sse("── Step 5: Replacing live database…")
+        # Step 6: Replace live database
+        yield _sse("── Step 6: Replacing live database…")
         try:
             # Checkpoint WAL before replacement so the copy is clean
             live_conn = sqlite3.connect(str(DB_FILE))
             live_conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
             live_conn.close()
-            shutil.copy2(str(decrypted), str(DB_FILE))
+            shutil.copy2(str(db_path), str(DB_FILE))
             yield _sse("    ✓ Database replaced")
         except Exception as e:
             yield _sse(f"✗ Replace failed: {e}", "error")
             return
 
-        yield _sse("── Step 6: Restarting ingest service…")
+        yield _sse("── Step 7: Restarting ingest service…")
         yield _sse(
             "    Connection will drop. Wait ~1 minute then reload the Dashboard.",
             "success"

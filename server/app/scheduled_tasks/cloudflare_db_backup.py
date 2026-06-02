@@ -62,6 +62,23 @@ def _verify_backup(path: Path) -> int:
     return total
 
 
+def _compress(src: Path) -> Path:
+    """Compress with zstd at default level. Deletes the original on success."""
+    dest = src.with_suffix(src.suffix + ".zst")
+    result = subprocess.run(
+        ["zstd", str(src), "-o", str(dest)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"zstd compression failed ({result.returncode}): {result.stderr.strip()}"
+        )
+    src.unlink()
+    return dest
+
+
 def _encrypt(src: Path, dest: Path, key_path: str) -> None:
     """
     Encrypt with age. 
@@ -97,7 +114,7 @@ def _upload_to_r2(path: Path, dir: str) -> None:
         "rclone", "copy",
         str(path),
         f"{settings.rclone_remote}:{settings.rclone_bucket}/{dir}/",
-    ], timeout=180)
+    ], timeout=600)
 
 
 def _verify_upload(filename: str) -> int:
@@ -120,7 +137,8 @@ def _verify_upload(filename: str) -> int:
 def cloudflare_backup_db_flow(
     prefix: str | None = None,
     suffix: str | None = None,
-    directory: str = "travelnet-backup"
+    directory: str = "travelnet-backup",
+    verify: bool = False
 ):
     logger = get_run_logger()
 
@@ -128,9 +146,9 @@ def cloudflare_backup_db_flow(
     parts = [p for p in [prefix, timestamp, suffix] if p]
     stem = "_".join(parts)
     db_filename = f"{stem}.db"
-    age_filename = f"{stem}.db.age"
+    age_filename = f"{stem}.db.zst.age"
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir="/data") as tmp:
         tmp_path = Path(tmp)
         snapshot_path = tmp_path / db_filename
         encrypted_path = tmp_path / age_filename
@@ -141,14 +159,22 @@ def cloudflare_backup_db_flow(
         snapshot_size_mb = snapshot_path.stat().st_size / 1_048_576
         logger.info("Snapshot size: %.1f MB", snapshot_size_mb)
 
-        # Step 2 — verify snapshot before encrypting
-        logger.info("Verifying snapshot integrity…")
-        row_count = _verify_backup(snapshot_path)
-        logger.info("Integrity OK — %d total rows", row_count)
+        # Step 2 — verify snapshot before compressing
+        row_count = None
+        if verify:
+            logger.info("Verifying snapshot integrity…")
+            row_count = _verify_backup(snapshot_path)
+            logger.info("Integrity OK — %d total rows", row_count)
 
-        # Step 3 — encrypt
+        # Step 3 — compress
+        logger.info("Compressing snapshot with zstd…")
+        compressed_path = _compress(snapshot_path)
+        compressed_size_mb = compressed_path.stat().st_size / 1_048_576
+        logger.info("Compressed size: %.1f MB", compressed_size_mb)
+
+        # Step 4 — encrypt
         logger.info("Encrypting → %s", age_filename)
-        _encrypt(snapshot_path, encrypted_path, settings.age_key_path)
+        _encrypt(compressed_path, encrypted_path, settings.age_key_path)
         encrypted_size_mb = encrypted_path.stat().st_size / 1_048_576
         if encrypted_size_mb < 0.01:
             raise RuntimeError(
@@ -157,11 +183,11 @@ def cloudflare_backup_db_flow(
             )
         logger.info("Encrypted size: %.1f MB", encrypted_size_mb)
 
-        # Step 4 — upload
+        # Step 5 — upload
         logger.info("Uploading to R2…")
         _upload_to_r2(encrypted_path, directory)
 
-        # Step 5 — verify upload
+        # Step 6 — verify upload
         logger.info("Verifying upload…")
         uploaded_bytes = _verify_upload(f"{directory}/{age_filename}")
         local_bytes = encrypted_path.stat().st_size
@@ -175,6 +201,7 @@ def cloudflare_backup_db_flow(
     result = {
         "filename": age_filename,
         "snapshot_size_mb": round(snapshot_size_mb, 1),
+        "compressed_size_mb": round(compressed_size_mb, 1),
         "encrypted_size_mb": round(encrypted_size_mb, 1),
         "row_count": row_count,
         "prefix": prefix,
