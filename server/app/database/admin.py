@@ -17,6 +17,7 @@ from auth import require_upload_token
 from database.connection import backup_db, get_conn
 from database.pruning import (
     CASCADE_ONLY, DEFAULT_TABLES, TABLE_CONFIG,
+    _CASCADE_PARENTS,
     get_prune_counts, prune_before, validate_tables,
 )
 from config.settings import settings
@@ -25,29 +26,27 @@ from config.settings import settings
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-RESETTABLE_TABLES = [
-    "country_transitions",
-    "cost_of_living",
-    "cron_results",
-    "daily_summary",
-    "flights",
-    "fx_rates",
-    "gap_annotations",
-    "known_places",
-    "location_noise",
-    "log_digest",
-    "ml_anomolies",
-    "ml_location_cluster_members",
-    "ml_location_clusters",
-    "ml_segments",
-    "photo_metadata",
-    "place_visits",
-    "transition_timezone",
-    "trigger_log",
-    "watchdog_heartbeat",
-    "weather_daily",
-    "weather_hourly"
-]
+# Tables excluded from the Dashboard reset endpoint (full table wipe).
+# Separate from EXCLUDE_TABLES in pruning.py — that controls timestamp-based
+# pruning; this controls whether a table can be fully cleared in one operation.
+RESET_EXCLUDE: set[str] = {
+    "places",            # geographic reference grid; everything FKs into this
+    "fx_rates",          # needed for backfill_gbp on surviving transactions
+    "api_usage",         # monthly counter; wiping mid-month breaks quota tracking
+    "cost_of_living",    # manually curated reference data; no re-ingestion path
+    "flights",           # manually logged; no automated re-ingestion path
+    "known_places",      # spatial memory built over weeks; not casually resettable
+    "place_visits",      # visits linked to known_places; same reasoning
+    "transition_timezone",     # structural; re-seeded by dedicated flow only
+    "country_transitions",     # structural; re-seeded by dedicated flow only
+    "ml_day_embeddings",       # expensive to regenerate; cleared by model rerun only
+    "ml_destination_profiles",
+    "ml_causal_graph",
+}
+
+RESETTABLE_TABLES: list[str] = sorted(
+    set(TABLE_CONFIG.keys()) - RESET_EXCLUDE
+)
 
 
 class PruneRequest(BaseModel):
@@ -63,21 +62,11 @@ async def get_resettable_tables():
 async def prune_tables_list():
     """Return the tables eligible for pruning and their cascade relationships."""
     return {
-        "tables":      list(TABLE_CONFIG.keys()),
-        "cascade_only": list(CASCADE_ONLY),
-        "pre_delete":  [],  # no pre-delete tables — all have timestamps or cascade
-        "cascade_parents": {
-            # True SQLite ON DELETE CASCADE relationships
-            "mood_labels":                 "state_of_mind",
-            "mood_associations":           "state_of_mind",
-            "location_noise":              "location_overland",
-            "cellular_state":              "location_shortcuts",
-            "workout_route":               "workouts",
-            "place_visits":                "known_places",
-            # ml_location_cluster_members cascades from location_overland (overland_id FK)
-            # but is deleted directly via its own created_at — not listed here as cascade
-        },
-        "default": DEFAULT_TABLES,
+        "tables":          list(TABLE_CONFIG.keys()),
+        "cascade_only":    list(CASCADE_ONLY),
+        "pre_delete":      [],
+        "cascade_parents": _CASCADE_PARENTS,
+        "default":         DEFAULT_TABLES,
     }
 
 
@@ -146,6 +135,33 @@ async def reset_table(table: str):
         conn.commit()
         logger.warning(f"Table {table} was cleared!")
     return {"message": f"Table '{table}' cleared successfully"}
+
+
+@router.post("/truncate-resettable", dependencies=[Depends(require_upload_token)])
+async def truncate_resettable():
+    """Delete all rows from every resettable table.
+
+    Clears each table in FK-safe order (children before parents) so that
+    FK constraints are not violated even when foreign_keys is ON.
+    Returns the list of tables that were cleared.
+    """
+    # Use DELETION_ORDER so children are deleted before their parents,
+    # then append cascade-only tables (they cascade automatically but we
+    # also clear them explicitly so counts go to zero reliably).
+    ordered = [t for t in DEFAULT_TABLES if t in set(RESETTABLE_TABLES)]
+    # Any resettable tables not in DEFAULT_TABLES come last.
+    remaining = [t for t in RESETTABLE_TABLES if t not in set(ordered)]
+    to_clear = ordered + remaining
+
+    cleared: list[str] = []
+    with get_conn() as conn:
+        for table in to_clear:
+            conn.execute(f"DELETE FROM [{table}]")
+            cleared.append(table)
+        conn.commit()
+
+    logger.warning("Truncate-all executed: cleared %d tables: %s", len(cleared), cleared)
+    return {"cleared": cleared, "count": len(cleared)}
 
 # ------------------------------------------------
 # Restore from Cloudflare R2
