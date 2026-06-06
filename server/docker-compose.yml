@@ -82,6 +82,7 @@ services:
       - ./app:/app
       - /mnt/linux/docker/services/travelnet/data/backup_db_to_cloudflare.sh:/backup_db_to_cloudflare.sh:ro  # unchanged (script stays on HDD)
       - /home/dan/.config/rclone:/root/.config/rclone:ro
+      - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/data/.travelnet_backup_key:ro
     restart: unless-stopped
     depends_on:
       - ingest
