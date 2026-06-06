@@ -71,7 +71,7 @@ class WatchdogHeartbeatTable(BaseTable[WatchdogHeartbeatRecord]):
                 WHERE id NOT IN (
                     SELECT id FROM watchdog_heartbeat
                     ORDER BY received_at DESC
-                    LIMIT 1440
+                    LIMIT 21600
                 )
             """)
             return conn.execute("SELECT changes()").fetchone()[0] > 0
