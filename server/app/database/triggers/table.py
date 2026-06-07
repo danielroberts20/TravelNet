@@ -35,8 +35,8 @@ class TriggerLogTable(BaseTable[TriggerRecord]):
                 payload     TEXT
             );""")
             conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_trigger_log_fired_at
-                ON trigger_log(fired_at);
+            CREATE INDEX IF NOT EXISTS idx_trigger_log_trigger_fired
+                ON trigger_log(trigger, fired_at);
             """)
 
     def insert(self, record: TriggerRecord) -> None:

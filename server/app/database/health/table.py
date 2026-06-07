@@ -49,8 +49,13 @@ class HealthQuantityTable(BaseTable[HealthQuantityRecord]):
             """)
 
             conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_hquantity_metric
-                ON health_quantity(metric);
+            CREATE INDEX IF NOT EXISTS idx_hquantity_metric_ts
+                ON health_quantity(metric, timestamp);
+            """)
+
+            conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_hquantity_no_place
+                ON health_quantity(timestamp) WHERE place_id IS NULL;
             """)
 
             conn.execute("""

@@ -35,12 +35,8 @@ class MlLocationSegmentsTable(BaseTable[MlLocationSegmentRecord]):
                 )
             """)
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ml_loc_seg_start_ts
-                    ON ml_location_segments(start_ts)
-            """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ml_loc_seg_end_ts
-                    ON ml_location_segments(end_ts)
+                CREATE INDEX IF NOT EXISTS idx_ml_loc_seg_range
+                    ON ml_location_segments(start_ts, end_ts)
             """)
 
     def insert(self, record: MlLocationSegmentRecord) -> None:

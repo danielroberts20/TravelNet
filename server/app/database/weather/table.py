@@ -107,9 +107,6 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
                 CREATE INDEX IF NOT EXISTS idx_weather_hourly_timestamp
                     ON weather_hourly(timestamp);
 
-                CREATE INDEX IF NOT EXISTS idx_weather_hourly_lat_lon
-                    ON weather_hourly(latitude, longitude);
-
                 CREATE INDEX IF NOT EXISTS idx_weather_hourly_lat_lon_ts
                     ON weather_hourly(latitude, longitude, timestamp);
 
@@ -136,9 +133,6 @@ class WeatherTable(BaseTable[WeatherHourlyRecord]):
 
                 CREATE INDEX IF NOT EXISTS idx_weather_daily_date
                     ON weather_daily(date);
-
-                CREATE INDEX IF NOT EXISTS idx_weather_daily_lat_lon
-                    ON weather_daily(latitude, longitude);
 
                 CREATE INDEX IF NOT EXISTS idx_weather_daily_lat_lon_date
                     ON weather_daily(latitude, longitude, date);

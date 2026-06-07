@@ -76,6 +76,11 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
                     ON place_visits(arrived_at);
             """)
 
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_place_visits_open
+                    ON place_visits(arrived_at) WHERE departed_at IS NULL;
+            """)
+
     def insert(self, record: KnownPlaceRecord) -> int:
         """Insert a new known place and return its id."""
         with get_conn() as conn:

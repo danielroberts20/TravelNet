@@ -42,6 +42,9 @@ class DailyCronTable(BaseTable[DailyCronRecord]):
                     error       TEXT,                 -- traceback if failed
                     UNIQUE(job_name, date)            -- one result per job per day; OR REPLACE on re-run
                 );""")
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_cron_job_ran
+                    ON cron_results(job_name, ran_at DESC);""")
 
     def insert(self, record: DailyCronRecord) -> None:
         """Insert a single daily cron record."""

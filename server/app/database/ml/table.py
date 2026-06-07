@@ -65,6 +65,11 @@ class MlTable(BaseTable[MlRecord]):
             """)
 
             conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ml_segments_range
+                    ON ml_segments(start_ts, end_ts);
+            """)
+
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS ml_anomalies (
                     id           INTEGER PRIMARY KEY,
                     detected_at  TEXT NOT NULL,

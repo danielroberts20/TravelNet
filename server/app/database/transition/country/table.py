@@ -54,6 +54,10 @@ class CountryTransitionTable(BaseTable[CountryTransitionRecord]):
                 CREATE INDEX IF NOT EXISTS idx_ct_country
                 ON country_transitions(country_code)
             """)
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_ct_open
+                ON country_transitions(entered_at) WHERE departed_at IS NULL
+            """)
  
     def insert(self, record: CountryTransitionRecord) -> bool:
         """Insert a country transition row.

@@ -43,10 +43,6 @@ class TransitionTimezoneTable(BaseTable[TransitionTimezoneRecord]):
             );""")
 
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_transition_timezone_transitioned_at ON transition_timezone(transitioned_at);
-            """)
-
-            conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_transition_timezone_place_id ON transition_timezone(place_id);
             """)
 

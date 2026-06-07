@@ -103,6 +103,11 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
             CREATE INDEX IF NOT EXISTS idx_overland_place
                 ON location_overland(place_id);
             """)
+
+            conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_overland_ts_latlon
+                ON location_overland(timestamp, latitude, longitude);
+            """)
         
         self.noise_counter = 0
         self.last_noisy_at = None

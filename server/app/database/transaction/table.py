@@ -94,6 +94,19 @@ _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_txn_place      ON transactions(place_id)",
     "CREATE INDEX IF NOT EXISTS idx_txn_col        ON transactions(col_id)",
     "CREATE INDEX IF NOT EXISTS idx_txn_category   ON transactions(category)",
+    """-- Partial: internal transfer detection (avoids full scan in categorise_transactions)
+    CREATE INDEX IF NOT EXISTS idx_txn_is_internal_1
+        ON transactions(timestamp) WHERE is_internal = 1""",
+    """-- Partial: unclassified rows (avoids full scan in categorise_transactions)
+    CREATE INDEX IF NOT EXISTS idx_txn_unclassified
+        ON transactions(timestamp) WHERE is_internal = 0 AND category IS NULL""",
+    """-- Partial: backfill GBP (avoids full scan in backfill_gbp.py)
+    CREATE INDEX IF NOT EXISTS idx_txn_no_gbp
+        ON transactions(timestamp) WHERE amount_gbp IS NULL""",
+    """-- Covering: daily summary spend queries (ML feature extraction)
+    CREATE INDEX IF NOT EXISTS idx_txn_spend
+        ON transactions(timestamp, amount_gbp)
+        WHERE is_internal = 0 AND amount_gbp IS NOT NULL""",
 ]
 
 _INSERT_SQL = """

@@ -47,6 +47,16 @@ class HeartRateTable(BaseTable[HeartRateRecord]):
                     ON health_heart_rate(timestamp);
             """)
 
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_hhr_no_place
+                    ON health_heart_rate(timestamp) WHERE place_id IS NULL;
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_hhr_ts_bpm
+                    ON health_heart_rate(timestamp, avg_bpm);
+            """)
+
     def insert(self, record: HeartRateRecord) -> None:
         """Insert a Heart Rate triplet row. Idempotent on (timestamp, source)."""
         ts = to_iso_str(record.timestamp)
