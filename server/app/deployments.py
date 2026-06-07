@@ -17,7 +17,10 @@ from scheduled_tasks.weekly_location_analysis import weekly_location_analysis_fl
 from scheduled_tasks.detect_country_transitions import detect_country_transitions_flow
 from scheduled_tasks.detect_timezone_transitions import detect_timezone_transitions_flow
 from scheduled_tasks.detect_flights import detect_flights_flow
-from scheduled_tasks.check_journal_staleness import check_journal_staleness_flow
+from scheduled_tasks.check_journal_staleness import (
+    check_journal_staleness_evening_flow,
+    check_journal_staleness_morning_flow,
+)
 from scheduled_tasks.send_transaction_reminder import send_transaction_reminder_flow
 from scheduled_tasks.get_fx_up_to_date import get_fx_up_to_date_flow
 from scheduled_tasks.check_health_gaps import check_health_gaps_flow
@@ -50,7 +53,8 @@ FLOW_REGISTRY = {
     "backfill-gbp":                backfill_gbp_flow,
     "send-transaction-reminder":   send_transaction_reminder_flow,
     "check-health-gaps":           check_health_gaps_flow,
-    "check-journal-staleness":     check_journal_staleness_flow,
+    "check-journal-staleness-evening":  check_journal_staleness_evening_flow,
+    "check-journal-staleness-morning":  check_journal_staleness_morning_flow,
     "send-warn-error-log":         send_warn_error_log_flow,
     "send-cron-digest":            send_cron_digest_flow,
     "backup-db":                   backup_db_flow,

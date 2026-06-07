@@ -428,7 +428,8 @@ HEALTH_UPLOAD_STALE_HOURS = editable("HEALTH_UPLOAD_STALE_HOURS", "Number of hou
 # Journal
 # ---------------------------------------------------------------------------
 
-JOURNAL_STALENESS_HOURS = editable("JOURNAL_STALENESS_HOURS", "Number of hours after which a journal entry is considered stale", group="Journal")(18)
+JOURNAL_REMIND_EVENING_HOUR = editable("JOURNAL_REMIND_EVENING_HOUR", "Hour of the day to remind users to write an evening journal entry", group="Journal")(20)  # 20:00 local — used as reference, baked into cron
+JOURNAL_REMIND_MORNING_HOUR = editable("JOURNAL_REMIND_MORNING_HOUR", "Hour of the day to remind users to write a morning journal entry", group="Journal")(9)   # 09:00 local — used as reference, baked into cron
 
 # ---------------------------------------------------------------------------
 # Daily Summary

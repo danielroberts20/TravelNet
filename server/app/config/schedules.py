@@ -10,6 +10,9 @@ update_timezone.py imported from deployments.py.
 
 # {deployment_name: (cron_expression_or_None, description)}
 # None cron = manual-only deployment (no automatic schedule).
+from config.general import JOURNAL_REMIND_EVENING_HOUR, JOURNAL_REMIND_MORNING_HOUR
+
+
 SCHEDULE_CONFIGS = {
     # FX rates
     "get-fx-daily":                     ("0 2 * * *",               "Daily FX rate retrieval for previous day"),
@@ -42,7 +45,8 @@ SCHEDULE_CONFIGS = {
     "check-health-gaps":                ("0 9 * * *",               "Daily check for missing or partial health metric days"),
 
     # Journal
-    "check-journal-staleness":          ("0 */4 * * *",             "Every 4 hours: send push notification if journal is stale"),
+    "check-journal-staleness-evening":  (f"0 {JOURNAL_REMIND_EVENING_HOUR} * * *", "Daily check for stale evening journal entries"),
+    "check-journal-staleness-morning":  (f"0 {JOURNAL_REMIND_MORNING_HOUR} * * *", "Daily check for stale morning journal entries"),
 
     # Notifications & digests
     "send-warn-error-log":              ("0 6 * * *",               "Daily flush and email of WARNING/ERROR log digest"),
