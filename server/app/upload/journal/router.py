@@ -11,7 +11,7 @@ from pydantic import BaseModel  # type: ignore
 
 from config.settings import settings
 from auth import require_upload_token
-from config.general import DATA_DIR, JOURNAL_BACKUP_DIR
+from config.general import DATA_DIR, JOURNAL_DIR
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ async def upload_journal_export(
     _validate_journal_zip(data)
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    zip_path = JOURNAL_BACKUP_DIR / f"journal_{timestamp}.zip"
+    zip_path = JOURNAL_DIR / f"journal_{timestamp}.zip"
     zip_path.write_bytes(data)
 
     logger.info(

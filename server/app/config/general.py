@@ -38,6 +38,7 @@ LOCATION_OVERLAND_BACKUP_DIR = LOCATION_BACKUP_DIR / "overland"
 REVOLUT_BACKUP_DIR = UPLOADS_BACKUP_DIR / "revolut"
 WISE_BACKUP_DIR = UPLOADS_BACKUP_DIR / "wise"
 JOURNAL_BACKUP_DIR = UPLOADS_BACKUP_DIR / "journal"
+JOURNAL_DIR = DATA_DIR / "journal"
 
 BACKUP_DIRS = [
     DATA_BACKUP_DIR,
@@ -61,6 +62,7 @@ BACKUP_DIRS = [
 if DATA_DIR.exists():
     for backup_dir in BACKUP_DIRS:
         backup_dir.mkdir(parents=True, exist_ok=True)
+    JOURNAL_DIR.mkdir(parents=True, exist_ok=True)
 
 STALE_DAYS = editable("STALE_DAYS", "Number of days to consider a backup stale", group="Storage & Backups")(7)
 PAGE_SIZE = editable("PAGE_SIZE", "Number of records to fetch at a time", group="Storage & Backups")(2000)
