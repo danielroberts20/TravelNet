@@ -3,6 +3,7 @@ services:
     build: .
     image: travelnet:latest
     container_name: travelnet
+    mem_limit: 1g          # FastAPI + all scheduled task flows
     init: true
     env_file: .env
     environment:
@@ -26,6 +27,7 @@ services:
     build:
       context: ../../Dashboard
     container_name: travelnet-dashboard
+    mem_limit: 384m        # Flask/gunicorn 2 workers, mostly reads
     restart: unless-stopped
     environment:
       DASHBOARD_TOKEN:       "${DASHBOARD_TOKEN}"
@@ -55,6 +57,7 @@ services:
   nginx:
     image: nginx:alpine
     container_name: travelnet-nginx
+    mem_limit: 64m         # pure proxy, negligible memory
     restart: unless-stopped
     ports:
       - "80:80"
@@ -72,6 +75,7 @@ services:
     build: .
     image: travelnet:latest
     command: python -m deployments
+    mem_limit: 768m        # runs flows, needs headroom for ML-adjacent tasks later
     init: true
     env_file: .env
     environment:
@@ -80,7 +84,7 @@ services:
       - /mnt/ssd/docker/services/travelnet/data:/data
       - /mnt/linux/docker/services/travelnet/data/backups:/data/backups
       - ./app:/app
-      - /mnt/linux/docker/services/travelnet/data/backup_db_to_cloudflare.sh:/backup_db_to_cloudflare.sh:ro  # unchanged (script stays on HDD)
+      - /mnt/linux/docker/services/travelnet/data/backup_db_to_cloudflare.sh:/backup_db_to_cloudflare.sh:ro
       - /home/dan/.config/rclone:/root/.config/rclone:ro
       - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/data/.travelnet_backup_key:ro
     restart: unless-stopped
