@@ -58,10 +58,10 @@ def _latest_in_dir(directory, pattern="*", index: int = 0) -> dict | None:
 def get_local_backups() -> dict:
     """Return latest backup info for each local backup type."""
     return {
-        "db":       _latest_in_dir(DATABASE_BACKUP_DIR, "*.db"),
+        "db":       _latest_in_dir(DATABASE_BACKUP_DIR, "*.db.zst"),
         "fx":       _latest_in_dir(FX_BACKUP_DIR, "*.json"),
-        "health":   _latest_in_dir(HEALTH_BACKUP_DIR, "*.json"),
-        "workouts": _latest_in_dir(WORKOUT_BACKUP_DIR, "*.json"),
+        "health":   _latest_in_dir(HEALTH_BACKUP_DIR, "*.jsonl"),
+        "workouts": _latest_in_dir(WORKOUT_BACKUP_DIR, "*.jsonl"),
         "location": {
             "shortcut": _latest_in_dir(LOCATION_SHORTCUTS_BACKUP_DIR, "*.csv"),
             "overland": _latest_in_dir(LOCATION_OVERLAND_BACKUP_DIR, "*.jsonl", index=1),
@@ -85,7 +85,7 @@ def get_remote_backups() -> dict | None:
 
         files = json.loads(proc.stdout)
         backups = sorted(
-            [f for f in files if f["Name"].endswith(".db.age")],
+            [f for f in files if f["Name"].endswith(".db.zst.age")],
             key=lambda f: f["ModTime"],
             reverse=True,
         )

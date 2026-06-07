@@ -29,8 +29,8 @@ async def _await_and_backup(country: str, departure: datetime) -> None:
     await asyncio.sleep(delay)
     logger.info("Running departure backup for %s", country)
     try:
-        from scheduled_tasks.backup_db import run
-        result = run(prefix=country)
+        from scheduled_tasks.backup_db import backup_db_flow
+        result = backup_db_flow(prefix=country)
         logger.info("Departure backup for %s complete: %s", country, result)
     except Exception:
         logger.exception("Departure backup for %s failed", country)
