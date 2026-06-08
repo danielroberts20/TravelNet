@@ -69,6 +69,11 @@ async def get_logs(lines: int = Query(200, ge=1, le=1000)):
 
 @router.get("/watchdog", dependencies=[Depends(require_upload_token)])
 async def get_watchdog():
+    import os
+    BREAK_FILE = "/app/BREAK_WATCHDOG"
+    if os.path.exists(BREAK_FILE):
+        raise HTTPException(status_code=500, detail="break mode active")
+    
     return {
         "status": "ok",
         "uptime": get_uptime()
