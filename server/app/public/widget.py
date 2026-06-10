@@ -58,7 +58,7 @@ def _last_backup_ts() -> str | None:
     """ISO timestamp of the most recently modified .db backup file, or None."""
     try:
         files = sorted(
-            DATABASE_BACKUP_DIR.glob("*.db"),
+            DATABASE_BACKUP_DIR.glob("*.db.zst"),
             key=lambda f: f.stat().st_mtime,
             reverse=True,
         )
