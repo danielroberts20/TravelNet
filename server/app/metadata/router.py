@@ -325,3 +325,16 @@ async def label_location(body):
     else:
         logger.warning("No location ID provided in label-location request")
         raise HTTPException(status_code=400, detail="Place ID is required")
+    
+class PcStateRequest(BaseModel):
+    state: str  # 'checking' | 'remote' | 'clear' | 'off'
+
+@router.post("/display/pc", dependencies=[Depends(require_upload_token)])
+async def push_pc_state(body: PcStateRequest):
+    """Push PC boot state to the home Pico display."""
+    if body.state not in ('checking', 'remote', 'clear', 'off'):
+        raise HTTPException(status_code=400, detail="state must be 'checking', 'remote', 'clear', or 'off'")
+    sent = _push_to_pico({"type": "pc", "state": body.state})
+    if not sent:
+        raise HTTPException(status_code=503, detail="Could not reach Pico display")
+    return {"status": "sent", "state": body.state}
