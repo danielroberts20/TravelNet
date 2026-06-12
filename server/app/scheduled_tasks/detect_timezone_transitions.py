@@ -16,7 +16,7 @@ from prefect import task, flow
 from prefect.logging import get_run_logger
 
 from database.transition.timezone.table import table as transition_timezone_table, TransitionTimezoneRecord
-from config.general import PAGE_SIZE
+from config.general import DWELL_MIN_POINTS, PAGE_SIZE
 from database.connection import get_conn
 from notifications import record_flow_result, notify_on_completion, log_on_success
 
@@ -55,14 +55,43 @@ def _detect_transitions(conn, logger) -> dict:
     Walk location_unified joined to places in chronological order.
     Insert a timezone_transitions row each time places.timezone changes.
 
+    State machine:
+      current_tz / current_offset — timezone we've accepted as current
+      candidate_tz / candidate_offset — new timezone we're evaluating
+      candidate_count              — consecutive points seen in candidate
+      candidate_first_ts / candidate_first_place_id
+                                   — metadata for the first point in candidate
+                                     (used as transitioned_at if confirmed)
+
+    Only promotes candidate → current after DWELL_MIN_POINTS consecutive
+    points, filtering out brief GPS noise at landing or border areas.
+
     Returns a dict with diagnostic counts.
     """
     inserted = 0
     skipped = 0       # INSERT OR IGNORE hits (already recorded)
     null_skipped = 0  # rows where place has no timezone yet
+    dwell_suppressed = 0  # candidates reset before reaching DWELL_MIN_POINTS
 
+    # Confirmed state
     current_tz: str | None = None
     current_offset: str | None = None
+
+    # Candidate (potential new timezone, not yet confirmed)
+    candidate_tz: str | None = None
+    candidate_offset: str | None = None
+    candidate_count: int = 0
+    candidate_first_ts: str | None = None
+    candidate_first_place_id: int | None = None
+
+    def reset_candidate() -> None:
+        nonlocal candidate_tz, candidate_offset, candidate_count
+        nonlocal candidate_first_ts, candidate_first_place_id
+        candidate_tz = None
+        candidate_offset = None
+        candidate_count = 0
+        candidate_first_ts = None
+        candidate_first_place_id = None
 
     offset = 0
 
@@ -86,48 +115,67 @@ def _detect_transitions(conn, logger) -> dict:
         for row in rows:
             row_tz = row["timezone"]
 
-            # Same timezone as before — no transition, keep walking.
+            # Still in confirmed timezone — reset any pending candidate.
             if row_tz == current_tz:
+                if candidate_count > 0:
+                    dwell_suppressed += 1
+                reset_candidate()
                 continue
 
-            # Timezone changed (or this is the very first geocoded point).
-            ts = row["timestamp"]
-            to_offset = _utc_offset_str(row_tz, ts, logger)
+            # Point is in a different timezone from confirmed.
+            if row_tz == candidate_tz:
+                # Continuing to accumulate points in the same candidate.
+                candidate_count += 1
+                if candidate_count >= DWELL_MIN_POINTS:
+                    ts = candidate_first_ts
+                    to_offset = candidate_offset
 
-            if to_offset is None:
-                # Unresolvable timezone — skip without updating current_tz so
-                # we don't lose track of the last known good timezone.
-                null_skipped += 1
-                continue
+                    try:
+                        was_inserted = transition_timezone_table.insert(TransitionTimezoneRecord(
+                            transitioned_at=ts,
+                            from_tz=current_tz,
+                            to_tz=candidate_tz,
+                            from_offset=current_offset,
+                            to_offset=to_offset,
+                        ))
 
-            try:
-                was_inserted = transition_timezone_table.insert(TransitionTimezoneRecord(
-                    transitioned_at=ts,
-                    from_tz=current_tz,
-                    to_tz=row_tz,
-                    from_offset=current_offset,
-                    to_offset=to_offset,
-                ))
+                        if was_inserted:
+                            inserted += 1
+                            logger.info(
+                                "Timezone transition at %s: %s → %s (%s)",
+                                ts, current_tz or "none", candidate_tz, to_offset,
+                            )
+                        else:
+                            skipped += 1
 
-                if was_inserted:
-                    inserted += 1
-                    logger.info(
-                        "Timezone transition at %s: %s → %s (%s)",
-                        ts, current_tz or "none", row_tz, to_offset,
-                    )
+                    except Exception:
+                        logger.exception(
+                            "Failed to insert timezone transition at %s (%s → %s)",
+                            ts, current_tz, candidate_tz,
+                        )
+
+                    # Advance state regardless of whether INSERT succeeded —
+                    # we don't want to re-detect the same transition on every row.
+                    current_tz = candidate_tz
+                    current_offset = candidate_offset
+                    reset_candidate()
+            else:
+                # New candidate timezone (different from both confirmed and
+                # previous candidate — e.g. brief third-zone noise crossing).
+                if candidate_count > 0:
+                    dwell_suppressed += 1
+                ts = row["timestamp"]
+                to_offset = _utc_offset_str(row_tz, ts, logger)
+                if to_offset is None:
+                    # Unresolvable timezone — skip without updating candidate so
+                    # we don't lose track of the last known good timezone.
+                    null_skipped += 1
                 else:
-                    skipped += 1
-
-            except Exception:
-                logger.exception(
-                    "Failed to insert timezone transition at %s (%s → %s)",
-                    ts, current_tz, row_tz,
-                )
-
-            # Advance state regardless of whether INSERT succeeded —
-            # we don't want to re-detect the same transition on every row.
-            current_tz = row_tz
-            current_offset = to_offset
+                    candidate_tz = row_tz
+                    candidate_offset = to_offset
+                    candidate_count = 1
+                    candidate_first_ts = ts
+                    candidate_first_place_id = row["place_id"]
 
         offset += PAGE_SIZE
 
@@ -135,6 +183,7 @@ def _detect_transitions(conn, logger) -> dict:
         "inserted": inserted,
         "already_recorded": skipped,
         "null_tz_skipped": null_skipped,
+        "dwell_suppressed": dwell_suppressed,
     }
 
 
@@ -145,10 +194,11 @@ def run_timezone_transition_detection() -> dict:
         results = _detect_transitions(conn, logger)
 
     logger.info(
-        "timezone_transitions complete — inserted=%d, skipped=%d, null_tz=%d",
+        "timezone_transitions complete — inserted=%d, skipped=%d, null_tz=%d, dwell_suppressed=%d",
         results["inserted"],
         results["already_recorded"],
         results["null_tz_skipped"],
+        results["dwell_suppressed"],
     )
     return results
 
