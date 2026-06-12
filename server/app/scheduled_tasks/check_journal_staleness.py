@@ -116,7 +116,7 @@ def _run(window: str = "evening") -> dict:
         result = {"window": window, "reminded": False, "skipped": "already_fired", "last_entry_ts": last_ts.isoformat()}
     else:
         logger.info("[%s] No entry found — sending reminder", window)
-        journal_notification(title=title, body=body)
+        journal_notification(title=title, body=body, retro=window == "morning")
         log_trigger(trigger)
         result = {"window": window, "reminded": True, "last_entry_ts": last_ts.isoformat(), "hours_since": round(hours_since, 1)}
 

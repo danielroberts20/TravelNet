@@ -106,7 +106,7 @@ def notify_on_completion(flow, flow_run, state: State):
         json={
             "message": FLOW_PREFIX + message
         },
-        timeout=5,
+        timeout=15,
     )
 
 def log_on_success(flow, flow_run, state: State):
@@ -140,8 +140,8 @@ def send_notification(title: str = "Title", body: str = "Body", time_sensitive: 
     url = settings.custom_notification_time_sensitive if time_sensitive else settings.custom_notification_not_time_sensitive
     return _trigger_notification(url, title, body, use_prefix, prefix)
 
-def journal_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = False, use_prefix: bool = True, prefix: str = None):
-    url = settings.journal_notification
+def journal_notification(title: str = "Title", body: str = "Body", retro: bool = False, time_sensitive: bool = False, use_prefix: bool = True, prefix: str = None):
+    url = settings.journal_notification if not retro else settings.retro_notification
     return _trigger_notification(url, title, body, use_prefix, prefix)
 
 def label_known_place_notification(title: str = "Title", body: str = "Body", time_sensitive: bool = True, use_prefix: bool = True, prefix: str = None):

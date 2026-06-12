@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     warning_notification: str = Field(alias="WARNING_NOTIFICATION")
     error_notification: str = Field(alias="ERROR_NOTIFICATION")
     journal_notification: str = Field(alias="JOURNAL_NOTIFICATION")
+    retro_notification: str = Field(alias="RETRO_JOURNAL_NOTIFICATION")
     label_known_place_notification: str = Field(alias="LABEL_KNOWN_PLACE_NOTIFICATION")
 
     # --- External APIs ---
