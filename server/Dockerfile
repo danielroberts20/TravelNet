@@ -4,7 +4,7 @@ WORKDIR /app
 
 # System deps first — changes rarely, should almost never rebuild
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends rclone age sqlite3 zstd \
+    && apt-get install -y --no-install-recommends rclone age sqlite3 zstd openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Python deps — only rebuilds when requirements.txt changes

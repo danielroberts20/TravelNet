@@ -1,10 +1,11 @@
 from prefect import flow
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.schedules import CronSchedule
-import subprocess
+from prefect.exceptions import ObjectNotFound
 from zoneinfo import ZoneInfo
 from datetime import datetime, timezone as dt_timezone
 from notifications import notify_on_completion, log_on_success
+
 
 # Each entry: (local_hour, local_minute, day_of_month, grep_pattern, command)
 _CRON_JOBS = [
@@ -31,7 +32,7 @@ _CRON_JOBS = [
     ),
     (
         1, 0, 1,
-        "certbot renew",
+        "certbot renew --quiet",
         "sudo certbot renew --quiet && "
         "cp /etc/letsencrypt/live/api.travelnet.dev/fullchain.pem /home/dan/services/Dashboard/certs/api.travelnet.dev.crt && "
         "chown dan:dan /home/dan/services/Dashboard/certs/api.travelnet.dev.crt && "
@@ -48,8 +49,6 @@ _CRON_JOBS = [
 
 
 def update_reboot_cron(iana_tz: str):
-    """Rewrite all timezone-sensitive host cron jobs to fire at the correct UTC time
-    for the given local IANA timezone."""
     tz = ZoneInfo(iana_tz)
     now = datetime.now(tz)
     new_entries = []
@@ -61,24 +60,24 @@ def update_reboot_cron(iana_tz: str):
         new_entries.append(f"{utc_time.minute} {utc_time.hour} {dom} * * {command}")
         grep_patterns.append(pattern)
 
-    strip_cmd = "crontab -l 2>/dev/null || true"  # handle empty crontab safely
-    for pattern in grep_patterns:
-        strip_cmd += f" | grep -v '{pattern}'"
+    crontab_path = "/var/spool/cron/crontabs/dan"
+    
+    # Read existing crontab
+    with open(crontab_path, "r") as f:
+        existing = f.readlines()
+    
+    # Strip managed lines
+    filtered = [
+        line for line in existing
+        if not any(pattern in line for pattern in grep_patterns)
+    ]
+    
+    # Append new entries
+    new_lines = filtered + [e + "\n" for e in new_entries]
+    
+    with open(crontab_path, "w") as f:
+        f.writelines(new_lines)
 
-    new_block = "\n".join(new_entries)
-
-    # Write to a temp file first, verify it's non-empty, then install
-    full_cmd = (
-        f'NEWCRON=$( ( {strip_cmd}; printf "{new_block}\n" ) ) && '
-        f'[ -n "$NEWCRON" ] && '
-        f'echo "$NEWCRON" | crontab -'
-    )
-
-    subprocess.run(
-        ["ssh", "-o", "StrictHostKeyChecking=no",
-         "dan@travelnet.tail186ff8.ts.net", full_cmd],
-        check=True
-    )
 
 @flow(name="Update Deployment Timezones", on_failure=[notify_on_completion], on_completion=[log_on_success])
 async def update_timezones_flow(timezone: str):
@@ -87,9 +86,12 @@ async def update_timezones_flow(timezone: str):
         for deployment in deployments:
             for sched in deployment.schedules:
                 if hasattr(sched.schedule, "cron"):
-                    await client.update_deployment_schedule(
-                        deployment_id=deployment.id,
-                        schedule_id=sched.id,
-                        schedule=CronSchedule(cron=sched.schedule.cron, timezone=timezone),
-                    )
+                    try:
+                        await client.update_deployment_schedule(
+                            deployment_id=deployment.id,
+                            schedule_id=sched.id,
+                            schedule=CronSchedule(cron=sched.schedule.cron, timezone=timezone),
+                        )
+                    except ObjectNotFound:
+                        pass  # stale schedule ID, skip
     update_reboot_cron(timezone)
