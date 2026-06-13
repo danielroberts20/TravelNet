@@ -100,13 +100,14 @@ def init_db() -> None:
 
     log_config_summary()
 
-    # In transition_timezone table init(), after CREATE TABLE:
     with get_conn() as conn:
-        conn.execute("""
-            INSERT OR IGNORE INTO transition_timezone 
-                (transitioned_at, from_tz, to_tz, from_offset, to_offset)
-            VALUES ('2020-01-01T00:00:00Z', NULL, 'Europe/London', NULL, '+01:00')
-        """)
+        count = conn.execute("SELECT COUNT(*) FROM transition_timezone").fetchone()[0]
+        if count == 0:
+            conn.execute("""
+                INSERT INTO transition_timezone
+                    (transitioned_at, from_tz, to_tz, from_offset, to_offset)
+                VALUES ('2020-01-01T00:00:00Z', NULL, 'Europe/London', NULL, '+00:00')
+            """)
 
 
 def insert_log(log: Log) -> None:

@@ -39,6 +39,20 @@ from scheduled_tasks.categorise_transactions import categorise_transactions_flow
 from scheduled_tasks.sleep_reminder import sleep_reminder_notify_flow, sleep_reminder_schedule_flow
 
 
+def get_current_timezone() -> str:
+    try:
+        from database.connection import get_conn
+        with get_conn(read_only=True) as conn:
+            row = conn.execute(
+                "SELECT to_tz FROM transition_timezone ORDER BY transitioned_at DESC LIMIT 1"
+            ).fetchone()
+            if row:
+                return row[0]
+    except Exception:
+        pass
+    return "Europe/London"
+
+
 FLOW_REGISTRY = {
     "get-fx-daily":                get_fx_flow,
     "get-fx-up-to-date":           get_fx_up_to_date_flow,
@@ -89,10 +103,11 @@ def _deployment_tags(flow) -> list[str]:
 
 
 if __name__ == "__main__":
+    current_tz = get_current_timezone()
     deployments = [
         FLOW_REGISTRY[name].to_deployment(
             name=FLOW_REGISTRY[name].name,
-            schedule=Cron(cron, timezone="Europe/London") if cron else None,
+            schedule=Cron(cron, timezone=current_tz) if cron else None,
             description=desc,
             tags=_deployment_tags(FLOW_REGISTRY[name]),
         )
