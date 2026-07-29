@@ -184,6 +184,12 @@ def get_db_stats() -> dict:
                 conn,
                 "SELECT COUNT(*) FROM health_quantity"
             )
+
+            heart_records = _fetchone(
+                conn,
+                "SELECT COUNT(*) FROM health_heart_rate"
+            )
+
             transactions = _fetchone(
                 conn,
                 "SELECT COUNT(*) FROM transactions"
@@ -204,7 +210,7 @@ def get_db_stats() -> dict:
 
         return {
             "gps_points": gps_points,
-            "health_records": health_records,
+            "health_records": int(health_records) + int(heart_records),
             "transactions": transactions,
             "last_synced": last_synced,
         }
