@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 @router.post("/shortcut", dependencies=[Depends(require_upload_token)])
 async def upload_csv(
         file: UploadFile = File(...),
-        background_tasks: BackgroundTasks = BackgroundTasks,
+        background_tasks: BackgroundTasks = None,
 ):
     """Accept a Shortcuts CSV location export, save a local backup, and queue processing."""
     if not file.filename.endswith(".csv"):
