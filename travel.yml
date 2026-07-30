@@ -159,10 +159,10 @@ legs:
         actual:
           arrival: null
           departure: null
-      - id: usa_post_camp
-        name: "Post Camp Labouring"
+      - id: usa_travel
+        name: "Post Camp Travel"
         planned:
-          arrival: "2026-06-16"
+          arrival: "2026-08-16"
           departure: "2026-09-02"
         actual:
           arrival: null
