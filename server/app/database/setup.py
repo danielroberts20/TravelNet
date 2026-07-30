@@ -28,6 +28,7 @@ from database.health.sleep.table import table as sleep_table
 from database.health.workouts.table import table as workouts_table
 from database.health.mood.table import table as mood_table
 from database.transaction.table import table as transactions_table
+from database.transaction.upload_log import table as upload_log_table
 from database.triggers.table import table as trigger_table
 from database.location.overland.table import table as overland_table
 from database.location.gap_annotations.table import table as gap_annotations_table
@@ -60,6 +61,7 @@ TABLE_REGISTRY: list[BaseTable] = [
     flights_table,
     mood_table,
     transactions_table,
+    upload_log_table,
     trigger_table,
     overland_table,
     gap_annotations_table,

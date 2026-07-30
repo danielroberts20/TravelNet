@@ -5,9 +5,9 @@ scheduled_tasks/daily_summary/transactions.py
 Owns the spending columns of daily_summary.
 
 Unlike health/location/pi, this domain isn't closed by calendar age —
-transactions are only complete when a month's CSVs have been uploaded
-and processed. The monthly backfill flow sets spend_complete = 1
-explicitly when it has finished its pass.
+transactions are only complete once upload_log shows every required
+source (see REQUIRED_UPLOAD_SOURCES) has an upload covering the date's
+calendar month. See _upload_coverage_predicate below.
 """
 from config.editable import load_overrides
 load_overrides()
@@ -20,8 +20,12 @@ from prefect.logging import get_run_logger
 from database.connection import get_conn
 from database.cost_of_living.queries import get_col_entry, get_uk_col_index
 from notifications import notify_on_completion, log_on_success, record_flow_result
-from scheduled_tasks.daily_summary.base import Domain, never_auto_close
+from scheduled_tasks.daily_summary.base import Domain
 from config.general import BACKFILL_MONTHS, TRANSACTION_COL_BATCH_SIZE
+
+# Sources that must each confirm coverage of a date's calendar month in
+# upload_log before that date can be considered spend-complete.
+REQUIRED_UPLOAD_SOURCES = ("revolut", "wise")
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +114,26 @@ def _transactions(conn, ctx: dict) -> dict:
 # Domain spec
 # ---------------------------------------------------------------------------
 
+def _upload_coverage_predicate(local_date: str, data: dict, conn) -> bool:
+    """
+    A date is spend-complete once every source in REQUIRED_UPLOAD_SOURCES
+    has an upload_log entry whose period covers it — i.e. that source's
+    statement for this calendar month has actually been uploaded.
+
+    Previously this was never auto-closed and the monthly backfill flow set
+    spend_complete = 1 unconditionally after it ran, regardless of whether
+    an upload for that month had ever happened — so a month nobody uploaded
+    yet, or a genuine zero-spend month, were indistinguishable and both got
+    marked complete. This ties completeness to actual upload coverage.
+    """
+    rows = conn.execute("""
+        SELECT source FROM upload_log
+        WHERE period_start <= ? AND period_end >= ?
+    """, (local_date, local_date)).fetchall()
+    covered = {r["source"] for r in rows}
+    return all(source in covered for source in REQUIRED_UPLOAD_SOURCES)
+
+
 TRANSACTIONS_DOMAIN = Domain(
     name="transactions",
     columns=frozenset({
@@ -118,9 +142,9 @@ TRANSACTIONS_DOMAIN = Domain(
     }),
     completeness_flag="spend_complete",
     compute_fn=compute_transaction_data,
-    # Not auto-closed — the monthly flow sets spend_complete = 1 explicitly
-    # after it has processed a full month's data.
-    completeness_predicate=never_auto_close,
+    # Complete once upload_log shows every required source has covered this
+    # date's month — see _upload_coverage_predicate.
+    completeness_predicate=_upload_coverage_predicate,
 )
 
 
@@ -134,8 +158,9 @@ TRANSACTIONS_DOMAIN = Domain(
 )
 def compute_transactions_flow(local_date: str) -> dict:
     """
-    Ad-hoc single-date upsert. Does NOT set spend_complete — that only
-    happens in the monthly backfill once the full month is processed.
+    Ad-hoc single-date upsert. spend_complete is derived from upload_log
+    coverage (see _upload_coverage_predicate) — it isn't a manual flag set
+    only by the monthly backfill.
     """
     logger = get_run_logger()
     data = TRANSACTIONS_DOMAIN.upsert_for_date(local_date)
@@ -285,12 +310,9 @@ def backfill_transactions_in_summary_flow(force_col: bool = False):
     failed  = 0
     for d in dates:
         try:
+            # spend_complete is now derived from upload_log coverage inside
+            # upsert_for_date — no separate unconditional flag-set needed.
             TRANSACTIONS_DOMAIN.upsert_for_date(d)
-            with get_conn() as conn:
-                conn.execute(
-                    "UPDATE daily_summary SET spend_complete = 1 WHERE date = ?",
-                    (d,),
-                )
             updated += 1
         except Exception as e:
             logger.error(f"Failed to backfill transactions for {d}: {e}")

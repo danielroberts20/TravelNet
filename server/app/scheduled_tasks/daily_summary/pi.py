@@ -14,7 +14,7 @@ from prefect import flow
 from prefect.logging import get_run_logger
 
 from notifications import notify_on_completion, log_on_success, record_flow_result
-from scheduled_tasks.daily_summary.base import Domain, closed_after
+from scheduled_tasks.daily_summary.base import Domain, closed_when_present_else_after
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +90,31 @@ def _power(conn, ctx: dict) -> dict:
 # Domain spec
 # ---------------------------------------------------------------------------
 
+# Fallback age (days) after which a date is closed even with no pi data at
+# all — covers dates that will genuinely never receive data (Pi offline,
+# no backfill possible) so they don't stay pending forever. Chosen larger
+# than the old blanket 2-day window since it's now a last resort rather
+# than the primary trigger; flagged for review — no strong signal dictated
+# this exact value.
+_NO_DATA_FALLBACK_DAYS = 14
+
+
+def _pi_data_present(data: dict) -> bool:
+    """True once real watchdog or power data has landed for the date.
+
+    Deliberately OR, not AND — unlike spend_complete (transactions.py),
+    which requires BOTH revolut and wise because they're two disjoint
+    components of a single total (missing either one understates spend).
+    Watchdog and power here are independent, redundant liveness signals
+    for the same underlying "is the Pi pipeline alive for this date"
+    question, not two halves of one figure — either one landing is
+    sufficient evidence the day isn't stuck waiting on ingestion. This
+    also avoids one source's legitimate permanent absence (e.g. the power
+    plug was unplugged all day) blocking completion until the age fallback.
+    """
+    return bool(data.get("watchdog_heartbeats_received")) or data.get("avg_w_pi") is not None
+
+
 PI_DOMAIN = Domain(
     name="pi",
     columns=frozenset({
@@ -101,8 +126,12 @@ PI_DOMAIN = Domain(
     }),
     completeness_flag="pi_complete",
     compute_fn=compute_pi_data,
-    # Watchdog and power data are realtime, photos are daily — 2 days is plenty.
-    completeness_predicate=closed_after(2),
+    # Close as soon as watchdog/power data has actually arrived (previously
+    # this closed blindly after 2 days regardless of data presence, which
+    # permanently masked gaps and dropped straggler data that arrived late
+    # since compute_daily_summary_flow only reprocesses pi_complete = 0
+    # dates). Falls back to calendar age only if nothing ever arrives.
+    completeness_predicate=closed_when_present_else_after(_NO_DATA_FALLBACK_DAYS, _pi_data_present),
 )
 
 

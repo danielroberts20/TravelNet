@@ -41,18 +41,35 @@ def _age_days(local_date: str) -> int:
     return (today - d).days
 
 
-def closed_after(days: int) -> Callable[[str], bool]:
+def closed_after(days: int) -> Callable[[str, dict, sqlite3.Connection], bool]:
     """Return a predicate: `local_date` is closed if it's at least `days` old."""
-    return lambda local_date: _age_days(local_date) >= days
+    return lambda local_date, data, conn: _age_days(local_date) >= days
 
 
-def never_auto_close(local_date: str) -> bool:
+def never_auto_close(local_date: str, data: dict, conn: sqlite3.Connection) -> bool:
     """
     Use for domains where completeness is determined by an external event
     (e.g. monthly upload) rather than by calendar age. The domain's own
     flow is responsible for setting the flag explicitly.
     """
     return False
+
+
+def closed_when_present_else_after(
+    days: int, is_present: Callable[[dict], bool]
+) -> Callable[[str, dict, sqlite3.Connection], bool]:
+    """
+    Return a predicate: close as soon as `is_present(data)` is True (real
+    data has landed), otherwise fall back to calendar-age closure after
+    `days` — for dates that will genuinely never receive data (e.g. the
+    source was offline and no backfill is possible), so they don't stay
+    pending forever.
+    """
+    def predicate(local_date: str, data: dict, conn: sqlite3.Connection) -> bool:
+        if is_present(data):
+            return True
+        return _age_days(local_date) >= days
+    return predicate
 
 
 # ---------------------------------------------------------------------------
@@ -65,10 +82,10 @@ class Domain:
     columns:                frozenset[str]
     completeness_flag:      str
     compute_fn:             Callable[[sqlite3.Connection, dict], dict]
-    completeness_predicate: Callable[[str], bool]
+    completeness_predicate: Callable[[str, dict, sqlite3.Connection], bool]
 
-    def is_closed(self, local_date: str) -> bool:
-        return self.completeness_predicate(local_date)
+    def is_closed(self, local_date: str, data: dict, conn: sqlite3.Connection) -> bool:
+        return self.completeness_predicate(local_date, data, conn)
 
     def upsert_for_date(self, local_date: str) -> dict:
         """
@@ -79,7 +96,7 @@ class Domain:
         with get_conn() as conn:
             ctx  = get_date_context(conn, local_date)
             data = self.compute_fn(conn, ctx)
-            data[self.completeness_flag] = 1 if self.is_closed(local_date) else 0
+            data[self.completeness_flag] = 1 if self.is_closed(local_date, data, conn) else 0
 
             _upsert_domain_columns(conn, local_date, ctx, self, data)
         return data

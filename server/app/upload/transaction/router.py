@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import datetime, timezone
 import hashlib
 import io
@@ -8,23 +9,81 @@ from babel import numbers
 from typing import Optional
 from notifications import send_notification
 from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends  # type: ignore
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends  # type: ignore
 from pydantic import BaseModel, Field, field_validator  # type: ignore
 from database.transaction.ingest.revolut import insert as insert_revolut
 
 from auth import require_upload_token
 from database.exchange.fx import convert_to_gbp
 from database.connection import get_conn, to_iso_str
+from database.transaction.upload_log import table as upload_log_table, UploadLogRecord
 from upload.transaction.wise_upload import parse_wise_upload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+def _parse_period(period: str) -> tuple[str, str]:
+    """Parse a "YYYY-MM" period string into (period_start, period_end) ISO dates.
+
+    period_start is the first day of the month, period_end the last day.
+    """
+    try:
+        dt = datetime.strptime(period, "%Y-%m")
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="period must be in 'YYYY-MM' format, e.g. '2026-07'",
+        )
+    last_day = monthrange(dt.year, dt.month)[1]
+    period_start = dt.replace(day=1).date().isoformat()
+    period_end = dt.replace(day=last_day).date().isoformat()
+    return period_start, period_end
+
+
+def _record_upload(source: str, period_start: str, period_end: str, row_count: int) -> None:
+    """Upsert upload_log coverage for this (source, period). Called after
+    ingestion finishes, from the background task, so row_count reflects
+    what was actually parsed."""
+    upload_log_table.insert(UploadLogRecord(
+        source=source,
+        period_start=period_start,
+        period_end=period_end,
+        row_count=row_count,
+    ))
+
+
+async def _wise_upload_task(contents: bytes, period_start: str, period_end: str) -> None:
+    result = await parse_wise_upload(contents)
+    row_count = 0
+    if result is not None:
+        _received, inserted, skipped, _errors = result
+        row_count = inserted + skipped
+    _record_upload("wise", period_start, period_end, row_count)
+
+
+def _revolut_upload_task(decoded: str, period_start: str, period_end: str) -> None:
+    inserted, upgraded, skipped, _errors = insert_revolut(decoded)
+    row_count = inserted + upgraded + skipped
+    _record_upload("revolut", period_start, period_end, row_count)
+
+
 @router.post("/wise", dependencies=[Depends(require_upload_token)])
-async def upload_wise(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    """Accept a Wise .zip export, validate it, save a backup, and queue ingestion."""
+async def upload_wise(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    period: str = Form(..., description="Calendar month this export covers, 'YYYY-MM'"),
+):
+    """Accept a Wise .zip export, validate it, save a backup, and queue ingestion.
+
+    `period` (form field, required) is the "YYYY-MM" calendar month this
+    statement covers — used to record upload_log coverage so daily_summary
+    can determine spend_complete for dates in that month.
+    """
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="File must be a .zip")
+
+    period_start, period_end = _parse_period(period)
 
     contents = await file.read()
 
@@ -42,15 +101,26 @@ async def upload_wise(background_tasks: BackgroundTasks, file: UploadFile = File
     with open(backup_path, "wb") as f:
         f.write(contents)
 
-    background_tasks.add_task(parse_wise_upload, contents)
+    background_tasks.add_task(_wise_upload_task, contents, period_start, period_end)
     return {"status": "queued", "files": csv_files}
 
 
 @router.post("/revolut", dependencies=[Depends(require_upload_token)])
-async def upload_revolut(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    """Accept a Revolut CSV export, save a backup, and queue ingestion."""
+async def upload_revolut(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    period: str = Form(..., description="Calendar month this export covers, 'YYYY-MM'"),
+):
+    """Accept a Revolut CSV export, save a backup, and queue ingestion.
+
+    `period` (form field, required) is the "YYYY-MM" calendar month this
+    statement covers — used to record upload_log coverage so daily_summary
+    can determine spend_complete for dates in that month.
+    """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
+
+    period_start, period_end = _parse_period(period)
 
     contents = await file.read()
     decoded = contents.decode("utf-8")
@@ -60,7 +130,7 @@ async def upload_revolut(background_tasks: BackgroundTasks, file: UploadFile = F
     with open(backup_path, "w+") as f:
         f.write(decoded)
 
-    background_tasks.add_task(insert_revolut, decoded)
+    background_tasks.add_task(_revolut_upload_task, decoded, period_start, period_end)
     return {"status": "queued"}
 
 

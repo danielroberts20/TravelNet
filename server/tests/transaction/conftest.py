@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 """
 
+UPLOAD_LOG_DDL = """
+CREATE TABLE IF NOT EXISTS upload_log (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    source        TEXT NOT NULL,
+    period_start  TEXT NOT NULL,
+    period_end    TEXT NOT NULL,
+    row_count     INTEGER NOT NULL,
+    inferred      INTEGER NOT NULL DEFAULT 0,
+    uploaded_at   TEXT,
+    UNIQUE(source, period_start, period_end)
+);
+"""
+
 REVOLUT_HEADERS = [
     "Type", "Product", "Started Date", "Completed Date",
     "Description", "Amount", "Fee", "Currency", "State", "Balance",
@@ -79,11 +92,16 @@ def db():
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.executescript(TRANSACTIONS_DDL)
+    conn.executescript(UPLOAD_LOG_DDL)
     return conn
 
 
 def row_count(db):
     return db.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+
+
+def upload_log_rows(db):
+    return db.execute("SELECT * FROM upload_log ORDER BY source").fetchall()
 
 
 def fetch_one(db, tx_id):
