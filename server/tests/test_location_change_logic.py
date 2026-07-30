@@ -112,8 +112,11 @@ def db():
             known_place_id INTEGER NOT NULL,
             arrived_at     TEXT NOT NULL,
             departed_at    TEXT,
-            duration_mins  INTEGER
+            duration_mins  INTEGER,
+            superseded_by  INTEGER
         );
+        CREATE UNIQUE INDEX idx_place_visits_one_open_per_place
+            ON place_visits(known_place_id) WHERE departed_at IS NULL;
         CREATE TABLE places (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             lat_snap     REAL,
@@ -445,9 +448,12 @@ class TestGetAllOpenVisits:
         assert results[0]["longitude"] == pytest.approx(lon)
 
     def test_ordered_by_arrived_at_desc(self, db):
-        place_id = _place(db, *LONDON)
-        earlier_id = _visit(db, place_id, _fixed(0))
-        later_id   = _visit(db, place_id, _fixed(30))
+        # Two different places — idx_place_visits_one_open_per_place allows only
+        # one open visit per known place, so ordering must be exercised across places.
+        place_a = _place(db, *LONDON)
+        place_b = _place(db, *LONDON_MID)
+        earlier_id = _visit(db, place_a, _fixed(0))
+        later_id   = _visit(db, place_b, _fixed(30))
         results = self._run(db)
         assert results[0]["id"] == later_id   # most recent first
         assert results[1]["id"] == earlier_id
@@ -500,7 +506,8 @@ class TestGetLastInRadiusTimestamp:
 
     def _run(self, db, kp_lat, kp_lon, arrived_at):
         with patch("triggers.location_change.get_conn", return_value=db), \
-             patch("triggers.location_change.LOCATION_CHANGE_RADIUS_M", CHANGE_M):
+             patch("triggers.location_change.LOCATION_CHANGE_RADIUS_M", CHANGE_M), \
+             patch("triggers.location_change.LOCATION_DEPARTURE_CONFIRMATION_MINS", DEPART_MINS):
             return get_last_in_radius_timestamp(kp_lat, kp_lon, arrived_at)
 
     def test_returns_most_recent_in_radius_point(self, db):
@@ -528,18 +535,50 @@ class TestGetLastInRadiusTimestamp:
         result = self._run(db, *LONDON, _fixed(0))
         assert result is None
 
-    def test_ignores_out_of_radius_between_valid_points(self, db):
-        lat, lon = LONDON
-        _pt(db, lat,    lon,    _fixed(0))
-        _pt(db, *PARIS, _fixed(10))    # out of radius — should be skipped
-        _pt(db, lat,    lon,    _fixed(20))
-        result = self._run(db, lat, lon, _fixed(-5))
-        assert result == _fixed(20)
-
     def test_point_at_edge_of_radius_included(self, db):
         lat, lon = LONDON
         # LONDON_MID is ~270 m, within CHANGE_M 500 m
         _pt(db, *LONDON_MID, _fixed(0))
+        result = self._run(db, lat, lon, _fixed(-5))
+        assert result == _fixed(0)
+
+    def test_brief_blip_shorter_than_confirmation_is_ignored(self, db):
+        """A short excursion outside radius that returns before DEPART_MINS elapses
+        is not a departure — scanning resumes and picks up the later in-radius point."""
+        lat, lon = LONDON
+        _pt(db, lat,    lon,    _fixed(0))
+        _pt(db, *PARIS, _fixed(2))     # 2-min blip — under DEPART_MINS=5
+        _pt(db, lat,    lon,    _fixed(3))
+        result = self._run(db, lat, lon, _fixed(-5))
+        assert result == _fixed(3)
+
+    def test_long_gap_confirms_departure_despite_later_revisit(self, db):
+        """A gap that persists >= DEPART_MINS is a confirmed departure at the last
+        in-radius point *before* the gap — even if the place is revisited later.
+
+        This is the known-place-swallows-a-revisit regression: the function must
+        stop at the first confirmed departure and not keep scanning into a
+        separate, later stay at the same known place.
+        """
+        lat, lon = LONDON
+        _pt(db, lat,    lon,    _fixed(0))
+        _pt(db, *PARIS, _fixed(10))    # gap starts — 10 min later return exceeds DEPART_MINS=5
+        _pt(db, lat,    lon,    _fixed(20))    # unrelated later revisit — must not be picked up
+        result = self._run(db, lat, lon, _fixed(-5))
+        assert result == _fixed(0)
+
+    def test_gap_exactly_at_confirmation_threshold_confirms_departure(self, db):
+        lat, lon = LONDON
+        _pt(db, lat,    lon,    _fixed(0))
+        _pt(db, *PARIS, _fixed(5))
+        _pt(db, lat,    lon,    _fixed(DEPART_MINS + 5))   # exactly DEPART_MINS after gap start
+        result = self._run(db, lat, lon, _fixed(-5))
+        assert result == _fixed(0)
+
+    def test_no_return_after_gap_still_confirms_departure(self, db):
+        lat, lon = LONDON
+        _pt(db, lat,    lon,    _fixed(0))
+        _pt(db, *PARIS, _fixed(1))   # never returns — confirmed by absence of contradiction
         result = self._run(db, lat, lon, _fixed(-5))
         assert result == _fixed(0)
 
@@ -550,9 +589,9 @@ class TestGetLastInRadiusTimestamp:
 
 class TestVisitExists:
 
-    def _run(self, db, place_id, arrived_at, tolerance=5):
+    def _run(self, db, place_id, arrived_at, departed_at=None):
         with patch("triggers.location_change.get_conn", return_value=db):
-            return visit_exists(place_id, arrived_at, tolerance)
+            return visit_exists(place_id, arrived_at, departed_at)
 
     def test_no_visits_returns_false(self, db):
         _place(db, *LONDON)
@@ -563,17 +602,24 @@ class TestVisitExists:
         _visit(db, place_id, _fixed(0))
         assert self._run(db, place_id, _fixed(0)) is True
 
-    def test_within_tolerance_returns_true(self, db):
+    def test_candidate_starting_inside_open_existing_visit_returns_true(self, db):
+        """An existing open visit (departed_at NULL) extends to now — any later
+        candidate arrival overlaps it."""
         place_id = _place(db, *LONDON)
         _visit(db, place_id, _fixed(0))
-        # Query 3 minutes later — within default tolerance of 5
         assert self._run(db, place_id, _fixed(3)) is True
 
-    def test_outside_tolerance_returns_false(self, db):
+    def test_candidate_far_in_future_of_closed_visit_returns_false(self, db):
         place_id = _place(db, *LONDON)
-        _visit(db, place_id, _fixed(0))
-        # Query 10 minutes later — outside tolerance of 5
-        assert self._run(db, place_id, _fixed(10)) is False
+        _visit(db, place_id, _fixed(0), departed_at=_fixed(5), duration_mins=5)
+        # Candidate arrives long after the existing visit closed — no overlap
+        assert self._run(db, place_id, _fixed(120)) is False
+
+    def test_candidate_overlapping_closed_visit_range_returns_true(self, db):
+        place_id = _place(db, *LONDON)
+        _visit(db, place_id, _fixed(0), departed_at=_fixed(30), duration_mins=30)
+        # Candidate arrives mid-way through the existing visit's range
+        assert self._run(db, place_id, _fixed(10), _fixed(40)) is True
 
     def test_different_place_id_returns_false(self, db):
         place_a = _place(db, *LONDON)
@@ -903,6 +949,87 @@ class TestHandleKnownPlace:
             "SELECT id FROM place_visits WHERE known_place_id = ?", (nearest["id"],)
         ).fetchone()
         assert kp["current_visit_id"] == pv["id"]
+
+
+# ===========================================================================
+# _handle_known_place — concurrency / race condition
+# ===========================================================================
+
+class TestHandleKnownPlaceConcurrency:
+    """Two calls that both read current_visit_id = NULL before either writes
+    (e.g. two threads racing, or a retry after a crash) must not both open a
+    visit for the same known place.
+
+    idx_place_visits_one_open_per_place is the DB-level guarantee; this test
+    simulates the race by resetting current_visit_id back to NULL between two
+    sequential _handle_known_place() calls, mimicking a second caller whose
+    SELECT ran before the first caller's INSERT committed.
+    """
+
+    def _run(self, db, nearest, arrived_at):
+        with patch("triggers.location_change.get_conn", return_value=db), \
+             patch("database.location.known_places.table.get_conn", return_value=db):
+            return _handle_known_place(nearest, arrived_at)
+
+    def _nearest(self, db, lat, lon):
+        place_id = _place(db, lat, lon)
+        return db.execute(
+            "SELECT id, latitude, longitude FROM known_places WHERE id = ?", (place_id,)
+        ).fetchone()
+
+    def test_only_one_open_visit_survives_the_race(self, db):
+        nearest = self._nearest(db, *LONDON)
+        place_id = nearest["id"]
+
+        first_opened = self._run(db, nearest, _fixed(0))
+        assert first_opened is True
+
+        # Simulate the second caller's stale read: it saw current_visit_id as
+        # NULL before the first caller's INSERT was visible, so reset it here.
+        db.execute("UPDATE known_places SET current_visit_id = NULL WHERE id = ?", (place_id,))
+        db.commit()
+
+        second_opened = self._run(db, nearest, _fixed(1))
+        assert second_opened is False  # loses the race — unique index rejects the insert
+
+        open_visits = db.execute(
+            "SELECT id FROM place_visits WHERE known_place_id = ? AND departed_at IS NULL",
+            (place_id,),
+        ).fetchall()
+        assert len(open_visits) == 1
+
+    def test_current_visit_id_repaired_to_the_winning_visit(self, db):
+        nearest = self._nearest(db, *LONDON)
+        place_id = nearest["id"]
+
+        self._run(db, nearest, _fixed(0))
+        winning_visit = db.execute(
+            "SELECT id FROM place_visits WHERE known_place_id = ?", (place_id,)
+        ).fetchone()["id"]
+
+        db.execute("UPDATE known_places SET current_visit_id = NULL WHERE id = ?", (place_id,))
+        db.commit()
+
+        self._run(db, nearest, _fixed(1))
+
+        row = db.execute(
+            "SELECT current_visit_id FROM known_places WHERE id = ?", (place_id,)
+        ).fetchone()
+        assert row["current_visit_id"] == winning_visit
+
+    def test_no_second_visit_row_created(self, db):
+        nearest = self._nearest(db, *LONDON)
+        place_id = nearest["id"]
+
+        self._run(db, nearest, _fixed(0))
+        db.execute("UPDATE known_places SET current_visit_id = NULL WHERE id = ?", (place_id,))
+        db.commit()
+        self._run(db, nearest, _fixed(1))
+
+        count = db.execute(
+            "SELECT COUNT(*) FROM place_visits WHERE known_place_id = ?", (place_id,)
+        ).fetchone()[0]
+        assert count == 1
 
 
 # ===========================================================================

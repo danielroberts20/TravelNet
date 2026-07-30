@@ -189,7 +189,7 @@ async def list_place_visits(place_id: int):
             raise HTTPException(status_code=404, detail="Place not found")
         rows = conn.execute("""
             SELECT id, arrived_at, departed_at, duration_mins, notes
-            FROM place_visits
+            FROM place_visits_cleaned
             WHERE known_place_id = ?
             ORDER BY arrived_at DESC
         """, (place_id,)).fetchall()

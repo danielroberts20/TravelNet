@@ -81,7 +81,7 @@ def _dominant_place(conn, ctx: dict) -> dict:
                      strftime('%s', MAX(pv.arrived_at, ?)))
                 AS REAL) / 60.0
             ) AS overlap_mins
-        FROM place_visits pv
+        FROM place_visits_cleaned pv
         WHERE pv.arrived_at < ?
           AND (pv.departed_at IS NULL OR pv.departed_at > ?)
         GROUP BY pv.known_place_id

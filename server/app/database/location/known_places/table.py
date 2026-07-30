@@ -12,6 +12,7 @@ The trigger logic that writes to these tables lives in triggers/location_change.
 This module owns only the schema and the low-level insert/update helpers.
 """
 
+import sqlite3
 from dataclasses import dataclass
 from typing import Optional
 
@@ -57,7 +58,8 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
                     arrived_at     TEXT NOT NULL,
                     departed_at    TEXT,
                     duration_mins  INTEGER,
-                    notes          TEXT
+                    notes          TEXT,
+                    superseded_by  INTEGER REFERENCES place_visits(id)
                 );
             """)
 
@@ -79,6 +81,30 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_place_visits_open
                     ON place_visits(arrived_at) WHERE departed_at IS NULL;
+            """)
+
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_place_visits_one_open_per_place
+                    ON place_visits(known_place_id) WHERE departed_at IS NULL;
+            """)
+
+            try:
+                conn.execute("ALTER TABLE place_visits ADD COLUMN superseded_by INTEGER REFERENCES place_visits(id)")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
+    def init_cleaned_view(self) -> None:
+        """Create the place_visits_cleaned view — place_visits minus superseded rows.
+
+        Raw place_visits rows are never deleted (immutability convention); rows
+        found to be duplicates/overlaps of another visit are flagged via
+        superseded_by instead. Downstream readers should query this view, not
+        place_visits directly.
+        """
+        with get_conn() as conn:
+            conn.execute("""
+                CREATE VIEW IF NOT EXISTS place_visits_cleaned AS
+                SELECT * FROM place_visits WHERE superseded_by IS NULL;
             """)
 
     def insert(self, record: KnownPlaceRecord) -> int:
@@ -108,14 +134,22 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
             )
             return cursor.rowcount > 0
 
-    def insert_visit(self, place_id: int, arrived_at: str) -> int:
-        """Open a new visit record for a known place and return its id."""
-        with get_conn() as conn:
-            cursor = conn.execute("""
-                INSERT INTO place_visits (known_place_id, arrived_at)
-                VALUES (?, ?)
-            """, (place_id, arrived_at))
-            return cursor.lastrowid
+    def insert_visit(self, place_id: int, arrived_at: str) -> Optional[int]:
+        """Open a new visit record for a known place and return its id.
+
+        Returns None if an open visit already exists for this place — enforced by
+        idx_place_visits_one_open_per_place, which is the source of truth for
+        "is a visit currently open," not known_places.current_visit_id.
+        """
+        try:
+            with get_conn() as conn:
+                cursor = conn.execute("""
+                    INSERT INTO place_visits (known_place_id, arrived_at)
+                    VALUES (?, ?)
+                """, (place_id, arrived_at))
+                return cursor.lastrowid
+        except sqlite3.IntegrityError:
+            return None
 
     def set_current_visit(self, place_id: int, visit_id: int) -> None:
         """Point known_places.current_visit_id at the active visit."""

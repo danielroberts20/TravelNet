@@ -96,6 +96,7 @@ def init_db() -> None:
     # Must be last — depends on location_shortcuts and location_overland tables
     location_table.init_unified_view()
     noise_table.init_clean_view()
+    known_places_table.init_cleaned_view()
     daily_summary_table.init_complete_view()
 
     log_config_summary()

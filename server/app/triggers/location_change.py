@@ -115,17 +115,60 @@ def get_first_point_after(timestamp: str):
 
 
 def get_last_in_radius_timestamp(kp_lat: float, kp_lon: float, arrived_at: str):
-    """Find the most recent location point within LOCATION_CHANGE_RADIUS_M since the visit started."""
+    """Find the timestamp marking the end of the *current* stay at a known place.
+
+    Walks forward chronologically from arrived_at, tracking the most recent
+    in-radius point seen so far. Whenever an out-of-radius point is found, the
+    absence is only treated as a genuine departure if it persists for at least
+    LOCATION_DEPARTURE_CONFIRMATION_MINS — either because a subsequent in-radius
+    return happens only after that many minutes have elapsed, or because no
+    in-radius return ever follows. If the device comes back within radius
+    before the confirmation window elapses, that gap is a blip (not a real
+    departure): scanning resumes from the return point instead of stopping.
+
+    This prevents a later, unrelated revisit to the same known place from being
+    folded into the current stay — the function stops at the first confirmed
+    departure and never scans past it looking for later data.
+    """
     with get_conn(read_only=True) as conn:
         rows = conn.execute("""
             SELECT timestamp, latitude, longitude FROM location_unified
             WHERE timestamp >= ?
-            ORDER BY timestamp DESC
+            ORDER BY timestamp ASC
         """, (arrived_at,)).fetchall()
-    for r in rows:
+
+    last_in_radius = None
+    n = len(rows)
+    i = 0
+    while i < n:
+        r = rows[i]
         if haversine_m(kp_lat, kp_lon, r['latitude'], r['longitude']) <= LOCATION_CHANGE_RADIUS_M:
-            return r['timestamp']
-    return None
+            last_in_radius = r['timestamp']
+            i += 1
+            continue
+
+        # Out-of-radius point — determine whether the absence is confirmed.
+        gap_start_dt = datetime.fromisoformat(r['timestamp'])
+        confirmed = True
+        j = i + 1
+        while j < n:
+            rj = rows[j]
+            elapsed_mins = (datetime.fromisoformat(rj['timestamp']) - gap_start_dt).total_seconds() / 60
+            if haversine_m(kp_lat, kp_lon, rj['latitude'], rj['longitude']) <= LOCATION_CHANGE_RADIUS_M:
+                if elapsed_mins < LOCATION_DEPARTURE_CONFIRMATION_MINS:
+                    confirmed = False  # returned before the gap was confirmed — just a blip
+                break
+            if elapsed_mins >= LOCATION_DEPARTURE_CONFIRMATION_MINS:
+                break  # absence persisted long enough to confirm, regardless of what follows
+            j += 1
+
+        if confirmed:
+            return last_in_radius
+
+        # Blip, not a departure — resume scanning from the in-radius return point.
+        i = j
+
+    return last_in_radius
 
 
 def check_departure():
@@ -183,20 +226,26 @@ def check_departure():
 # Idempotency helper (used by retroactive scanner)
 # ---------------------------------------------------------------------------
 
-def visit_exists(place_id: int, arrived_at: str, tolerance_mins: int = 5) -> bool:
-    """Return True if a visit for place_id already exists within tolerance_mins of arrived_at.
+def visit_exists(place_id: int, arrived_at: str, departed_at: str = None) -> bool:
+    """Return True if an existing visit's time range overlaps the candidate's.
 
-    Used by the retroactive scanner to avoid creating duplicate visit records
-    when the same historical window is processed more than once.
+    The candidate range is [arrived_at, departed_at or now) — departed_at is
+    None for the retroactive scanner's use case (checking a not-yet-opened
+    visit against history), which means "still open, extends to now."
+    Existing visits with departed_at IS NULL are treated the same way.
+
+    Used by the retroactive scanner to avoid creating duplicate/overlapping
+    visit records when the same historical window is processed more than once.
     """
+    now_str = to_iso_str(datetime.now(timezone.utc))
+    candidate_end = departed_at or now_str
     with get_conn(read_only=True) as conn:
         row = conn.execute("""
             SELECT id FROM place_visits
             WHERE known_place_id = ?
-              AND ABS(
-                  (julianday(arrived_at) - julianday(?)) * 24 * 60
-              ) <= ?
-        """, (place_id, arrived_at, tolerance_mins)).fetchone()
+              AND arrived_at < ?
+              AND COALESCE(departed_at, ?) > ?
+        """, (place_id, candidate_end, now_str, arrived_at)).fetchone()
     return row is not None
 
 
@@ -256,6 +305,21 @@ def _handle_known_place(nearest, arrived_at: str) -> bool:
             conn.execute("UPDATE known_places SET current_visit_id = NULL WHERE id = ?", (place_id,))
 
     visit_id = known_places_table.insert_visit(place_id, arrived_at)
+
+    if visit_id is None:
+        # Lost the race: another call opened a visit for this place between our
+        # SELECT above and this INSERT. The unique index is the source of truth —
+        # repair current_visit_id to point at the visit that actually won.
+        with get_conn(read_only=True) as conn:
+            open_visit = conn.execute(
+                "SELECT id FROM place_visits WHERE known_place_id = ? AND departed_at IS NULL",
+                (place_id,),
+            ).fetchone()
+        if open_visit is not None:
+            known_places_table.set_current_visit(place_id, open_visit['id'])
+        logger.info("Still at %s, no action needed (open visit already exists)", name)
+        return False
+
     logger.important("Return visit to %s", name)
     known_places_table.increment_visit_count(place_id, arrived_at, visit_id)
     return True
