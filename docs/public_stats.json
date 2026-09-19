@@ -5,9 +5,9 @@
   "stopover_countries": 0,
   "total_countries": 0,
   "current_leg": null,
-  "gps_points": 348949,
-  "health_records": 62099,
+  "gps_points": 352617,
+  "health_records": 62640,
   "transactions": 602,
-  "last_synced": "2026-09-18T20:55:19Z",
-  "generated_at": "2026-09-18T21:00:20Z"
+  "last_synced": "2026-09-19T20:55:48Z",
+  "generated_at": "2026-09-19T21:00:13Z"
 }
