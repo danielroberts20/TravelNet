@@ -32,6 +32,7 @@ def _place_row_to_dict(row) -> dict:
         "latitude": d["latitude"],
         "longitude": d["longitude"],
         "display_name": d.get("display_name"),
+        "timezone": d.get("timezone"),
         "first_seen": d["first_seen"],
         "last_visited": d.get("last_visited"),
         "visit_count": d["visit_count"],
@@ -91,7 +92,7 @@ async def list_places():
             SELECT
                 kp.id, kp.label, kp.notes, kp.latitude, kp.longitude,
                 kp.first_seen, kp.last_visited, kp.visit_count, kp.total_time_mins,
-                p.display_name, p.geocoded_at
+                p.display_name, p.geocoded_at, p.timezone
             FROM known_places kp
             LEFT JOIN places p ON p.id = kp.place_id
             ORDER BY kp.last_visited DESC, kp.first_seen DESC
@@ -139,7 +140,7 @@ async def update_place(place_id: int, request: PlaceUpdateRequest):
             SELECT
                 kp.id, kp.label, kp.notes, kp.latitude, kp.longitude,
                 kp.first_seen, kp.last_visited, kp.visit_count, kp.total_time_mins,
-                p.display_name, p.geocoded_at
+                p.display_name, p.geocoded_at, p.timezone
             FROM known_places kp
             LEFT JOIN places p ON p.id = kp.place_id
             WHERE kp.id = ?
@@ -184,7 +185,12 @@ def geocode_place(place_id: int):
 @router.get("/{place_id}/visits", dependencies=[Depends(require_upload_token)])
 async def list_place_visits(place_id: int):
     with get_conn() as conn:
-        kp = conn.execute("SELECT id FROM known_places WHERE id = ?", (place_id,)).fetchone()
+        kp = conn.execute("""
+            SELECT kp.id, p.timezone
+            FROM known_places kp
+            LEFT JOIN places p ON p.id = kp.place_id
+            WHERE kp.id = ?
+        """, (place_id,)).fetchone()
         if not kp:
             raise HTTPException(status_code=404, detail="Place not found")
         rows = conn.execute("""
@@ -193,4 +199,7 @@ async def list_place_visits(place_id: int):
             WHERE known_place_id = ?
             ORDER BY arrived_at DESC
         """, (place_id,)).fetchall()
-    return {"visits": [_visit_row_to_dict(r) for r in rows]}
+    return {
+        "timezone": dict(kp).get("timezone"),
+        "visits": [_visit_row_to_dict(r) for r in rows],
+    }
