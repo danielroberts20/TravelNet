@@ -8,27 +8,17 @@ from notifications import notify_on_completion, log_on_success
 
 
 # Each entry: (local_hour, local_minute, day_of_month, grep_pattern, command)
+#
+# The Tailscale cert renewal job (and its scp-to-Watchdog companion) were retired
+# together: nothing verifies against the Tailscale-issued cert anymore (Watchdog's
+# CERT_PATH now points at api.travelnet.dev.crt), so renewing and distributing it
+# served no purpose.
 _CRON_JOBS = [
     (
         4, 0, 1,
         "graceful_reboot.sh",
         "/bin/bash /home/dan/services/TravelNet/server/scripts/graceful_reboot.sh scheduled "
         ">> /home/dan/services/TravelNet/server/logs/reboot.log 2>&1"
-    ),
-    (
-        0, 0, 1,
-        "tailscale cert",
-        "tailscale cert --cert-file /home/dan/services/Dashboard/certs/travelnet.tail186ff8.ts.net.crt "
-        "--key-file /home/dan/services/Dashboard/certs/travelnet.tail186ff8.ts.net.key "
-        "travelnet.tail186ff8.ts.net >> /home/dan/services/TravelNet/server/logs/tailscale_cert.log 2>&1 "
-        "&& docker restart travelnet-nginx"
-    ),
-    (
-        0, 5, 1,
-        "watchdog.tail186ff8.ts.net",
-        "scp -i /home/dan/.ssh/id_ed25519 "
-        "/home/dan/services/Dashboard/certs/travelnet.tail186ff8.ts.net.crt "
-        "dan@watchdog.tail186ff8.ts.net:/home/dan/watchdog/certs/travelnet.crt"
     ),
     (
         1, 0, 1,
@@ -43,8 +33,17 @@ _CRON_JOBS = [
         "api.travelnet.dev.crt",
         "scp -i /home/dan/.ssh/id_ed25519 "
         "/home/dan/services/Dashboard/certs/api.travelnet.dev.crt "
-        "dan@watchdog.tail186ff8.ts.net:/home/dan/watchdog/certs/api.travelnet.dev.crt"
+        "dan@192.168.0.63:/home/dan/watchdog/certs/api.travelnet.dev.crt"
     ),
+]
+
+# Patterns of managed cron lines that used to be installed but are no longer in
+# _CRON_JOBS above. The stripping step only removes lines matching a *current*
+# job's pattern, so a retired job's old crontab line would otherwise be stuck
+# there forever. Keep entries here for one deploy cycle after retiring a job.
+_RETIRED_PATTERNS = [
+    "tailscale cert",
+    "watchdog.tail186ff8.ts.net",
 ]
 
 
@@ -66,10 +65,11 @@ def update_reboot_cron(iana_tz: str):
     with open(crontab_path, "r") as f:
         existing = f.readlines()
     
-    # Strip managed lines
+    # Strip managed lines (current jobs, plus anything left over from retired ones)
+    strip_patterns = grep_patterns + _RETIRED_PATTERNS
     filtered = [
         line for line in existing
-        if not any(pattern in line for pattern in grep_patterns)
+        if not any(pattern in line for pattern in strip_patterns)
     ]
     
     # Append new entries
