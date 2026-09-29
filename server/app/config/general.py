@@ -182,9 +182,26 @@ GAP_ANNOTATION_TOLERANCE_MINUTES = editable(
     group="Location"
 )(10)
 
-DWELL_MIN_POINTS = editable(key="DWELL_MIN_POINTS", 
+DWELL_MIN_POINTS = editable(key="DWELL_MIN_POINTS",
                             description="Minimum consecutive GPS points in a new country before registering a country transition. " \
                                         "Higher values filter out more border noise.", group="Location")(3)
+
+PUBLIC_LOCATION_FUZZ_RADIUS_KM = editable(
+    "PUBLIC_LOCATION_FUZZ_RADIUS_KM",
+    "Max radius in km of random jitter applied to coordinates returned by the "
+    "unauthenticated /public/location endpoint. Jitter is a random distance up "
+    "to this radius in a random direction, not a fixed offset, so repeated "
+    "calls can't be averaged out to recover the real point.",
+    group="Location"
+)(5.0)
+
+PUBLIC_LOCATION_HISTORY_DOWNSAMPLE_MINUTES = editable(
+    "PUBLIC_LOCATION_HISTORY_DOWNSAMPLE_MINUTES",
+    "Minimum minutes between consecutive points returned by /public/location's "
+    "`since` history query. A point is kept early if it crosses "
+    "LOCATION_CHANGE_RADIUS_M instead, so genuine movement isn't smoothed away.",
+    group="Location"
+)(15)
 
 
 # ---------------------------------------------------------------------------
