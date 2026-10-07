@@ -95,6 +95,17 @@ app.add_middleware(
 
 app.add_middleware(PublicPathFilterMiddleware)
 
+@app.get("/health", include_in_schema=False)
+async def health() -> dict:
+    """Liveness probe for Docker healthchecks and the dashboard.
+
+    Deliberately trivial (no DB, no auth): it answers on the event loop, so a
+    wedged or starved process fails it. Not in API_ALLOWED_PREFIXES, so it is
+    not reachable through the public api.travelnet.dev hostname.
+    """
+    return {"status": "ok"}
+
+
 app.include_router(compute_router, prefix="/compute")
 app.include_router(uploads_router, prefix="/upload")
 app.include_router(db_router, prefix="/database")
