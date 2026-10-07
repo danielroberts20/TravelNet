@@ -16,6 +16,7 @@ Usage:
 """
 
 from pathlib import Path
+from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -31,7 +32,13 @@ class Settings(BaseSettings):
     compute_host: str = Field(alias="COMPUTE_HOST")
     compute_port: int = Field(alias="COMPUTE_PORT")
     compute_username: str = Field(alias="COMPUTE_USERNAME")
-    compute_password: str = Field(alias="COMPUTE_PASSWORD")
+    # Authentication to the compute host. Prefer a key (COMPUTE_SSH_KEY_PATH); the password is
+    # kept only as a fallback while migrating and can be removed once the key works.
+    compute_password: Optional[str] = Field(default=None, alias="COMPUTE_PASSWORD")
+    compute_ssh_key_path: Optional[str] = Field(default=None, alias="COMPUTE_SSH_KEY_PATH")
+    # known_hosts file (from `ssh-keyscan -p PORT HOST`). When set, unknown or changed host keys
+    # are refused instead of silently trusted.
+    compute_known_hosts_path: Optional[str] = Field(default=None, alias="COMPUTE_KNOWN_HOSTS_PATH")
 
     # --- Notification webhooks ---
     custom_notification_time_sensitive: str = Field(alias="CUSTOM_NOTIFICATION_TIME_SENSITIVE")

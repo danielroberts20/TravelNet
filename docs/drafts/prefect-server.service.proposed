@@ -3,6 +3,9 @@
 # built-in flow-run vacuum with 14-day retention.
 # Step 6 adds only the two --health-* lines, so Docker reports healthy/unhealthy
 # for this container (the image has python but no curl/wget).
+# Step 8 adds --env-file /etc/prefect-server.env (root:root, mode 600) holding
+#   PREFECT_SERVER_API_AUTH_STRING=user:password
+# so the credential is not in this world-readable unit file. /api/health stays open for the healthcheck.
 [Unit]
 Description=Prefect Server (Docker)
 After=docker.service
@@ -17,6 +20,7 @@ ExecStart=/usr/bin/docker run \
   -p 4200:4200 \
   --name prefect-server \
   --network travelnet \
+  --env-file /etc/prefect-server.env \
   -e PREFECT_UI_API_URL=http://travelnet.tail186ff8.ts.net:4200/api \
   -e PREFECT_HOME=/prefect \
   -e PREFECT_SQLALCHEMY_POOL_SIZE=5 \

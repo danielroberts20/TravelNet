@@ -21,6 +21,7 @@ if not SCRIPT.exists():
 
 CURL_STUB = """#!/bin/bash
 echo "curl $*" >> "$STUB_LOG"
+case "$*" in *"-K -"*) cat >> "$STUB_LOG.stdin";; esac    # credentials arrive as a config line on stdin
 case "$*" in
   *flow_runs/count*)
     [ "$COUNT_MODE" = "fail" ] && exit 7
@@ -64,6 +65,14 @@ def rig(tmp_path):
     }
 
     class Rig:
+        def add_env(self, line):
+            with open(env_file, "a") as f:
+                f.write(line + "\n")
+
+        def stdin(self):
+            p = Path(str(log) + ".stdin")
+            return p.read_text() if p.exists() else ""
+
         def run(self, reason="scheduled", counts_seq=None, **extra_env):
             if counts_seq is not None:
                 counts.write_text("".join(f"{c}\n" for c in counts_seq))
@@ -181,3 +190,17 @@ def test_missing_env_file_fails_before_anything_is_stopped(rig, tmp_path):
     r = rig.run("scheduled", TRAVELNET_ENV_FILE=str(tmp_path / "nope.env"))
     assert r.returncode != 0
     assert kinds(rig.calls()) == []
+
+
+def test_prefect_credentials_reach_curl_on_stdin_never_in_arguments(rig):
+    rig.add_env("PREFECT_API_AUTH_STRING=svc:s3cr3t-value")
+    rig.run("manual", counts_seq=[0])
+    assert not any("s3cr3t-value" in c for c in rig.calls())          # not in any argument (ps would show it)
+    assert 'user = "svc:s3cr3t-value"' in rig.stdin()
+    (req,) = [c for c in rig.calls() if "flow_runs/count" in c]
+    assert "-K -" in req
+
+
+def test_without_credentials_curl_gets_no_user_line(rig):
+    rig.run("manual", counts_seq=[0])
+    assert "user =" not in rig.stdin()

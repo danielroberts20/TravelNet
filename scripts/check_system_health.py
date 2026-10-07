@@ -76,6 +76,7 @@ EXPECTED_CONTAINERS = [
     "prefect-server",
     "trevor",
     "constellation",
+    "travelnet-docker-proxy",
 ]
 
 # Containers whose lifecycle belongs to a systemd unit, not docker/compose.
