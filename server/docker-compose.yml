@@ -18,6 +18,9 @@ services:
       - /var/spool/cron/crontabs/dan:/var/spool/cron/crontabs/dan
       - /home/dan/services/TravelNet/travel.yml:/travel.yml:rw
       - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/data/.travelnet_backup_key:ro
+      # SSH key + pinned host key for the compute PC (COMPUTE_SSH_KEY_PATH / COMPUTE_KNOWN_HOSTS_PATH).
+      # A directory on purpose: a missing single-file mount source would be created as a root-owned dir.
+      - /home/dan/.config/travelnet-compute:/run/secrets/compute:ro
     ports:
       - "8000:8000"
     restart: unless-stopped
