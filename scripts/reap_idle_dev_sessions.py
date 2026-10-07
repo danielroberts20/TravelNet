@@ -15,7 +15,7 @@ A session is a process whose program path (argv[0]) contains --match
     replaced by "-">/*.jsonl) was written within --idle-hours, or
   * its process tree used CPU faster than --cpu-rate between two runs (a long test
     run or build keeps a session alive even if nothing is written to the transcript).
-Otherwise the idle clock runs. A session idle for --idle-hours (default 3) is
+Otherwise the idle clock runs. A session idle for --idle-hours (default 6) is
 stopped (SIGTERM to the tree, SIGKILL after --grace seconds) and ONE Pushcut
 notification lists what was stopped.
 
@@ -285,7 +285,7 @@ def main(argv_: list[str] | None = None, *, now: float | None = None, proc_root:
          kill=os.kill, notify=None, sleep=time.sleep) -> list[dict]:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--dry-run", action="store_true", help="report what would be stopped; stop nothing")
-    ap.add_argument("--idle-hours", type=float, default=3.0)
+    ap.add_argument("--idle-hours", type=float, default=6.0)
     ap.add_argument("--cpu-rate", type=float, default=0.05,
                     help="CPU seconds per second (over the whole tree) above which a session counts as active")
     ap.add_argument("--grace", type=float, default=30.0, help="seconds between SIGTERM and SIGKILL")

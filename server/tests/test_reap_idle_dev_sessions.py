@@ -94,7 +94,7 @@ def rig(tmp_path):
             fake_kill = lambda pid, sig: kills.append((pid, sig))
             return r.main(
                 ["--match", MATCH, "--state-file", str(state), "--projects-dir", str(projects),
-                 "--grace", "0", *extra],
+                 "--idle-hours", "3", "--grace", "0", *extra],   # window stated explicitly, not the default
                 now=now, proc_root=str(proc.root), kill=fake_kill,
                 notify=lambda t, x: notes.append((t, x)), sleep=lambda s: None)
 
@@ -257,6 +257,23 @@ def test_stops_the_whole_tree_and_sigkills_survivors(rig):
     killed = {p for p, s in rig.kills_ if s == signal.SIGKILL}
     assert termed == {500, 501} and killed == {500, 501}
     assert sorted(res[0]["forced"]) == [500, 501]
+
+
+def test_default_idle_window_is_six_hours(rig):
+    """With no --idle-hours the window is 6 h: 5 h of quiet is not enough, 7 h is."""
+    def run(now):
+        return r.main(["--match", MATCH, "--state-file", str(rig.state_file),
+                       "--projects-dir", str(rig.projects_dir), "--grace", "0"],
+                      now=now, proc_root=str(rig.fake.root),
+                      kill=lambda p, s: rig.kills_.append((p, s)),
+                      notify=lambda t, x: rig.notes_.append((t, x)), sleep=lambda s: None)
+
+    idle_session(rig, 500, transcript_age=5 * HOUR)
+    run(NOW)
+    assert run(NOW + 1800) == []                       # 5.5 h idle: spared
+    assert rig.kills_ == []
+    assert len(run(NOW + 1.5 * HOUR)) == 1             # 6.5 h idle: stopped
+    assert "Idle ≥ 6h" in rig.notes_[-1][1]
 
 
 # --- dry run & notification --------------------------------------------------------------------

@@ -2,7 +2,7 @@
 # Starts in --dry-run: it reports (once per session, via Pushcut) what it WOULD stop and kills nothing.
 # To go live, delete " --dry-run" from ExecStart, then: systemctl --user daemon-reload
 [Unit]
-Description=Stop Claude Code dev sessions idle for 3+ hours (frees RAM for TravelNet)
+Description=Stop Claude Code dev sessions idle for 6+ hours (frees RAM for TravelNet)
 
 [Service]
 Type=oneshot

@@ -695,7 +695,7 @@ I should have checked the real data before reporting it; I inferred from run sta
 
 **Problem:** dev sessions (Claude Code processes started from the desktop app) linger for 13+ hours after use, holding RAM on the production Pi (about 1.5 GB resident+swap at the worst point). Their transcripts are on disk, so a stopped session can be resumed.
 
-**Policy (user's choice):** option 1, a timer-driven reaper; idle threshold **3 hours**; send a custom Pushcut notification when it identifies and stops a session.
+**Policy (user's choice):** option 1, a timer-driven reaper; idle threshold **6 hours** (first set to 3; raised after the reaper stopped a conversation that was only waiting on the user); send a custom Pushcut notification when it identifies and stops a session.
 
 **Files:** `scripts/reap_idle_dev_sessions.py` (stdlib only), `docs/drafts/dev-session-reaper.service` / `.timer` (systemd *user* units, no sudo; `systemd-analyze --user verify` clean), `server/tests/test_reap_idle_dev_sessions.py` (27 tests).
 
@@ -715,3 +715,5 @@ I should have checked the real data before reporting it; I inferred from run sta
 **Rollout:** the service unit ships with `--dry-run`, so the first days only report (once per session) what it would stop. Going live is deleting that flag. The user timer runs while the user has a login session (`Linger=no`), which is exactly when dev sessions exist.
 
 **Installed 2026-10-07 ~03:37 UTC by the user and switched live immediately** (`--dry-run` removed from the user unit; timer every 30 min). The first live run's log shows both sessions seen twice; the Constellation session (idle since its last transcript write at 00:53 UTC) becomes eligible at 03:53 UTC and will be stopped on the next run after that (~04:07 UTC), with one Pushcut.
+
+**Live behaviour (2026-10-07):** the first live run stopped the idle Constellation session at 04:07 UTC (SIGTERM was enough; the process was gone and a Pushcut was sent). Three hours later it also stopped the conversation it was being developed in, after 3 h without a transcript write while the user was away; the app resumed it from its transcript on the next message. That is why the window was raised to 6 hours.
