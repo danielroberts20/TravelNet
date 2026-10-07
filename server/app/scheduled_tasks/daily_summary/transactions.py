@@ -25,7 +25,21 @@ from config.general import BACKFILL_MONTHS, TRANSACTION_COL_BATCH_SIZE
 
 # Sources that must each confirm coverage of a date's calendar month in
 # upload_log before that date can be considered spend-complete.
-REQUIRED_UPLOAD_SOURCES = ("revolut", "wise")
+REQUIRED_UPLOAD_SOURCES = ("revolut", "wise", "commbank")
+
+# First date (local, ISO) a source can have data. A source is only required for
+# dates on/after its start — otherwise every date before the account existed
+# could never be spend-complete. Sources not listed apply to all dates.
+UPLOAD_SOURCE_START_DATES = {
+    "commbank": "2026-08-30",  # CommBank account opened
+}
+
+
+def _required_sources_for(local_date: str) -> tuple[str, ...]:
+    return tuple(
+        s for s in REQUIRED_UPLOAD_SOURCES
+        if UPLOAD_SOURCE_START_DATES.get(s, "") <= local_date
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +131,7 @@ def _transactions(conn, ctx: dict) -> dict:
 def _upload_coverage_predicate(local_date: str, data: dict, conn) -> bool:
     """
     A date is spend-complete once every source in REQUIRED_UPLOAD_SOURCES
-    has an upload_log entry whose period covers it — i.e. that source's
+    that existed on that date (see UPLOAD_SOURCE_START_DATES) has an upload_log entry whose period covers it — i.e. that source's
     statement for this calendar month has actually been uploaded.
 
     Previously this was never auto-closed and the monthly backfill flow set
@@ -131,7 +145,7 @@ def _upload_coverage_predicate(local_date: str, data: dict, conn) -> bool:
         WHERE period_start <= ? AND period_end >= ?
     """, (local_date, local_date)).fetchall()
     covered = {r["source"] for r in rows}
-    return all(source in covered for source in REQUIRED_UPLOAD_SOURCES)
+    return all(source in covered for source in _required_sources_for(local_date))
 
 
 TRANSACTIONS_DOMAIN = Domain(

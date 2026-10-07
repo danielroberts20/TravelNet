@@ -47,8 +47,8 @@ def _add_upload(conn, source, period_start, period_end, row_count=1):
     )
 
 
-def test_required_sources_are_revolut_and_wise():
-    assert set(REQUIRED_UPLOAD_SOURCES) == {"revolut", "wise"}
+def test_required_sources_are_revolut_wise_and_commbank():
+    assert set(REQUIRED_UPLOAD_SOURCES) == {"revolut", "wise", "commbank"}
 
 
 def test_incomplete_with_no_uploads(conn):
@@ -60,15 +60,17 @@ def test_incomplete_when_only_one_source_covers(conn):
     assert _upload_coverage_predicate("2026-03-15", {}, conn) is False
 
 
-def test_complete_when_both_sources_cover(conn):
+def test_complete_when_all_sources_cover(conn):
     _add_upload(conn, "revolut", "2026-03-01", "2026-03-31")
     _add_upload(conn, "wise", "2026-03-01", "2026-03-31")
+    _add_upload(conn, "commbank", "2026-03-01", "2026-03-31")
     assert _upload_coverage_predicate("2026-03-15", {}, conn) is True
 
 
 def test_date_outside_any_uploaded_period_is_incomplete(conn):
     _add_upload(conn, "revolut", "2026-03-01", "2026-03-31")
     _add_upload(conn, "wise", "2026-03-01", "2026-03-31")
+    _add_upload(conn, "commbank", "2026-03-01", "2026-03-31")
     assert _upload_coverage_predicate("2026-04-01", {}, conn) is False
 
 
@@ -78,11 +80,28 @@ def test_zero_row_count_upload_still_counts_as_coverage(conn):
     uploaded yet."""
     _add_upload(conn, "revolut", "2026-03-01", "2026-03-31", row_count=0)
     _add_upload(conn, "wise", "2026-03-01", "2026-03-31", row_count=0)
+    _add_upload(conn, "commbank", "2026-03-01", "2026-03-31", row_count=0)
     assert _upload_coverage_predicate("2026-03-15", {}, conn) is True
 
 
 def test_boundary_dates_are_covered(conn):
     _add_upload(conn, "revolut", "2026-03-01", "2026-03-31")
     _add_upload(conn, "wise", "2026-03-01", "2026-03-31")
+    _add_upload(conn, "commbank", "2026-03-01", "2026-03-31")
     assert _upload_coverage_predicate("2026-03-01", {}, conn) is True
     assert _upload_coverage_predicate("2026-03-31", {}, conn) is True
+
+
+def test_commbank_not_required_before_account_opened(conn):
+    """Dates before the CommBank account existed only need revolut + wise."""
+    _add_upload(conn, "revolut", "2026-03-01", "2026-03-31")
+    _add_upload(conn, "wise", "2026-03-01", "2026-03-31")
+    assert _upload_coverage_predicate("2026-03-15", {}, conn) is True
+
+
+def test_commbank_required_from_account_opened(conn):
+    _add_upload(conn, "revolut", "2026-09-01", "2026-09-30")
+    _add_upload(conn, "wise", "2026-09-01", "2026-09-30")
+    assert _upload_coverage_predicate("2026-09-15", {}, conn) is False
+    _add_upload(conn, "commbank", "2026-09-01", "2026-09-30")
+    assert _upload_coverage_predicate("2026-09-15", {}, conn) is True

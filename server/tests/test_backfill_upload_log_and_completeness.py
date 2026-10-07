@@ -146,8 +146,9 @@ def test_recompute_spend_complete_flips_0_to_1_when_both_sources_covered(db_path
     conn.execute("INSERT INTO daily_summary (date, spend_complete) VALUES ('2026-06-15', 0)")
     conn.execute("""
         INSERT INTO upload_log (source, period_start, period_end, row_count, inferred)
-        VALUES ('revolut', '2026-06-01', '2026-06-30', 5, 0),
-               ('wise',    '2026-06-01', '2026-06-30', 3, 0)
+        VALUES ('revolut',  '2026-06-01', '2026-06-30', 5, 0),
+               ('wise',     '2026-06-01', '2026-06-30', 3, 0),
+               ('commbank', '2026-06-01', '2026-06-30', 2, 0)
     """)
     conn.commit()
 
