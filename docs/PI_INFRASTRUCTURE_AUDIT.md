@@ -717,3 +717,9 @@ I should have checked the real data before reporting it; I inferred from run sta
 **Installed 2026-10-07 ~03:37 UTC by the user and switched live immediately** (`--dry-run` removed from the user unit; timer every 30 min). The first live run's log shows both sessions seen twice; the Constellation session (idle since its last transcript write at 00:53 UTC) becomes eligible at 03:53 UTC and will be stopped on the next run after that (~04:07 UTC), with one Pushcut.
 
 **Live behaviour (2026-10-07):** the first live run stopped the idle Constellation session at 04:07 UTC (SIGTERM was enough; the process was gone and a Pushcut was sent). Three hours later it also stopped the conversation it was being developed in, after 3 h without a transcript write while the user was away; the app resumed it from its transcript on the next message. That is why the window was raised to 6 hours.
+
+---
+
+## 25. Health monitor installed (2026-10-07)
+
+`scripts/check_system_health.py` was replaced by the reviewed draft (`docs/drafts/check_system_health.py.proposed`, now removed) after about nine hours of every container reporting healthy. It was installed with an atomic rename a few minutes before a cron tick. The first real run (09:15 UTC, root's cron) created its state file, ran every new check (mounts, Docker health, restart counts, per-container OOM, systemd services, backup age, Prefect DB size, swap-in rate) and raised no alerts. The permanently-tripped "swap > 60 %" alert is gone; swap now alerts above 90 % or on sustained swap-in. Restart-on-unhealthy is rate-limited to 3 per 6 hours per container. Roll back with `git checkout <previous commit> -- scripts/check_system_health.py`.
