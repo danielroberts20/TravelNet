@@ -30,6 +30,31 @@ services:
     networks:
       - travelnet
 
+  # The dashboard used to mount /var/run/docker.sock (root on the host). It only needs to follow
+  # the logs of two containers and restart three, so it talks to this allow-list proxy instead.
+  docker-proxy:
+    image: haproxy:3.0-alpine
+    container_name: travelnet-docker-proxy
+    restart: unless-stopped
+    user: root             # needs to read the root-owned Docker socket; everything else is dropped below
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    mem_limit: 32m
+    pids_limit: 64
+    volumes:
+      - ./docker-proxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:           # the proxy itself answers /_ping when it is up and the socket is reachable
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2375/_ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - travelnet
+
   dashboard:
     build:
       context: ../../Dashboard
@@ -51,10 +76,11 @@ services:
       WATCHDOG_IP: "${WATCHDOG_IP}"
       PREFECT_API_URL: "http://prefect-server:4200/api"   # was the app.py default (Tailscale hostname)
       PREFECT_UI_URL:  "http://travelnet.tail186ff8.ts.net:4200"   # browser-facing link; change when Tailscale is retired
+      PREFECT_API_AUTH_STRING: "${PREFECT_API_AUTH_STRING:-}"   # Prefect server HTTP Basic credentials ("user:password")
+      DOCKER_HOST: "tcp://docker-proxy:2375"   # allow-listed proxy, not the raw socket (see docker-proxy/haproxy.cfg)
     volumes:
       - /mnt/ssd/docker/services/travelnet/data:/data:ro
       - /mnt/linux/docker/services/travelnet/data/backups:/data/backups:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /home/dan/services/Dashboard:/app
       - /home/dan/services/TravelNet/server:/travelnet-server:ro
       - /home/dan/services/codex:/docs:ro
@@ -62,6 +88,8 @@ services:
       - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/data/.travelnet_backup_key:ro
     depends_on:
       ingest:
+        condition: service_healthy
+      docker-proxy:
         condition: service_healthy
     healthcheck:           # /healthz is explicit and unauthenticated; the SPA catch-all returns 200 for any path
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=5)"]
@@ -94,6 +122,7 @@ services:
       start_period: 10s
     networks:
       - travelnet
+      - constellation      # reaches Constellation here; Constellation is no longer on the travelnet network
 
   prefect-worker:
     build: .
@@ -130,3 +159,7 @@ services:
 networks:
   travelnet:
     name: travelnet
+  # Constellation is the most exposed app (public uploads/media). It only needs to be reachable by
+  # nginx, so it lives on its own network instead of sharing travelnet with the API and Prefect.
+  constellation:
+    name: constellation
