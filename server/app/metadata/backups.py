@@ -15,7 +15,7 @@ import subprocess
 from config.general import (
     DATABASE_BACKUP_DIR, FX_BACKUP_DIR, HEALTH_BACKUP_DIR,
     LOCATION_OVERLAND_BACKUP_DIR, LOCATION_SHORTCUTS_BACKUP_DIR,
-    REVOLUT_BACKUP_DIR, STALE_DAYS, WISE_BACKUP_DIR, WORKOUT_BACKUP_DIR,
+    COMMBANK_BACKUP_DIR, REVOLUT_BACKUP_DIR, STALE_DAYS, WISE_BACKUP_DIR, WORKOUT_BACKUP_DIR,
 )
 
 
@@ -68,6 +68,7 @@ def get_local_backups() -> dict:
         },
         "revolut":  _latest_in_dir(REVOLUT_BACKUP_DIR, "*.csv"),
         "wise":     _latest_in_dir(WISE_BACKUP_DIR, "*.zip"),
+        "commbank": _latest_in_dir(COMMBANK_BACKUP_DIR, "*.pdf"),
     }
 
 
