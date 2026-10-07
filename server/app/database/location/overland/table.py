@@ -108,7 +108,16 @@ class LocationOverlandTable(BaseTable[OverlandRecord]):
             CREATE INDEX IF NOT EXISTS idx_overland_ts_latlon
                 ON location_overland(timestamp, latitude, longitude);
             """)
-        
+
+            # The retroactive noise flow filters on horizontal_accuracy > threshold.
+            # A plain (not partial) index: the threshold is an editable setting passed
+            # as a bound parameter, which SQLite cannot match to a partial-index WHERE.
+            # Measured on the live DB (389 k rows): 4,564 ms -> 3 ms.
+            conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_overland_accuracy
+                ON location_overland(horizontal_accuracy);
+            """)
+
         self.noise_counter = 0
         self.last_noisy_at = None
 
