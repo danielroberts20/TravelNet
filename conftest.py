@@ -8,6 +8,20 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "server", "app"))
 
+# Keep the test suite away from any real Prefect server.
+#
+# The developer's Prefect profile (~/.prefect/profiles.toml) points at the
+# production server, so a test that runs a flow or task through the Prefect
+# engine would silently write real flow runs, task runs and logs into production.
+# (That happened: dozens of "Backfill FX" / "Backfill GBP" test runs ended up in the
+# production Prefect UI.) Environment variables beat the profile, so point the
+# client at a closed local port and forbid the ephemeral server: engine use now
+# fails fast with a connection error instead. Call `flow.fn(...)` / `task.fn(...)`
+# and patch `get_run_logger` in tests. Must run before anything imports prefect.
+os.environ["PREFECT_API_URL"] = "http://127.0.0.1:9/api"
+os.environ["PREFECT_SERVER_ALLOW_EPHEMERAL_MODE"] = "false"
+os.environ["PREFECT_LOGGING_TO_API_ENABLED"] = "false"
+
 
 @pytest.fixture(autouse=True)
 def suppress_notifications():

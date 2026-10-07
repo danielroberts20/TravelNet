@@ -2,7 +2,14 @@ import logging
 import sqlite3
 import pytest
 from unittest.mock import patch, MagicMock
-from scheduled_tasks.backfill_gbp import backfill_gbp_flow
+
+from scheduled_tasks import backfill_gbp
+from scheduled_tasks.backfill_gbp import backfill_gbp_flow, backfill_null_gbp
+from notifications import notify_on_completion, log_on_success
+
+# Like test_get_fx_up_to_date.py, these tests never use the Prefect engine (the root
+# conftest.py blocks it, because the developer's profile points at the production
+# server): the task is called through `.fn`, and the flow wiring is checked with mocks.
 
 
 @pytest.fixture
@@ -61,10 +68,11 @@ def test_backfills_foreign_currency(db):
     db.commit()
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
-        backfill_gbp_flow()
+        result = backfill_null_gbp.fn()
 
     row = db.execute("SELECT amount_gbp FROM transactions WHERE id = 'tx1'").fetchone()
     assert row["amount_gbp"] == pytest.approx(-40.0, rel=1e-4)  # -50 / 1.25
+    assert result == {"backfilled": 1, "still_null": 0}
 
 
 def test_backfills_gbp_transaction(db):
@@ -73,7 +81,7 @@ def test_backfills_gbp_transaction(db):
     db.commit()
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
-        backfill_gbp_flow()
+        backfill_null_gbp.fn()
 
     row = db.execute("SELECT amount_gbp FROM transactions WHERE id = 'tx2'").fetchone()
     assert row["amount_gbp"] == pytest.approx(-20.0)
@@ -86,12 +94,13 @@ def test_logs_warning_when_fx_missing(db, caplog):
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
         with caplog.at_level(logging.WARNING, logger="scheduled_tasks.backfill_gbp"):
-            backfill_gbp_flow()
+            result = backfill_null_gbp.fn()
 
     row = db.execute("SELECT amount_gbp FROM transactions WHERE id = 'tx3'").fetchone()
     assert row["amount_gbp"] is None
     assert "still NULL" in caplog.text
     assert "tx3" in caplog.text
+    assert result == {"backfilled": 0, "still_null": 1}
 
 
 def test_no_nulls_does_nothing(db, caplog):
@@ -101,9 +110,10 @@ def test_no_nulls_does_nothing(db, caplog):
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
         with caplog.at_level(logging.INFO, logger="scheduled_tasks.backfill_gbp"):
-            backfill_gbp_flow()
+            result = backfill_null_gbp.fn()
 
     assert "No NULL amount_gbp transactions found." in caplog.text
+    assert result == {"backfilled": 0, "still_null": 0}
 
 
 def test_does_not_overwrite_existing_amount_gbp(db):
@@ -112,7 +122,25 @@ def test_does_not_overwrite_existing_amount_gbp(db):
     db.commit()
 
     with patch("scheduled_tasks.backfill_gbp.get_conn", return_value=db):
-        backfill_gbp_flow()
+        backfill_null_gbp.fn()
 
     row = db.execute("SELECT amount_gbp FROM transactions WHERE id = 'tx5'").fetchone()
     assert row["amount_gbp"] == pytest.approx(-99.0)  # unchanged
+
+
+# --- the flow around the task ---
+
+def test_flow_runs_the_task_and_records_its_result():
+    task_result = {"backfilled": 2, "still_null": 1}
+    with patch("scheduled_tasks.backfill_gbp.backfill_null_gbp", return_value=task_result) as task, \
+         patch("scheduled_tasks.backfill_gbp.record_flow_result") as record:
+        result = backfill_gbp_flow.fn()
+    task.assert_called_once_with()
+    record.assert_called_once_with(task_result)
+    assert result == task_result
+
+
+def test_flow_notifies_on_failure_and_logs_on_success():
+    assert backfill_gbp_flow.on_failure_hooks == [notify_on_completion]
+    assert backfill_gbp_flow.on_completion_hooks == [log_on_success]
+    assert backfill_gbp_flow.name == "Backfill GBP"
