@@ -8,10 +8,12 @@ import zipfile
 from babel import numbers
 from typing import Optional
 from notifications import send_notification
-from config.general import REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
+from config.general import COMMBANK_BACKUP_DIR, REVOLUT_BACKUP_DIR, WISE_BACKUP_DIR
+from fastapi.concurrency import run_in_threadpool
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Depends  # type: ignore
 from pydantic import BaseModel, Field, field_validator  # type: ignore
 from database.transaction.ingest.revolut import insert as insert_revolut
+from database.transaction.ingest.commbank import CommbankParseError, insert as insert_commbank, parse_commbank_pdf
 
 from auth import require_upload_token
 from database.exchange.fx import convert_to_gbp
@@ -66,6 +68,12 @@ def _revolut_upload_task(decoded: str, period_start: str, period_end: str) -> No
     inserted, upgraded, skipped, _errors = insert_revolut(decoded)
     row_count = inserted + upgraded + skipped
     _record_upload("revolut", period_start, period_end, row_count)
+
+
+def _commbank_upload_task(txs: list[dict], period_start: str, period_end: str) -> None:
+    inserted, skipped, _errors = insert_commbank(txs)
+    row_count = inserted + skipped
+    _record_upload("commbank", period_start, period_end, row_count)
 
 
 @router.post("/wise", dependencies=[Depends(require_upload_token)])
@@ -132,6 +140,42 @@ async def upload_revolut(
 
     background_tasks.add_task(_revolut_upload_task, decoded, period_start, period_end)
     return {"status": "queued"}
+
+
+@router.post("/commbank", dependencies=[Depends(require_upload_token)])
+async def upload_commbank(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    period: str = Form(..., description="Calendar month this export covers, 'YYYY-MM'"),
+):
+    """Accept a CommBank Transaction Summary PDF, validate it, save a backup, and queue ingestion.
+
+    The PDF is parsed up front so an unreadable or unrecognised statement is
+    rejected with a 400 rather than failing silently in the background.
+
+    `period` (form field, required) is the "YYYY-MM" calendar month this
+    statement covers — used to record upload_log coverage so daily_summary
+    can determine spend_complete for dates in that month.
+    """
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+
+    period_start, period_end = _parse_period(period)
+
+    contents = await file.read()
+
+    try:
+        txs = await run_in_threadpool(parse_commbank_pdf, contents)
+    except CommbankParseError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    now = datetime.now()
+    backup_path = COMMBANK_BACKUP_DIR / f"{now.strftime('%Y-%m-%d_%H-%M-%S')}.pdf"
+    with open(backup_path, "wb") as f:
+        f.write(contents)
+
+    background_tasks.add_task(_commbank_upload_task, txs, period_start, period_end)
+    return {"status": "queued", "transactions": len(txs)}
 
 
 class CashTransactionRequest(BaseModel):
