@@ -22,7 +22,7 @@ SCHEDULE_CONFIGS = {
     # Location & geocoding
     "geocode-places":                   ("30 4 * * *",              "Daily reverse geocoding of uncoded places"),
     "backfill-place":                   ("15 5 * * *",              "Daily backfill of place_id on health/transaction rows"),
-    "identify-location-noise":          ("0 * * * *",               "Daily flagging of noisy location points"),
+    "identify-location-noise":          ("0 4 * * *",               "Daily retroactive flagging of noisy location points (ingest flags new points in real time)"),
     "retroactive-location-scan":        ("15 3 */2 * *",            "Every other night: retroactive scan for missed location stays"),
 
     # Weekly location analysis (Sunday)

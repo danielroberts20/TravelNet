@@ -1,0 +1,35 @@
+# PROPOSED replacement for /etc/systemd/system/prefect-server.service  (not applied)
+# Currently installed (Step 2): pinned local image, memory/pids caps, analytics off,
+# built-in flow-run vacuum with 14-day retention.
+# Step 6 adds only the two --health-* lines, so Docker reports healthy/unhealthy
+# for this container (the image has python but no curl/wget).
+[Unit]
+Description=Prefect Server (Docker)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/docker run \
+  --memory=1g --memory-swap=1g --pids-limit=256 \
+  --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4200/api/health', timeout=5)\"" \
+  --health-interval=30s --health-timeout=10s --health-retries=3 --health-start-period=60s \
+  -p 4200:4200 \
+  --name prefect-server \
+  --network travelnet \
+  -e PREFECT_UI_API_URL=http://travelnet.tail186ff8.ts.net:4200/api \
+  -e PREFECT_HOME=/prefect \
+  -e PREFECT_SQLALCHEMY_POOL_SIZE=5 \
+  -e PREFECT_SQLALCHEMY_MAX_OVERFLOW=0 \
+  -e PREFECT_SERVER_ANALYTICS_ENABLED=false \
+  -e PREFECT_SERVER_SERVICES_DB_VACUUM_ENABLED=events,flow_runs \
+  -e PREFECT_SERVER_SERVICES_DB_VACUUM_RETENTION_PERIOD=1209600 \
+  -v /mnt/ssd/docker/services/prefect/data:/prefect \
+  prefect-pinned:3.6.25 \
+  prefect server start --host 0.0.0.0
+
+ExecStop=/usr/bin/docker stop prefect-server
+ExecStopPost=/usr/bin/docker rm prefect-server
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+# systemd USER unit (no sudo): ~/.config/systemd/user/dev-session-reaper.service
+# Starts in --dry-run: it reports (once per session, via Pushcut) what it WOULD stop and kills nothing.
+# To go live, delete " --dry-run" from ExecStart, then: systemctl --user daemon-reload
+[Unit]
+Description=Stop Claude Code dev sessions idle for 6+ hours (frees RAM for TravelNet)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -B /mnt/ssd/services/TravelNet/scripts/reap_idle_dev_sessions.py --dry-run
+StandardOutput=append:/home/dan/services/TravelNet/logs/dev_session_reaper.log
+StandardError=inherit
+Nice=10

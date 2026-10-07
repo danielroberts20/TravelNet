@@ -26,3 +26,6 @@ exclude:
   - Gemfile.lock
   - node_modules
   - README.md
+  # Operations notes and unreleased drafts: kept in the repo, not published on the docs site
+  - PI_INFRASTRUCTURE_AUDIT.md
+  - drafts

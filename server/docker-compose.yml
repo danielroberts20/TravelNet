@@ -8,7 +8,8 @@ services:
     env_file: .env
     environment:
       CRONTAB_FILE: "/var/spool/cron/crontabs/dan"
-      PREFECT_API_URL: "http://travelnet.tail186ff8.ts.net:4200/api"
+      PREFECT_API_URL: "http://prefect-server:4200/api"   # same Docker network; no Tailscale dependency
+      PREFECT_UI_URL: "http://travelnet.tail186ff8.ts.net:4200"   # browser-facing, used only for run links in logs
     volumes:
       - /mnt/ssd/docker/services/travelnet/data:/data
       - /mnt/linux/docker/services/travelnet/data/backups:/data/backups
@@ -20,6 +21,12 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+    healthcheck:           # event-loop liveness; 3 misses (~90 s) => "unhealthy", which check_system_health.py restarts
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s    # init_db() on a ~1 GB database
     networks:
       - travelnet
 
@@ -42,6 +49,8 @@ services:
       TREVOR_URL:            "${TREVOR_URL}"
       TREVOR_API_KEY:        "${TREVOR_API_KEY}"
       WATCHDOG_IP: "${WATCHDOG_IP}"
+      PREFECT_API_URL: "http://prefect-server:4200/api"   # was the app.py default (Tailscale hostname)
+      PREFECT_UI_URL:  "http://travelnet.tail186ff8.ts.net:4200"   # browser-facing link; change when Tailscale is retired
     volumes:
       - /mnt/ssd/docker/services/travelnet/data:/data:ro
       - /mnt/linux/docker/services/travelnet/data/backups:/data/backups:ro
@@ -52,7 +61,14 @@ services:
       - /home/dan/services/TravelNet/travel.yml:/travel.yml:rw
       - /mnt/linux/docker/services/travelnet/.travelnet_backup_key:/data/.travelnet_backup_key:ro
     depends_on:
-      - ingest
+      ingest:
+        condition: service_healthy
+    healthcheck:           # /healthz is explicit and unauthenticated; the SPA catch-all returns 200 for any path
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - travelnet
 
@@ -70,6 +86,12 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - dashboard
+    healthcheck:           # answered by nginx itself (see /nginx-health in nginx.conf)
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - travelnet
 
@@ -81,7 +103,9 @@ services:
     init: true
     env_file: .env
     environment:
-      - PREFECT_API_URL=http://travelnet.tail186ff8.ts.net:4200/api
+      - PREFECT_API_URL=http://prefect-server:4200/api
+      - PREFECT_UI_URL=http://travelnet.tail186ff8.ts.net:4200
+      - PREFECT_RUNNER_SERVER_ENABLE=true   # Prefect's built-in runner health endpoint on 127.0.0.1:8080 (503 if it has not polled for 20 s)
     volumes:
       - /mnt/ssd/docker/services/travelnet/data:/data
       - /mnt/linux/docker/services/travelnet/data/backups:/data/backups
@@ -92,7 +116,14 @@ services:
       - /var/spool/cron/crontabs/dan:/var/spool/cron/crontabs/dan
     restart: unless-stopped
     depends_on:
-      - ingest
+      ingest:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s   # registering ~35 deployments takes a while, longer if the server is busy
     networks:
       - travelnet
 

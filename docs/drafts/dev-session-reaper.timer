@@ -1,0 +1,11 @@
+# systemd USER timer: ~/.config/systemd/user/dev-session-reaper.timer
+[Unit]
+Description=Run the idle dev-session reaper every 30 minutes
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=30min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
