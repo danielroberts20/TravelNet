@@ -103,3 +103,23 @@ class TestGetClosestLatLonByTimestamp:
         lat, lon = get_closest_lat_lon_by_timestamp(cur, "2024-06-15 09:00:00")
         assert lat is None
         assert lon is None
+
+
+class TestGetNearestLatLonWithinHours:
+
+    def test_finds_fix_hours_away_before_or_after(self, db):
+        from database.transaction.ingest.util import get_nearest_lat_lon_within_hours
+        _insert(db, "2026-09-13T08:00:00Z", 1.0, 1.0)   # 4h before
+        _insert(db, "2026-09-13T15:00:00Z", 2.0, 2.0)   # 3h after — nearer
+        lat, lon = get_nearest_lat_lon_within_hours(db.cursor(), "2026-09-13T12:00:00Z")
+        assert (lat, lon) == (2.0, 2.0)
+
+    def test_none_when_outside_window(self, db):
+        from database.transaction.ingest.util import get_nearest_lat_lon_within_hours
+        _insert(db, "2026-09-14T01:00:00Z", 1.0, 1.0)   # 13h after
+        assert get_nearest_lat_lon_within_hours(db.cursor(), "2026-09-13T12:00:00Z") == (None, None)
+
+    def test_window_boundary_included(self, db):
+        from database.transaction.ingest.util import get_nearest_lat_lon_within_hours
+        _insert(db, "2026-09-14T00:00:00Z", 1.0, 1.0)   # exactly +12h
+        assert get_nearest_lat_lon_within_hours(db.cursor(), "2026-09-13T12:00:00Z") == (1.0, 1.0)
