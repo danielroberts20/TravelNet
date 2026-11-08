@@ -158,6 +158,7 @@ LOCATION_DEPARTURE_CONFIRMATION_MINS = editable("LOCATION_DEPARTURE_CONFIRMATION
 LOCATION_MINIMUM_POINTS = editable("LOCATION_MINIMUM_POINTS", "Minimum number of location points within the stay duration to consider it a valid stay", group="Location")(5)
 LOCATION_STATIONARITY_RADIUS_M = editable("LOCATION_STATIONARITY_RADIUS_M", "Distance in meters that location points must be within to be considered stationary rather than in transit", group="Location")(150)
 LOCATION_STREAK_POINT_LIMIT = editable("LOCATION_STREAK_POINT_LIMIT", "Maximum number of recent location points to scan when computing the current stationary streak", group="Location")(1000)
+LOCATION_MANUAL_ADD_MAX_POINT_AGE_MINS = editable("LOCATION_MANUAL_ADD_MAX_POINT_AGE_MINS", "Maximum age in minutes of the latest GPS point for the dashboard 'Add current location' button to accept it as the current location", group="Location")(30)
 LOCATION_NOISE_ACCURACY_THRESHOLD = editable("LOCATION_NOISE_ACCURACY_THRESHOLD", "Threshold for horizontal accuracy to consider a location point as tier 1 noise", group="Location")(100)
 TIER2_TRAILING_SKIP = editable("TIER2_TRAILING_SKIP", "Number of most recent points to skip when applying tier 2 noise flags, due to incomplete next-point context", group="Location")(10)
 TIER2_DISPLACEMENT_M = editable("TIER2_DISPLACEMENT_M", "Distance in meters that a point must displace from its predecessor to be considered a potential noise spike in tier 2 detection", group="Location")(150)

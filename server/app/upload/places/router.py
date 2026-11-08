@@ -2,10 +2,21 @@ import logging
 from typing import Optional
 
 from auth import require_upload_token
+from config import general
 from database.connection import get_conn
 from database.location.geocoding import insert_geocode, reverse_geocode
 from pydantic import BaseModel #type: ignore
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore
+from database.location.sub_places.table import (
+    table as sub_places_table,
+    SubPlaceRecord,
+    DEFAULT_RADIUS_M,
+)
+from triggers.location_change import (
+    add_known_place_now,
+    AlreadyKnownPlaceError,
+    NoRecentLocationError,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,6 +29,28 @@ class PlaceRequest(BaseModel):
 class PlaceUpdateRequest(BaseModel):
     label: Optional[str] = None
     notes: Optional[str] = None
+
+class AddCurrentPlaceRequest(BaseModel):
+    label: Optional[str] = None
+    notes: Optional[str] = None
+
+class SubPlaceCreateRequest(BaseModel):
+    name: str
+    type: Optional[str] = None          # free entry; created in sub_place_types if new
+    notes: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    radius_m: int = DEFAULT_RADIUS_M
+    wifi_ssid: Optional[str] = None
+
+class SubPlaceUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    type: Optional[str] = None
+    notes: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    radius_m: Optional[int] = None
+    wifi_ssid: Optional[str] = None
 
 class VisitUpdateRequest(BaseModel):
     notes: Optional[str] = None
@@ -98,6 +131,32 @@ async def list_places():
             ORDER BY kp.last_visited DESC, kp.first_seen DESC
         """).fetchall()
     return {"places": [_place_row_to_dict(r) for r in rows]}
+
+
+@router.post("/add-current", dependencies=[Depends(require_upload_token)])
+async def add_current_place(request: AddCurrentPlaceRequest):
+    """Instantly add the current location as a known place, skipping the stay-duration threshold."""
+    try:
+        place_id = add_known_place_now(label=request.label, notes=request.notes)
+    except AlreadyKnownPlaceError as e:
+        raise HTTPException(status_code=409, detail={
+            "message": "Current location is already within a known place",
+            "place_id": e.place_id,
+            "label": e.label,
+        })
+    except NoRecentLocationError as e:
+        raise HTTPException(status_code=422, detail={"message": str(e)})
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT
+                kp.id, kp.label, kp.notes, kp.latitude, kp.longitude,
+                kp.first_seen, kp.last_visited, kp.visit_count, kp.total_time_mins,
+                p.display_name, p.geocoded_at, p.timezone
+            FROM known_places kp
+            LEFT JOIN places p ON p.id = kp.place_id
+            WHERE kp.id = ?
+        """, (place_id,)).fetchone()
+    return _place_row_to_dict(row)
 
 
 @router.patch("/visits/{visit_id}", dependencies=[Depends(require_upload_token)])
@@ -203,3 +262,106 @@ async def list_place_visits(place_id: int):
         "timezone": dict(kp).get("timezone"),
         "visits": [_visit_row_to_dict(r) for r in rows],
     }
+
+# ---------------------------------------------------------------------------
+# Sub-places
+# ---------------------------------------------------------------------------
+
+def _clean(value: Optional[str]) -> Optional[str]:
+    """Strip a string; empty becomes None."""
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+def _validate_geo(lat, lon, radius) -> None:
+    if (lat is None) != (lon is None):
+        raise HTTPException(status_code=422, detail="latitude and longitude must be set together")
+    if lat is not None and not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        raise HTTPException(status_code=422, detail="latitude/longitude out of range")
+    if radius is not None and not (5 <= radius <= 500):
+        raise HTTPException(status_code=422, detail="radius_m must be between 5 and 500")
+
+
+def _require_place(place_id: int) -> None:
+    with get_conn(read_only=True) as conn:
+        if not conn.execute("SELECT 1 FROM known_places WHERE id = ?", (place_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Place not found")
+
+
+@router.get("/sub-place-types", dependencies=[Depends(require_upload_token)])
+async def list_sub_place_types():
+    return {"types": sub_places_table.list_types()}
+
+
+@router.get("/{place_id}/sub-places", dependencies=[Depends(require_upload_token)])
+async def list_sub_places(place_id: int):
+    _require_place(place_id)
+    return {
+        "sub_places": sub_places_table.list_for_place(place_id),
+        # Source of truth for the UI's "pin is outside the parent place" warning.
+        "parent_radius_m": general.LOCATION_CHANGE_RADIUS_M,
+    }
+
+
+@router.post("/{place_id}/sub-places", dependencies=[Depends(require_upload_token)])
+async def create_sub_place(place_id: int, request: SubPlaceCreateRequest):
+    _require_place(place_id)
+    name = _clean(request.name)
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    _validate_geo(request.latitude, request.longitude, request.radius_m)
+    type_name = _clean(request.type)
+    sub_id = sub_places_table.insert(SubPlaceRecord(
+        known_place_id=place_id,
+        name=name,
+        type_id=sub_places_table.get_or_create_type(type_name) if type_name else None,
+        notes=_clean(request.notes),
+        latitude=request.latitude,
+        longitude=request.longitude,
+        radius_m=request.radius_m,
+        wifi_ssid=_clean(request.wifi_ssid),
+    ))
+    return sub_places_table.get(sub_id)
+
+
+@router.patch("/sub-places/{sub_place_id}", dependencies=[Depends(require_upload_token)])
+async def update_sub_place(sub_place_id: int, request: SubPlaceUpdateRequest):
+    current = sub_places_table.get(sub_place_id)
+    if not current or current["archived_at"]:
+        raise HTTPException(status_code=404, detail="Sub-place not found")
+    sent = request.model_fields_set
+    fields = {}
+    if "name" in sent:
+        name = _clean(request.name)
+        if not name:
+            raise HTTPException(status_code=422, detail="name cannot be empty")
+        fields["name"] = name
+    if "type" in sent:
+        type_name = _clean(request.type)
+        fields["type_id"] = sub_places_table.get_or_create_type(type_name) if type_name else None
+    if "notes" in sent:
+        fields["notes"] = _clean(request.notes)
+    if "wifi_ssid" in sent:
+        fields["wifi_ssid"] = _clean(request.wifi_ssid)
+    if "radius_m" in sent:
+        if request.radius_m is None:
+            raise HTTPException(status_code=422, detail="radius_m cannot be null")
+        fields["radius_m"] = request.radius_m
+    if "latitude" in sent or "longitude" in sent:
+        fields["latitude"] = request.latitude if "latitude" in sent else current["latitude"]
+        fields["longitude"] = request.longitude if "longitude" in sent else current["longitude"]
+    _validate_geo(fields.get("latitude", current["latitude"]),
+                  fields.get("longitude", current["longitude"]),
+                  fields.get("radius_m"))
+    sub_places_table.update(sub_place_id, **fields)
+    return sub_places_table.get(sub_place_id)
+
+
+@router.delete("/sub-places/{sub_place_id}", dependencies=[Depends(require_upload_token)])
+async def archive_sub_place(sub_place_id: int):
+    """Soft-delete: history is retained, the sub-place is hidden from listings."""
+    if not sub_places_table.archive_sub_place(sub_place_id):
+        raise HTTPException(status_code=404, detail="Sub-place not found")
+    return {"status": "archived"}
