@@ -15,6 +15,7 @@ Covers:
   detect_arrival             — unified arrival handler (known place + new place)
   _handle_known_place        — record a return visit or note ongoing one
   _handle_new_place          — promote streak to known place + fire notification
+  streak_is_airborne         — in-flight frozen-position detection by altitude
   add_known_place_now        — manual add bypassing the stay-duration threshold
   run                        — end-to-end real-time trigger
 """
@@ -37,6 +38,8 @@ from triggers.location_change import (
     _handle_known_place,
     _handle_new_place,
     add_known_place_now,
+    streak_is_airborne,
+    AirborneError,
     AlreadyKnownPlaceError,
     NoRecentLocationError,
     run,
@@ -96,7 +99,8 @@ def db():
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
             latitude  REAL NOT NULL,
-            longitude REAL NOT NULL
+            longitude REAL NOT NULL,
+            altitude  REAL
         );
         CREATE TABLE known_places (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,11 +138,11 @@ def db():
     return conn
 
 
-def _pt(db, lat, lon, ts):
+def _pt(db, lat, lon, ts, alt=None):
     """Insert a single location_unified point."""
     db.execute(
-        "INSERT INTO location_unified (timestamp, latitude, longitude) VALUES (?,?,?)",
-        (ts, lat, lon),
+        "INSERT INTO location_unified (timestamp, latitude, longitude, altitude) VALUES (?,?,?,?)",
+        (ts, lat, lon, alt),
     )
     db.commit()
 
@@ -1213,6 +1217,20 @@ class TestDeletedPlacesIgnored:
                 patch.stopall()
 
 
+class TestHandleNewPlaceUngeocoded:
+    """Regression: a spot with no geocoded address used to leave `body` unbound."""
+
+    def test_notification_falls_back_to_coordinates(self, db):
+        with patch("triggers.location_change.get_conn", return_value=db), \
+             patch("database.location.known_places.table.get_conn", return_value=db), \
+             patch("triggers.location_change.get_place_id", return_value=1), \
+             patch("triggers.location_change.get_address", return_value=None), \
+             patch("triggers.location_change.dispatch") as dispatch_mock:
+            _handle_new_place(*LONDON, _fixed(0))
+        assert db.execute("SELECT COUNT(*) FROM known_places").fetchone()[0] == 1
+        assert "near 51.507, -0.128" in dispatch_mock.call_args.kwargs["noti_body"]
+
+
 # ===========================================================================
 # add_known_place_now
 # ===========================================================================
@@ -1311,3 +1329,114 @@ class TestAddKnownPlaceNow:
                     p.stop()
         assert db.execute("SELECT COUNT(*) FROM known_places").fetchone()[0] == 1
         assert db.execute("SELECT COUNT(*) FROM place_visits WHERE known_place_id = ?", (pid,)).fetchone()[0] == 1
+
+
+# ===========================================================================
+# streak_is_airborne + in-flight suppression
+# ===========================================================================
+
+AIRBORNE_M = 6000
+
+
+def _airborne(db, start, end):
+    with patch("triggers.location_change.get_conn", return_value=db), \
+         patch("triggers.location_change.LOCATION_AIRBORNE_ALTITUDE_M", AIRBORNE_M):
+        return streak_is_airborne(start, end)
+
+
+class TestStreakIsAirborne:
+
+    def test_cruising_altitude_is_airborne(self, db):
+        for i in range(6):
+            _pt(db, *LONDON, _fixed(i * 5), alt=11000)
+        assert _airborne(db, _fixed(0), _fixed(25)) is True
+
+    def test_ground_altitude_is_not(self, db):
+        for i in range(6):
+            _pt(db, *LONDON, _fixed(i * 5), alt=40)
+        assert _airborne(db, _fixed(0), _fixed(25)) is False
+
+    def test_no_altitude_data_is_never_airborne(self, db):
+        for i in range(6):
+            _pt(db, *LONDON, _fixed(i * 5))
+        assert _airborne(db, _fixed(0), _fixed(25)) is False
+
+    def test_no_points_in_range_is_not_airborne(self, db):
+        assert _airborne(db, _fixed(0), _fixed(25)) is False
+
+    def test_exactly_half_high_counts_as_airborne(self, db):
+        for i, alt in enumerate([10000, 10000, 50, 50]):
+            _pt(db, *LONDON, _fixed(i), alt=alt)
+        assert _airborne(db, _fixed(0), _fixed(3)) is True
+
+    def test_minority_high_is_not_airborne(self, db):
+        for i, alt in enumerate([10000, 50, 50, 50]):
+            _pt(db, *LONDON, _fixed(i), alt=alt)
+        assert _airborne(db, _fixed(0), _fixed(3)) is False
+
+    def test_threshold_is_exclusive(self, db):
+        _pt(db, *LONDON, _fixed(0), alt=AIRBORNE_M)
+        assert _airborne(db, _fixed(0), _fixed(0)) is False
+
+    def test_only_points_inside_the_range_count(self, db):
+        _pt(db, *LONDON, _fixed(-60), alt=11000)       # earlier, in flight
+        for i in range(3):
+            _pt(db, *LONDON, _fixed(i), alt=30)
+        assert _airborne(db, _fixed(0), _fixed(2)) is False
+
+
+class TestAirborneSuppression:
+
+    def _detect(self, db):
+        patches = _cfg() + [patch("triggers.location_change.LOCATION_AIRBORNE_ALTITUDE_M", AIRBORNE_M)]
+        with patch("triggers.location_change.get_conn", return_value=db), \
+             patch("database.location.known_places.table.get_conn", return_value=db), \
+             patch("triggers.location_change.get_place_id", return_value=1), \
+             patch("triggers.location_change.dispatch") as dispatch_mock:
+            for p in patches:
+                p.start()
+            try:
+                return detect_arrival(), dispatch_mock
+            finally:
+                patch.stopall()
+
+    def _frozen_streak(self, db, alt):
+        # 8 identical points, 5 min apart: 35 min, well past STAY_MINS (30)
+        for i in range(8):
+            _pt(db, *LONDON, _fixed(i * 5), alt=alt)
+
+    def test_frozen_in_flight_streak_creates_no_place(self, db):
+        self._frozen_streak(db, 11000)
+        opened, dispatch_mock = self._detect(db)
+        assert opened is False
+        assert db.execute("SELECT COUNT(*) FROM known_places").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM place_visits").fetchone()[0] == 0
+        dispatch_mock.assert_not_called()
+
+    def test_identical_streak_on_the_ground_still_creates_place(self, db):
+        self._frozen_streak(db, 40)
+        opened, _ = self._detect(db)
+        assert opened is True
+        assert db.execute("SELECT COUNT(*) FROM known_places").fetchone()[0] == 1
+
+    def test_airborne_streak_over_existing_place_opens_no_visit(self, db):
+        _place(db, *LONDON, label="Home")
+        self._frozen_streak(db, 11000)
+        opened, _ = self._detect(db)
+        assert opened is False
+        assert db.execute("SELECT COUNT(*) FROM place_visits").fetchone()[0] == 0
+
+    def test_manual_add_refuses_when_airborne(self, db):
+        for i in range(4):
+            _pt(db, *LONDON, _now(-4 + i), alt=11000)
+        patches = _cfg() + [patch("triggers.location_change.LOCATION_AIRBORNE_ALTITUDE_M", AIRBORNE_M)]
+        with patch("triggers.location_change.get_conn", return_value=db), \
+             patch("database.location.known_places.table.get_conn", return_value=db):
+            for p in patches:
+                p.start()
+            try:
+                with pytest.raises(AirborneError):
+                    add_known_place_now()
+            finally:
+                patch.stopall()
+        assert db.execute("SELECT COUNT(*) FROM known_places").fetchone()[0] == 0

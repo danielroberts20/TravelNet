@@ -67,7 +67,8 @@ def db():
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT NOT NULL,
             latitude  REAL NOT NULL,
-            longitude REAL NOT NULL
+            longitude REAL NOT NULL,
+            altitude  REAL
         );
         CREATE TABLE known_places (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,10 +101,10 @@ def db():
     return conn
 
 
-def _pt(db, lat, lon, ts):
+def _pt(db, lat, lon, ts, alt=None):
     db.execute(
-        "INSERT INTO location_unified (timestamp, latitude, longitude) VALUES (?,?,?)",
-        (ts, lat, lon),
+        "INSERT INTO location_unified (timestamp, latitude, longitude, altitude) VALUES (?,?,?,?)",
+        (ts, lat, lon, alt),
     )
     db.commit()
 
@@ -316,6 +317,21 @@ class TestScanForStays:
              "latitude": lat, "longitude": lon}
             for i in range(n_points)
         ]
+
+    # ---- In-flight frozen positions ----
+
+    def test_airborne_cluster_is_skipped_and_scan_continues(self, db):
+        flight = self._make_cluster(*LONDON, 0, 8, gap_mins=5)       # 35 min, frozen
+        for p in flight:
+            _pt(db, p["latitude"], p["longitude"], p["timestamp"], alt=11000)
+        ground = self._make_cluster(*PARIS, 120, 8, gap_mins=5)      # later real stay
+        for p in ground:
+            _pt(db, p["latitude"], p["longitude"], p["timestamp"], alt=35)
+        with patch("triggers.location_change.LOCATION_AIRBORNE_ALTITUDE_M", 6000):
+            processed = self._run(db, flight + ground)
+        assert processed == 1
+        rows = db.execute("SELECT latitude FROM known_places").fetchall()
+        assert len(rows) == 1 and rows[0]["latitude"] == pytest.approx(PARIS[0])
 
     # ---- Empty / trivial cases ----
 

@@ -62,6 +62,7 @@ from triggers.location_change import (
     check_departure,
     get_nearest_known_place,
     visit_exists,
+    streak_is_airborne,
     _handle_known_place,
     _handle_new_place,
     _streak_duration_mins,
@@ -161,6 +162,11 @@ def _scan_for_stays(points: list, logger) -> int:
         if len(cluster) >= LOCATION_MINIMUM_POINTS:
             streak_end = cluster[-1]['timestamp']
             duration   = _streak_duration_mins(streak_start, streak_end)
+
+            if streak_is_airborne(streak_start, streak_end):
+                logger.info("Retroactive: skipping airborne cluster at %s (%d pts)", streak_start, len(cluster))
+                i = j if j > i else i + 1
+                continue
 
             avg_lat = sum(p['latitude']  for p in cluster) / len(cluster)
             avg_lon = sum(p['longitude'] for p in cluster) / len(cluster)
