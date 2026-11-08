@@ -10,6 +10,7 @@ from config.general import (
     LOCATION_REVISIT_DURATION_MINS,
     LOCATION_DEPARTURE_CONFIRMATION_MINS,
     LOCATION_STREAK_POINT_LIMIT,
+    LOCATION_MANUAL_ADD_MAX_POINT_AGE_MINS,
 )
 from database.location.geocoding import get_place_id, insert_geocode, reverse_geocode
 from database.location.known_places.table import table as known_places_table, KnownPlaceRecord
@@ -348,6 +349,82 @@ def _handle_new_place(lat: float, lon: float, arrived_at: str) -> None:
              cooldown_hours=1,
              noti_title="📍 New Location Discovered",
              noti_body=body)
+
+
+# ---------------------------------------------------------------------------
+# Manual add (bypasses the stay-duration threshold)
+# ---------------------------------------------------------------------------
+
+class ManualAddError(Exception):
+    """The current location cannot be added as a known place."""
+
+
+class NoRecentLocationError(ManualAddError):
+    """No GPS point recent enough to represent the current location."""
+
+
+class AlreadyKnownPlaceError(ManualAddError):
+    """The current location is already inside an existing known place."""
+
+    def __init__(self, place_id: int, label: str | None):
+        super().__init__(f"Already within known place {place_id}")
+        self.place_id = place_id
+        self.label = label
+
+
+def add_known_place_now(label: str | None = None, notes: str | None = None) -> int:
+    """Immediately promote the current location to a known place.
+
+    Skips LOCATION_STAY_DURATION_MINS and LOCATION_MINIMUM_POINTS. Uses the
+    stationary-streak centroid and start when a streak exists, otherwise the
+    single most recent GPS point. Opens a visit so departure detection and
+    later return-visit handling work exactly as for auto-discovered places.
+    No discovery notification is sent — the user initiated this.
+
+    Raises NoRecentLocationError if the newest point is missing/stale, and
+    AlreadyKnownPlaceError if it falls within LOCATION_CHANGE_RADIUS_M of an
+    existing known place. Returns the new known_places id.
+    """
+    with get_conn(read_only=True) as conn:
+        latest = conn.execute("""
+            SELECT timestamp, latitude, longitude
+            FROM location_unified
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """).fetchone()
+
+    if latest is None:
+        raise NoRecentLocationError("No location data available")
+
+    age_mins = (datetime.now(timezone.utc) - datetime.fromisoformat(latest['timestamp'])).total_seconds() / 60
+    if age_mins > LOCATION_MANUAL_ADD_MAX_POINT_AGE_MINS:
+        raise NoRecentLocationError(
+            f"Latest location point is {age_mins:.0f} min old (max {LOCATION_MANUAL_ADD_MAX_POINT_AGE_MINS})"
+        )
+
+    streak = get_stationary_streak()
+    if streak is not None:
+        lat, lon, arrived_at, _, _ = streak
+    else:
+        lat, lon, arrived_at = latest['latitude'], latest['longitude'], latest['timestamp']
+
+    nearest = get_nearest_known_place(lat, lon)
+    if nearest is not None:
+        with get_conn(read_only=True) as conn:
+            existing = conn.execute(
+                "SELECT label FROM known_places WHERE id = ?", (nearest['id'],)
+            ).fetchone()
+        raise AlreadyKnownPlaceError(nearest['id'], existing['label'] if existing else None)
+
+    place_id = known_places_table.insert(KnownPlaceRecord(
+        latitude=lat, longitude=lon, first_seen=arrived_at,
+        place_id=get_place_id(lat, lon),
+        label=label or None, notes=notes or None,
+    ))
+    visit_id = known_places_table.insert_visit(place_id, arrived_at)
+    known_places_table.set_current_visit(place_id, visit_id)
+    logger.important("Manually added known place %d at %.5f, %.5f", place_id, lat, lon)
+    return place_id
 
 
 # ---------------------------------------------------------------------------

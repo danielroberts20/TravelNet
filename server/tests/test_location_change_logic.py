@@ -15,6 +15,7 @@ Covers:
   detect_arrival             — unified arrival handler (known place + new place)
   _handle_known_place        — record a return visit or note ongoing one
   _handle_new_place          — promote streak to known place + fire notification
+  add_known_place_now        — manual add bypassing the stay-duration threshold
   run                        — end-to-end real-time trigger
 """
 
@@ -35,6 +36,9 @@ from triggers.location_change import (
     detect_arrival,
     _handle_known_place,
     _handle_new_place,
+    add_known_place_now,
+    AlreadyKnownPlaceError,
+    NoRecentLocationError,
     run,
 )
 
@@ -1187,3 +1191,103 @@ class TestRun:
         ).fetchall()
         assert visits[0]["departed_at"] is not None  # old visit closed
         assert visits[1]["departed_at"] is None       # new visit open
+
+
+# ===========================================================================
+# add_known_place_now
+# ===========================================================================
+
+class TestAddKnownPlaceNow:
+
+    def _run(self, db, **kwargs):
+        patches = _cfg()
+        with patch("triggers.location_change.get_conn", return_value=db), \
+             patch("database.location.known_places.table.get_conn", return_value=db), \
+             patch("triggers.location_change.get_place_id", return_value=1), \
+             patch("triggers.location_change.dispatch") as mock_dispatch:
+            for p in patches:
+                p.start()
+            try:
+                result = add_known_place_now(**kwargs)
+            finally:
+                for p in patches:
+                    p.stop()
+            self.dispatch = mock_dispatch
+            return result
+
+    def test_single_recent_point_is_enough(self, db):
+        """One fresh point, far below MIN_POINTS and STAY_MINS, still creates a place."""
+        _pt(db, *LONDON, _now(-1))
+        pid = self._run(db)
+        row = db.execute("SELECT * FROM known_places WHERE id = ?", (pid,)).fetchone()
+        assert row["latitude"] == pytest.approx(LONDON[0])
+        assert row["visit_count"] == 1
+
+    def test_opens_visit_and_sets_current_visit(self, db):
+        _pt(db, *LONDON, _now(-1))
+        pid = self._run(db)
+        visit = db.execute("SELECT * FROM place_visits WHERE known_place_id = ?", (pid,)).fetchone()
+        assert visit["departed_at"] is None
+        cv = db.execute("SELECT current_visit_id FROM known_places WHERE id = ?", (pid,)).fetchone()[0]
+        assert cv == visit["id"]
+
+    def test_uses_streak_start_as_arrival(self, db):
+        for off in (-10, -6, -3, -1):
+            _pt(db, *LONDON_NEAR, _now(off))
+        pid = self._run(db)
+        visit = db.execute("SELECT arrived_at FROM place_visits WHERE known_place_id = ?", (pid,)).fetchone()
+        assert visit["arrived_at"] == _now(-10)[:16] + visit["arrived_at"][16:]  # same minute
+
+    def test_label_and_notes_saved(self, db):
+        _pt(db, *LONDON, _now(-1))
+        pid = self._run(db, label="Cafe", notes="good wifi")
+        row = db.execute("SELECT label, notes FROM known_places WHERE id = ?", (pid,)).fetchone()
+        assert (row["label"], row["notes"]) == ("Cafe", "good wifi")
+
+    def test_empty_label_stored_as_null(self, db):
+        _pt(db, *LONDON, _now(-1))
+        pid = self._run(db, label="", notes="")
+        row = db.execute("SELECT label, notes FROM known_places WHERE id = ?", (pid,)).fetchone()
+        assert row["label"] is None and row["notes"] is None
+
+    def test_no_notification_sent(self, db):
+        _pt(db, *LONDON, _now(-1))
+        self._run(db)
+        self.dispatch.assert_not_called()
+
+    def test_no_location_data_raises(self, db):
+        with pytest.raises(NoRecentLocationError):
+            self._run(db)
+
+    def test_stale_point_raises_and_creates_nothing(self, db):
+        _pt(db, *LONDON, _now(-120))
+        with pytest.raises(NoRecentLocationError):
+            self._run(db)
+        assert db.execute("SELECT COUNT(*) FROM known_places").fetchone()[0] == 0
+
+    def test_inside_existing_place_raises_with_its_id(self, db):
+        existing = _place(db, *LONDON, label="Home")
+        _pt(db, *LONDON_NEAR, _now(-1))
+        with pytest.raises(AlreadyKnownPlaceError) as exc:
+            self._run(db)
+        assert exc.value.place_id == existing
+        assert exc.value.label == "Home"
+        assert db.execute("SELECT COUNT(*) FROM known_places").fetchone()[0] == 1
+
+    def test_next_trigger_run_does_not_duplicate(self, db):
+        """After a manual add, normal arrival detection sees a known place with an open visit."""
+        for off in (-12, -9, -6, -3, -1):
+            _pt(db, *LONDON, _now(off))
+        pid = self._run(db)
+        patches = _cfg()
+        with patch("triggers.location_change.get_conn", return_value=db), \
+             patch("database.location.known_places.table.get_conn", return_value=db):
+            for p in patches:
+                p.start()
+            try:
+                detect_arrival()
+            finally:
+                for p in patches:
+                    p.stop()
+        assert db.execute("SELECT COUNT(*) FROM known_places").fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM place_visits WHERE known_place_id = ?", (pid,)).fetchone()[0] == 1

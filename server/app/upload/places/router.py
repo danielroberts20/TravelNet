@@ -6,6 +6,11 @@ from database.connection import get_conn
 from database.location.geocoding import insert_geocode, reverse_geocode
 from pydantic import BaseModel #type: ignore
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore
+from triggers.location_change import (
+    add_known_place_now,
+    AlreadyKnownPlaceError,
+    NoRecentLocationError,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -16,6 +21,10 @@ class PlaceRequest(BaseModel):
     notes: str
 
 class PlaceUpdateRequest(BaseModel):
+    label: Optional[str] = None
+    notes: Optional[str] = None
+
+class AddCurrentPlaceRequest(BaseModel):
     label: Optional[str] = None
     notes: Optional[str] = None
 
@@ -98,6 +107,32 @@ async def list_places():
             ORDER BY kp.last_visited DESC, kp.first_seen DESC
         """).fetchall()
     return {"places": [_place_row_to_dict(r) for r in rows]}
+
+
+@router.post("/add-current", dependencies=[Depends(require_upload_token)])
+async def add_current_place(request: AddCurrentPlaceRequest):
+    """Instantly add the current location as a known place, skipping the stay-duration threshold."""
+    try:
+        place_id = add_known_place_now(label=request.label, notes=request.notes)
+    except AlreadyKnownPlaceError as e:
+        raise HTTPException(status_code=409, detail={
+            "message": "Current location is already within a known place",
+            "place_id": e.place_id,
+            "label": e.label,
+        })
+    except NoRecentLocationError as e:
+        raise HTTPException(status_code=422, detail={"message": str(e)})
+    with get_conn() as conn:
+        row = conn.execute("""
+            SELECT
+                kp.id, kp.label, kp.notes, kp.latitude, kp.longitude,
+                kp.first_seen, kp.last_visited, kp.visit_count, kp.total_time_mins,
+                p.display_name, p.geocoded_at, p.timezone
+            FROM known_places kp
+            LEFT JOIN places p ON p.id = kp.place_id
+            WHERE kp.id = ?
+        """, (place_id,)).fetchone()
+    return _place_row_to_dict(row)
 
 
 @router.patch("/visits/{visit_id}", dependencies=[Depends(require_upload_token)])
