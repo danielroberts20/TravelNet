@@ -141,7 +141,7 @@ def _movement(conn, ctx: dict) -> dict:
     
     new_places = conn.execute("""
         SELECT COUNT(*) AS n FROM known_places 
-        WHERE first_seen >= ? AND first_seen < ?
+        WHERE first_seen >= ? AND first_seen < ? AND deleted_at IS NULL
     """, (ctx["utc_start"], ctx["utc_end"])).fetchone()
 
     return {

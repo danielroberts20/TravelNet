@@ -25,7 +25,7 @@ def tbl():
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("CREATE TABLE known_places (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+    conn.execute("CREATE TABLE known_places (id INTEGER PRIMARY KEY AUTOINCREMENT, deleted_at TEXT)")
     conn.execute("INSERT INTO known_places DEFAULT VALUES")
     conn.execute("INSERT INTO known_places DEFAULT VALUES")
     with patch("database.location.sub_places.table.get_conn", return_value=conn):

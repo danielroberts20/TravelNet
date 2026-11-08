@@ -30,6 +30,7 @@ def db():
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             label            TEXT,
             notes            TEXT,
+            deleted_at       TEXT,
             latitude         REAL NOT NULL,
             longitude        REAL NOT NULL,
             place_id         INTEGER,
@@ -245,3 +246,54 @@ class TestIncrementVisitCount:
         t.increment_visit_count(place_id, "2024-06-16T09:00:00Z", visit_id)
         row = db.execute("SELECT current_visit_id FROM known_places WHERE id = ?", (place_id,)).fetchone()
         assert row["current_visit_id"] == visit_id
+
+
+# ---------------------------------------------------------------------------
+# soft_delete_place / restore_place / place_visits_cleaned
+# ---------------------------------------------------------------------------
+
+class TestSoftDelete:
+
+    def _place(self, db):
+        return db.execute(
+            "INSERT INTO known_places (latitude, longitude, first_seen) VALUES (1, 2, '2026-01-01T00:00:00Z')"
+        ).lastrowid
+
+    def test_soft_delete_sets_flag_and_keeps_row(self, tbl):
+        t, db = tbl
+        pid = self._place(db)
+        assert t.soft_delete_place(pid, "2026-11-08T00:00:00Z") is True
+        row = db.execute("SELECT deleted_at FROM known_places WHERE id = ?", (pid,)).fetchone()
+        assert row["deleted_at"] == "2026-11-08T00:00:00Z"
+
+    def test_soft_delete_twice_or_missing_returns_false(self, tbl):
+        t, db = tbl
+        pid = self._place(db)
+        t.soft_delete_place(pid, "2026-11-08T00:00:00Z")
+        assert t.soft_delete_place(pid, "2026-11-09T00:00:00Z") is False
+        assert t.soft_delete_place(999, "2026-11-09T00:00:00Z") is False
+        # first deletion time is preserved
+        assert db.execute("SELECT deleted_at FROM known_places WHERE id = ?", (pid,)).fetchone()[0] == "2026-11-08T00:00:00Z"
+
+    def test_restore_clears_flag(self, tbl):
+        t, db = tbl
+        pid = self._place(db)
+        assert t.restore_place(pid) is False          # not deleted yet
+        t.soft_delete_place(pid, "2026-11-08T00:00:00Z")
+        assert t.restore_place(pid) is True
+        assert db.execute("SELECT deleted_at FROM known_places WHERE id = ?", (pid,)).fetchone()[0] is None
+
+    def test_cleaned_view_hides_visits_of_deleted_places_only(self, tbl):
+        t, db = tbl
+        keep, gone = self._place(db), self._place(db)
+        for pid in (keep, gone):
+            db.execute("INSERT INTO place_visits (known_place_id, arrived_at) VALUES (?, '2026-01-01T00:00:00Z')", (pid,))
+        db.execute("ALTER TABLE place_visits ADD COLUMN superseded_by INTEGER")
+        with patch("database.location.known_places.table.get_conn", return_value=db):
+            t.init_cleaned_view()
+            t.init_cleaned_view()   # idempotent: drop + recreate
+            t.soft_delete_place(gone, "2026-11-08T00:00:00Z")
+            visible = {r[0] for r in db.execute("SELECT known_place_id FROM place_visits_cleaned")}
+            assert visible == {keep}
+            t.restore_place(gone)
+            assert {r[0] for r in db.execute("SELECT known_place_id FROM place_visits_cleaned")} == {keep, gone}

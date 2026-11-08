@@ -73,6 +73,7 @@ def db():
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             label            TEXT,
             notes            TEXT,
+            deleted_at       TEXT,
             latitude         REAL NOT NULL,
             longitude        REAL NOT NULL,
             place_id         INTEGER,

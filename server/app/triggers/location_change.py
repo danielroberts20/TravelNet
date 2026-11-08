@@ -267,7 +267,9 @@ def get_address(lat, lon):
 def get_nearest_known_place(lat, lon):
     """Return the nearest known place row if within LOCATION_CHANGE_RADIUS_M, else None."""
     with get_conn(read_only=True) as conn:
-        rows = conn.execute("SELECT id, latitude, longitude FROM known_places").fetchall()
+        rows = conn.execute(
+            "SELECT id, latitude, longitude FROM known_places WHERE deleted_at IS NULL"
+        ).fetchall()
     closest = None
     closest_dist = float('inf')
     for r in rows:

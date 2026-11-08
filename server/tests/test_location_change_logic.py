@@ -102,6 +102,7 @@ def db():
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             label            TEXT,
             notes            TEXT,
+            deleted_at       TEXT,
             latitude         REAL NOT NULL,
             longitude        REAL NOT NULL,
             place_id         INTEGER,
@@ -1191,6 +1192,25 @@ class TestRun:
         ).fetchall()
         assert visits[0]["departed_at"] is not None  # old visit closed
         assert visits[1]["departed_at"] is None       # new visit open
+
+
+# ===========================================================================
+# deleted places are invisible to arrival detection
+# ===========================================================================
+
+class TestDeletedPlacesIgnored:
+
+    def test_get_nearest_known_place_skips_deleted(self, db):
+        pid = _place(db, *LONDON)
+        db.execute("UPDATE known_places SET deleted_at = '2026-11-08T00:00:00Z' WHERE id = ?", (pid,))
+        db.commit()
+        with patch("triggers.location_change.get_conn", return_value=db):
+            for p in _cfg():
+                p.start()
+            try:
+                assert get_nearest_known_place(*LONDON_NEAR) is None
+            finally:
+                patch.stopall()
 
 
 # ===========================================================================
