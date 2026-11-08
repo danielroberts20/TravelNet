@@ -11,6 +11,7 @@ from config.general import (
     LOCATION_DEPARTURE_CONFIRMATION_MINS,
     LOCATION_STREAK_POINT_LIMIT,
     LOCATION_MANUAL_ADD_MAX_POINT_AGE_MINS,
+    LOCATION_AIRBORNE_ALTITUDE_M,
 )
 from database.location.geocoding import get_place_id, insert_geocode, reverse_geocode
 from database.location.known_places.table import table as known_places_table, KnownPlaceRecord
@@ -79,6 +80,29 @@ def get_stationary_streak(limit: int = None):
     avg_lon = sum(p['longitude'] for p in streak) / len(streak)
 
     return avg_lat, avg_lon, streak_start, streak_end, len(streak)
+
+
+def streak_is_airborne(streak_start: str, streak_end: str) -> bool:
+    """Return True if a stationary streak is really an in-flight frozen position.
+
+    In flight the phone has no GPS fix, so the Shortcuts location action keeps
+    reporting the last one: identical lat/lon/altitude every 5 minutes, which
+    looks exactly like a long stay. The tell is altitude. Real places in the
+    data never exceed ~410 m, flights cruise at 9-13 km, so the default
+    LOCATION_AIRBORNE_ALTITUDE_M (6000 m) separates them cleanly.
+
+    A streak is airborne when at least half of its altitude-bearing points
+    (either source) are above the threshold. Streaks with no altitude data are
+    never treated as airborne — we only suppress on positive evidence.
+    """
+    with get_conn(read_only=True) as conn:
+        row = conn.execute("""
+            SELECT COUNT(*) AS n,
+                   COALESCE(SUM(altitude > ?), 0) AS high
+            FROM location_unified
+            WHERE timestamp BETWEEN ? AND ? AND altitude IS NOT NULL
+        """, (LOCATION_AIRBORNE_ALTITUDE_M, streak_start, streak_end)).fetchone()
+    return row['n'] > 0 and row['high'] * 2 >= row['n']
 
 
 def _streak_duration_mins(streak_start: str, streak_end: str) -> float:
@@ -339,10 +363,11 @@ def _handle_new_place(lat: float, lon: float, arrived_at: str) -> None:
 
     logger.important("New location detected at %.5f, %.5f", lat, lon)
 
+    # The spot may not be geocoded yet (get_address -> None); fall back to coordinates
+    # rather than leaving `body` unbound after the place and visit are already written.
     address = get_address(lat, lon)
-    if address:
-        locality = address.get("locality", None)
-        body = f"Discovered {f'in {locality}' if locality else f'near {lat:.3f}, {lon:.3f}'}. Tap here to add a label"
+    locality = address.get("locality", None) if address else None
+    body = f"Discovered {f'in {locality}' if locality else f'near {lat:.3f}, {lon:.3f}'}. Tap here to add a label"
     
     now = to_iso_str(datetime.now(timezone.utc))
 
@@ -363,6 +388,10 @@ class ManualAddError(Exception):
 
 class NoRecentLocationError(ManualAddError):
     """No GPS point recent enough to represent the current location."""
+
+
+class AirborneError(ManualAddError):
+    """The current location looks like an in-flight frozen position."""
 
 
 class AlreadyKnownPlaceError(ManualAddError):
@@ -410,6 +439,9 @@ def add_known_place_now(label: str | None = None, notes: str | None = None) -> i
     else:
         lat, lon, arrived_at = latest['latitude'], latest['longitude'], latest['timestamp']
 
+    if streak_is_airborne(arrived_at, latest['timestamp']):
+        raise AirborneError("Current location looks like an in-flight position (altitude too high)")
+
     nearest = get_nearest_known_place(lat, lon)
     if nearest is not None:
         with get_conn(read_only=True) as conn:
@@ -449,6 +481,10 @@ def detect_arrival(streak=None):
 
     lat, lon, streak_start, streak_end, point_count = streak
     duration = _streak_duration_mins(streak_start, streak_end)
+
+    if streak_is_airborne(streak_start, streak_end):
+        logger.info("Ignoring stationary streak at %.4f, %.4f (%d pts): airborne", lat, lon, point_count)
+        return False
 
     nearest = get_nearest_known_place(lat, lon)
 

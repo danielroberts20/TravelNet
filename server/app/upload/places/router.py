@@ -19,6 +19,7 @@ from triggers.location_change import (
     add_known_place_now,
     AlreadyKnownPlaceError,
     NoRecentLocationError,
+    AirborneError,
 )
 
 router = APIRouter()
@@ -151,7 +152,7 @@ async def add_current_place(request: AddCurrentPlaceRequest):
             "place_id": e.place_id,
             "label": e.label,
         })
-    except NoRecentLocationError as e:
+    except (NoRecentLocationError, AirborneError) as e:
         raise HTTPException(status_code=422, detail={"message": str(e)})
     with get_conn() as conn:
         row = conn.execute("""
