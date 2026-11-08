@@ -21,7 +21,7 @@ def client():
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("CREATE TABLE known_places (id INTEGER PRIMARY KEY AUTOINCREMENT)")
+    conn.execute("CREATE TABLE known_places (id INTEGER PRIMARY KEY AUTOINCREMENT, deleted_at TEXT)")
     conn.execute("INSERT INTO known_places DEFAULT VALUES")
     app = FastAPI()
     app.include_router(places_router.router, prefix="/upload/places")

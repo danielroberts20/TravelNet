@@ -93,18 +93,32 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
             except sqlite3.OperationalError:
                 pass  # Column already exists
 
+            try:
+                conn.execute("ALTER TABLE known_places ADD COLUMN deleted_at TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
+
     def init_cleaned_view(self) -> None:
         """Create the place_visits_cleaned view — place_visits minus superseded rows.
 
         Raw place_visits rows are never deleted (immutability convention); rows
         found to be duplicates/overlaps of another visit are flagged via
-        superseded_by instead. Downstream readers should query this view, not
-        place_visits directly.
+        superseded_by instead, and visits of soft-deleted known places
+        (known_places.deleted_at) are excluded too. Downstream readers should
+        query this view, not place_visits directly.
+
+        The view is dropped and recreated on every start so definition changes
+        take effect (CREATE VIEW IF NOT EXISTS would keep a stale definition).
         """
         with get_conn() as conn:
+            conn.execute("DROP VIEW IF EXISTS place_visits_cleaned")
             conn.execute("""
-                CREATE VIEW IF NOT EXISTS place_visits_cleaned AS
-                SELECT * FROM place_visits WHERE superseded_by IS NULL;
+                CREATE VIEW place_visits_cleaned AS
+                SELECT * FROM place_visits
+                WHERE superseded_by IS NULL
+                  AND known_place_id NOT IN (
+                      SELECT id FROM known_places WHERE deleted_at IS NOT NULL
+                  );
             """)
 
     def insert(self, record: KnownPlaceRecord) -> int:
@@ -131,6 +145,30 @@ class KnownPlacesTable(BaseTable[KnownPlaceRecord]):
             cursor = conn.execute(
                 "UPDATE known_places SET notes = ? WHERE id = ?",
                 (note, place_id),
+            )
+            return cursor.rowcount > 0
+
+    def soft_delete_place(self, place_id: int, deleted_at: str) -> bool:
+        """Flag a known place as deleted. Rows are kept (immutability convention).
+
+        Returns True if an active place was flagged, False if it does not exist
+        or is already deleted. Visits and sub-places are left in place; they are
+        hidden through place_visits_cleaned and by being reachable only via
+        their (now hidden) parent.
+        """
+        with get_conn() as conn:
+            cursor = conn.execute(
+                "UPDATE known_places SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL",
+                (deleted_at, place_id),
+            )
+            return cursor.rowcount > 0
+
+    def restore_place(self, place_id: int) -> bool:
+        """Clear the deleted flag. Returns True if a deleted place was restored."""
+        with get_conn() as conn:
+            cursor = conn.execute(
+                "UPDATE known_places SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+                (place_id,),
             )
             return cursor.rowcount > 0
 

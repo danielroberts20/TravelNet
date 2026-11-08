@@ -7,6 +7,9 @@ from database.connection import get_conn
 from database.location.geocoding import insert_geocode, reverse_geocode
 from pydantic import BaseModel #type: ignore
 from fastapi import APIRouter, Depends, HTTPException  # type: ignore
+from database.location.known_places.table import table as known_places_table
+from database.connection import to_iso_str
+from datetime import datetime, timezone
 from database.location.sub_places.table import (
     table as sub_places_table,
     SubPlaceRecord,
@@ -29,6 +32,9 @@ class PlaceRequest(BaseModel):
 class PlaceUpdateRequest(BaseModel):
     label: Optional[str] = None
     notes: Optional[str] = None
+
+class DeletePlaceRequest(BaseModel):
+    confirm_id: int   # must equal the place id in the URL
 
 class AddCurrentPlaceRequest(BaseModel):
     label: Optional[str] = None
@@ -98,7 +104,7 @@ async def list_null_places():
             LEFT JOIN places p
                 ON p.lat_snap = ROUND(kp.latitude, 3)
                 AND p.lon_snap = ROUND(kp.longitude, 3)
-            WHERE kp.label IS NULL
+            WHERE kp.label IS NULL AND kp.deleted_at IS NULL
             ORDER BY kp.first_seen DESC
         """).fetchall()
     return {"places": [dict(row) for row in rows]}
@@ -128,6 +134,7 @@ async def list_places():
                 p.display_name, p.geocoded_at, p.timezone
             FROM known_places kp
             LEFT JOIN places p ON p.id = kp.place_id
+            WHERE kp.deleted_at IS NULL
             ORDER BY kp.last_visited DESC, kp.first_seen DESC
         """).fetchall()
     return {"places": [_place_row_to_dict(r) for r in rows]}
@@ -177,7 +184,7 @@ async def update_visit(visit_id: int, request: VisitUpdateRequest):
 @router.patch("/{place_id}", dependencies=[Depends(require_upload_token)])
 async def update_place(place_id: int, request: PlaceUpdateRequest):
     with get_conn() as conn:
-        row = conn.execute("SELECT id FROM known_places WHERE id = ?", (place_id,)).fetchone()
+        row = conn.execute("SELECT id FROM known_places WHERE id = ? AND deleted_at IS NULL", (place_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Place not found")
         fields = request.__fields_set__
@@ -211,7 +218,7 @@ async def update_place(place_id: int, request: PlaceUpdateRequest):
 def geocode_place(place_id: int):
     """Trigger on-demand Nominatim geocode for a known place. Runs in thread pool (blocking)."""
     with get_conn() as conn:
-        kp = conn.execute("SELECT * FROM known_places WHERE id = ?", (place_id,)).fetchone()
+        kp = conn.execute("SELECT * FROM known_places WHERE id = ? AND deleted_at IS NULL", (place_id,)).fetchone()
         if not kp:
             raise HTTPException(status_code=404, detail="Place not found")
         kp = dict(kp)
@@ -248,7 +255,7 @@ async def list_place_visits(place_id: int):
             SELECT kp.id, p.timezone
             FROM known_places kp
             LEFT JOIN places p ON p.id = kp.place_id
-            WHERE kp.id = ?
+            WHERE kp.id = ? AND kp.deleted_at IS NULL
         """, (place_id,)).fetchone()
         if not kp:
             raise HTTPException(status_code=404, detail="Place not found")
@@ -262,6 +269,42 @@ async def list_place_visits(place_id: int):
         "timezone": dict(kp).get("timezone"),
         "visits": [_visit_row_to_dict(r) for r in rows],
     }
+
+# ---------------------------------------------------------------------------
+# Delete / restore (soft)
+# ---------------------------------------------------------------------------
+
+@router.delete("/{place_id}", dependencies=[Depends(require_upload_token)])
+async def delete_place(place_id: int, request: DeletePlaceRequest):
+    """Soft-delete a known place. The body must repeat the id (``confirm_id``) so a
+    stray or blind DELETE cannot remove a place. Rows are kept and can be restored."""
+    if request.confirm_id != place_id:
+        raise HTTPException(status_code=400, detail="confirm_id does not match place id")
+    with get_conn(read_only=True) as conn:
+        row = conn.execute("""
+            SELECT kp.id, kp.label, kp.visit_count, kp.total_time_mins,
+                   (SELECT COUNT(*) FROM sub_places sp
+                     WHERE sp.known_place_id = kp.id AND sp.archived_at IS NULL) AS sub_places
+            FROM known_places kp WHERE kp.id = ? AND kp.deleted_at IS NULL
+        """, (place_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Place not found")
+    if not known_places_table.soft_delete_place(place_id, to_iso_str(datetime.now(timezone.utc))):
+        raise HTTPException(status_code=404, detail="Place not found")
+    logger.warning("Known place %d (%r) deleted via API: %d visit(s), %d sub-place(s) hidden",
+                   place_id, row["label"], row["visit_count"], row["sub_places"])
+    return {
+        "status": "deleted", "id": place_id, "label": row["label"],
+        "visits_hidden": row["visit_count"], "sub_places_hidden": row["sub_places"],
+    }
+
+
+@router.post("/{place_id}/restore", dependencies=[Depends(require_upload_token)])
+async def restore_place(place_id: int):
+    if not known_places_table.restore_place(place_id):
+        raise HTTPException(status_code=404, detail="No deleted place with that id")
+    return {"status": "restored", "id": place_id}
+
 
 # ---------------------------------------------------------------------------
 # Sub-places
@@ -286,7 +329,7 @@ def _validate_geo(lat, lon, radius) -> None:
 
 def _require_place(place_id: int) -> None:
     with get_conn(read_only=True) as conn:
-        if not conn.execute("SELECT 1 FROM known_places WHERE id = ?", (place_id,)).fetchone():
+        if not conn.execute("SELECT 1 FROM known_places WHERE id = ? AND deleted_at IS NULL", (place_id,)).fetchone():
             raise HTTPException(status_code=404, detail="Place not found")
 
 
