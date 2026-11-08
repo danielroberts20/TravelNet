@@ -32,3 +32,6 @@ server/scripts/graceful_reboot.sh
 server/schema.sql
 server/app/prompt.py
 server/__init__.py
+
+# Local audit notes
+AUDIT.md
