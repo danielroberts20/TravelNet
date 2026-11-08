@@ -7,6 +7,7 @@ TABLE_REGISTRY lists every BaseTable instance in dependency order:
 - places must be first (FK target for all place_id columns)
 - location_overland and location_shortcuts must precede the unified view
 - known_places must precede place_visits (FK)
+- known_places must precede sub_places (FK)
 - The unified view is initialised last via location_table.init_unified_view()
 """
 from config.editable import log_config_summary
@@ -33,6 +34,7 @@ from database.triggers.table import table as trigger_table
 from database.location.overland.table import table as overland_table
 from database.location.gap_annotations.table import table as gap_annotations_table
 from database.location.known_places.table import table as known_places_table
+from database.location.sub_places.table import table as sub_places_table
 from database.location.noise.table import table as noise_table
 from database.weather.table import table as weather_table
 from database.weather.fetch_log import weather_fetch_log
@@ -66,6 +68,7 @@ TABLE_REGISTRY: list[BaseTable] = [
     overland_table,
     gap_annotations_table,
     known_places_table,     # known_places + place_visits (must follow places_table)
+    sub_places_table,       # sub_place_types + sub_places (must follow known_places_table)
     weather_table,
     weather_fetch_log,
     log_digest_table,
