@@ -47,7 +47,7 @@ class DisplayMessageRequest(BaseModel):
     text: str
 
 @router.post("/display/message", dependencies=[Depends(require_upload_token)])
-async def push_display_message(body: DisplayMessageRequest):
+def push_display_message(body: DisplayMessageRequest):
     """Push a short message to the home Pico display (from Dan, anywhere in world)."""
     text = body.text.strip()
     if not text:
@@ -61,14 +61,14 @@ async def push_display_message(body: DisplayMessageRequest):
     
 
 @router.get("/logs", dependencies=[Depends(require_upload_token)])
-async def get_logs(lines: int = Query(200, ge=1, le=1000)):
+def get_logs(lines: int = Query(200, ge=1, le=1000)):
     """Return the last `lines` lines of the main server log file."""
     logs = read_last_lines_efficient(LOG_FILE, n=lines)
     return Response(content=logs, media_type="text/plain")
 
 
 @router.get("/watchdog", dependencies=[Depends(require_upload_token)])
-async def get_watchdog():
+def get_watchdog():
     import os
     BREAK_FILE = "/app/BREAK_WATCHDOG"
     if os.path.exists(BREAK_FILE):
@@ -81,7 +81,7 @@ async def get_watchdog():
 
 
 @router.get("/status")
-async def get_status():
+def get_status():
     return {
         "uptime": get_uptime(),
         "db": get_db_stats(),
@@ -103,7 +103,7 @@ class ConfigUpdate(BaseModel):
 
 
 @router.get("/config", dependencies=[Depends(require_upload_token)])
-async def get_config():
+def get_config():
     """Return all registered editable config values, including override status."""
     editable = get_editable()
     overrides = {}
@@ -129,7 +129,7 @@ async def get_config():
 
 
 @router.post("/config", dependencies=[Depends(require_upload_token)])
-async def update_config(update: ConfigUpdate):
+def update_config(update: ConfigUpdate):
     """Persist a config override to config_overrides.json (requires server restart to apply)."""
     editable = get_editable()
     if update.key not in editable:
@@ -163,7 +163,7 @@ async def update_config(update: ConfigUpdate):
 
 
 @router.delete("/config/{key}", dependencies=[Depends(require_upload_token)])
-async def reset_config(key: str):
+def reset_config(key: str):
     """Remove a config override for key, restoring its default value on next restart."""
     if not OVERRIDES_PATH.exists():
         raise HTTPException(status_code=404, detail="No overrides file found")
@@ -181,7 +181,7 @@ async def reset_config(key: str):
 
 
 @router.get("/backups", dependencies=[Depends(require_upload_token)])
-async def get_backups():
+def get_backups():
     """Return latest local and remote (Cloudflare R2) backup info for all data types."""
     return {
         "local":  get_local_backups(),
@@ -203,7 +203,7 @@ class GapAnnotationRequest(BaseModel):
 
 
 @router.post("/annotate_gap", dependencies=[Depends(require_upload_token)])
-async def annotate_gap(body: GapAnnotationRequest):
+def annotate_gap(body: GapAnnotationRequest):
     """Record a known gap in location/health data with a human-readable description."""
     start_ts = int(body.start_time.timestamp())
     end_ts = int(body.end_time.timestamp())
@@ -235,7 +235,7 @@ async def annotate_gap(body: GapAnnotationRequest):
 
 
 @router.get("/annotations", dependencies=[Depends(require_upload_token)])
-async def get_annotations():
+def get_annotations():
     """Return all recorded gap annotations ordered by start time."""
     return {"annotations": gap_annotations_table.list_annotations()}
 
@@ -302,7 +302,7 @@ async def update_deployment_tz(body: DeploymentTzRequest):
     return {"status": "updated", "from": current_tz, "to": body.timezone}
 
 @router.get("/widget_status")
-async def widget_status():
+def widget_status():
     return {
         "value": 0.72,
         "label": "72%",
@@ -311,7 +311,7 @@ async def widget_status():
     }
 
 @router.post("/label-place")
-async def label_location(body):
+def label_location(body):
     label = body.get("label", {})
     place_id = body.get("id", {})
 
@@ -330,7 +330,7 @@ class PcStateRequest(BaseModel):
     state: str  # 'checking' | 'remote' | 'clear' | 'off'
 
 @router.post("/display/pc", dependencies=[Depends(require_upload_token)])
-async def push_pc_state(body: PcStateRequest):
+def push_pc_state(body: PcStateRequest):
     """Push PC boot state to the home Pico display."""
     if body.state not in ('checking', 'remote', 'clear', 'off'):
         raise HTTPException(status_code=400, detail="state must be 'checking', 'remote', 'clear', or 'off'")

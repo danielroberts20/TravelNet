@@ -27,8 +27,15 @@ from util import haversine_km
 
 RAW_LAT, RAW_LON = 51.5074, -0.1278  # London
 
+# The public queries read the base tables directly (the location_unified view is a
+# full scan). Tests insert into location_overland; location_shortcuts stays empty.
 LOCATION_UNIFIED_DDL = """
-    CREATE TABLE location_unified (
+    CREATE TABLE location_overland (
+        timestamp TEXT NOT NULL,
+        latitude  REAL NOT NULL,
+        longitude REAL NOT NULL
+    );
+    CREATE TABLE location_shortcuts (
         timestamp TEXT NOT NULL,
         latitude  REAL NOT NULL,
         longitude REAL NOT NULL
@@ -61,7 +68,7 @@ class TestGetLatestLocation:
 
     def test_returns_fuzzed_coordinates_not_raw(self, patch_conn):
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T12:00:00Z", RAW_LAT, RAW_LON),
         )
         result = get_latest_location()
@@ -70,7 +77,7 @@ class TestGetLatestLocation:
 
     def test_fuzzed_point_within_expected_radius(self, patch_conn):
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T12:00:00Z", RAW_LAT, RAW_LON),
         )
         result = get_latest_location()
@@ -80,7 +87,7 @@ class TestGetLatestLocation:
 
     def test_last_synced_formatted(self, patch_conn):
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T12:00:00Z", RAW_LAT, RAW_LON),
         )
         result = get_latest_location()
@@ -88,11 +95,11 @@ class TestGetLatestLocation:
 
     def test_returns_most_recent_of_multiple_rows(self, patch_conn):
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T10:00:00Z", 10.0, 10.0),
         )
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T12:00:00Z", RAW_LAT, RAW_LON),
         )
         result = get_latest_location()
@@ -112,7 +119,7 @@ class TestGetLocationHistory:
     def test_points_are_fuzzed_not_raw(self, patch_conn):
         from datetime import datetime, timezone
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T12:00:00Z", RAW_LAT, RAW_LON),
         )
         result = get_location_history(datetime(2026, 1, 1, tzinfo=timezone.utc))
@@ -122,11 +129,11 @@ class TestGetLocationHistory:
     def test_ordered_by_timestamp_ascending(self, patch_conn):
         from datetime import datetime, timezone
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T14:00:00Z", RAW_LAT, RAW_LON),
         )
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T12:00:00Z", RAW_LAT, RAW_LON),
         )
         result = get_location_history(datetime(2026, 1, 1, tzinfo=timezone.utc))
@@ -141,7 +148,7 @@ class TestGetLocationHistory:
         # downsample-minutes threshold and under LOCATION_CHANGE_RADIUS_M).
         for i in range(20):
             patch_conn.execute(
-                "INSERT INTO location_unified VALUES (?, ?, ?)",
+                "INSERT INTO location_overland VALUES (?, ?, ?)",
                 (f"2026-04-11T12:{i:02d}:00Z", RAW_LAT, RAW_LON),
             )
         result = get_location_history(datetime(2026, 1, 1, tzinfo=timezone.utc))
@@ -154,11 +161,11 @@ class TestGetLocationHistory:
         even though it's well under the time threshold."""
         from datetime import datetime, timezone
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T12:00:00Z", RAW_LAT, RAW_LON),
         )
         patch_conn.execute(
-            "INSERT INTO location_unified VALUES (?, ?, ?)",
+            "INSERT INTO location_overland VALUES (?, ?, ?)",
             ("2026-04-11T12:01:00Z", RAW_LAT + 0.5, RAW_LON + 0.5),  # ~50km+ away
         )
         result = get_location_history(datetime(2026, 1, 1, tzinfo=timezone.utc))

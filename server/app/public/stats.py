@@ -14,6 +14,8 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 import sqlite3
+import threading
+import time
 import yaml
 
 from database.connection import get_conn
@@ -169,7 +171,29 @@ def _fetchone(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> int:
     return row[0] if row and row[0] is not None else 0
 
 
+# location_unified is a UNION view: COUNT(*) over it scans ~500k rows (~2.5s on the Pi).
+# This endpoint is public and unauthenticated, so cache the result rather than
+# letting every request pay that cost.
+_DB_STATS_TTL_SECS = 300
+_db_stats_cache: dict = {"at": 0.0, "value": None}
+_db_stats_lock = threading.Lock()
+
+
 def get_db_stats() -> dict:
+    """Cached wrapper around _query_db_stats (see _DB_STATS_TTL_SECS)."""
+    with _db_stats_lock:
+        cached = _db_stats_cache["value"]
+        if cached is not None and time.monotonic() - _db_stats_cache["at"] < _DB_STATS_TTL_SECS:
+            return cached
+        value = _query_db_stats()
+        # Don't cache the all-zero fallback returned on a query failure.
+        if value.get("last_synced") is not None or value.get("gps_points"):
+            _db_stats_cache["value"] = value
+            _db_stats_cache["at"] = time.monotonic()
+        return value
+
+
+def _query_db_stats() -> dict:
     """
     Query the DB for public-safe aggregate counts.
     Returns a dict of counts and last_synced timestamp.
@@ -195,8 +219,12 @@ def get_db_stats() -> dict:
                 "SELECT COUNT(*) FROM transactions"
             )
             # Last synced = most recent location point timestamp
+            # MAX over the base tables (indexed) instead of the view (full scan).
             row = conn.execute(
-                "SELECT MAX(timestamp) FROM location_unified"
+                "SELECT MAX(t) FROM ("
+                " SELECT MAX(timestamp) AS t FROM location_overland"
+                " UNION ALL"
+                " SELECT MAX(timestamp) FROM location_shortcuts)"
             ).fetchone()
             last_synced_raw = row[0] if row else None
 
