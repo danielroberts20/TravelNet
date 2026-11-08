@@ -254,8 +254,8 @@ legs:
       - id: aus_east_coast
         name: "East Coast"
         planned:
-          arrival: "2027-02-14"
-          departure: "2027-03-11"
+          arrival: "2027-03-15"
+          departure: "2027-04-08"
         actual:
           arrival: null
           departure: null
@@ -268,7 +268,7 @@ legs:
     stopover: false
     planned:
       arrival: "2027-07-01"
-      departure: "2028-12-01"
+      departure: "2027-12-01"
     actual:
       arrival: null
       departure: null
