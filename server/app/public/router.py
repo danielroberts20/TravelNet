@@ -28,7 +28,7 @@ router = APIRouter()
 
 @router.get("/stats")
 @limiter.limit("30/minute")
-async def public_stats(request: Request):
+def public_stats(request: Request):
     """
     Returns sanitised trip statistics for the public demo site.
     Contains counts and city-level metadata only — no raw location data.
@@ -37,7 +37,7 @@ async def public_stats(request: Request):
 
 @router.get("/widget")
 @limiter.limit("30/minute")
-async def public_widget(request: Request):
+def public_widget(request: Request):
     """
     Public widget endpoint for the Scriptable iOS home screen widget.
     No auth. Returns system health and current trip context.
@@ -47,7 +47,7 @@ async def public_widget(request: Request):
 
 @router.get("/location")
 @limiter.limit("30/minute")
-async def public_location(request: Request, since: Optional[str] = Query(None)):
+def public_location(request: Request, since: Optional[str] = Query(None)):
     """
     Fuzzed location for external consumers (e.g. Constellation's
     "how far apart are we" stat). No auth. Coordinates are always randomly

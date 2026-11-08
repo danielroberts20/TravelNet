@@ -93,7 +93,7 @@ def _visit_row_to_dict(row) -> dict:
     }
 
 @router.get("/list-null", dependencies=[Depends(require_upload_token)])
-async def list_null_places():
+def list_null_places():
     """List all places with null names"""
     with get_conn() as conn:
         rows = conn.execute("""
@@ -111,7 +111,7 @@ async def list_null_places():
     return {"places": [dict(row) for row in rows]}
 
 @router.post("/update-label", dependencies=[Depends(require_upload_token)])
-async def update_place_label(request: PlaceRequest):
+def update_place_label(request: PlaceRequest):
     """Update the label for a given place_id"""
     notes = None if request.notes == '' else request.notes
     with get_conn() as conn:
@@ -126,7 +126,7 @@ async def update_place_label(request: PlaceRequest):
 
 
 @router.get("/list", dependencies=[Depends(require_upload_token)])
-async def list_places():
+def list_places():
     with get_conn() as conn:
         rows = conn.execute("""
             SELECT
@@ -142,7 +142,7 @@ async def list_places():
 
 
 @router.post("/add-current", dependencies=[Depends(require_upload_token)])
-async def add_current_place(request: AddCurrentPlaceRequest):
+def add_current_place(request: AddCurrentPlaceRequest):
     """Instantly add the current location as a known place, skipping the stay-duration threshold."""
     try:
         place_id = add_known_place_now(label=request.label, notes=request.notes)
@@ -168,7 +168,7 @@ async def add_current_place(request: AddCurrentPlaceRequest):
 
 
 @router.patch("/visits/{visit_id}", dependencies=[Depends(require_upload_token)])
-async def update_visit(visit_id: int, request: VisitUpdateRequest):
+def update_visit(visit_id: int, request: VisitUpdateRequest):
     with get_conn() as conn:
         row = conn.execute("SELECT id FROM place_visits WHERE id = ?", (visit_id,)).fetchone()
         if not row:
@@ -183,7 +183,7 @@ async def update_visit(visit_id: int, request: VisitUpdateRequest):
 
 
 @router.patch("/{place_id}", dependencies=[Depends(require_upload_token)])
-async def update_place(place_id: int, request: PlaceUpdateRequest):
+def update_place(place_id: int, request: PlaceUpdateRequest):
     with get_conn() as conn:
         row = conn.execute("SELECT id FROM known_places WHERE id = ? AND deleted_at IS NULL", (place_id,)).fetchone()
         if not row:
@@ -250,7 +250,7 @@ def geocode_place(place_id: int):
 
 
 @router.get("/{place_id}/visits", dependencies=[Depends(require_upload_token)])
-async def list_place_visits(place_id: int):
+def list_place_visits(place_id: int):
     with get_conn() as conn:
         kp = conn.execute("""
             SELECT kp.id, p.timezone
@@ -276,7 +276,7 @@ async def list_place_visits(place_id: int):
 # ---------------------------------------------------------------------------
 
 @router.delete("/{place_id}", dependencies=[Depends(require_upload_token)])
-async def delete_place(place_id: int, request: DeletePlaceRequest):
+def delete_place(place_id: int, request: DeletePlaceRequest):
     """Soft-delete a known place. The body must repeat the id (``confirm_id``) so a
     stray or blind DELETE cannot remove a place. Rows are kept and can be restored."""
     if request.confirm_id != place_id:
@@ -301,7 +301,7 @@ async def delete_place(place_id: int, request: DeletePlaceRequest):
 
 
 @router.post("/{place_id}/restore", dependencies=[Depends(require_upload_token)])
-async def restore_place(place_id: int):
+def restore_place(place_id: int):
     if not known_places_table.restore_place(place_id):
         raise HTTPException(status_code=404, detail="No deleted place with that id")
     return {"status": "restored", "id": place_id}
@@ -335,12 +335,12 @@ def _require_place(place_id: int) -> None:
 
 
 @router.get("/sub-place-types", dependencies=[Depends(require_upload_token)])
-async def list_sub_place_types():
+def list_sub_place_types():
     return {"types": sub_places_table.list_types()}
 
 
 @router.get("/{place_id}/sub-places", dependencies=[Depends(require_upload_token)])
-async def list_sub_places(place_id: int):
+def list_sub_places(place_id: int):
     _require_place(place_id)
     return {
         "sub_places": sub_places_table.list_for_place(place_id),
@@ -350,7 +350,7 @@ async def list_sub_places(place_id: int):
 
 
 @router.post("/{place_id}/sub-places", dependencies=[Depends(require_upload_token)])
-async def create_sub_place(place_id: int, request: SubPlaceCreateRequest):
+def create_sub_place(place_id: int, request: SubPlaceCreateRequest):
     _require_place(place_id)
     name = _clean(request.name)
     if not name:
@@ -371,7 +371,7 @@ async def create_sub_place(place_id: int, request: SubPlaceCreateRequest):
 
 
 @router.patch("/sub-places/{sub_place_id}", dependencies=[Depends(require_upload_token)])
-async def update_sub_place(sub_place_id: int, request: SubPlaceUpdateRequest):
+def update_sub_place(sub_place_id: int, request: SubPlaceUpdateRequest):
     current = sub_places_table.get(sub_place_id)
     if not current or current["archived_at"]:
         raise HTTPException(status_code=404, detail="Sub-place not found")
@@ -404,7 +404,7 @@ async def update_sub_place(sub_place_id: int, request: SubPlaceUpdateRequest):
 
 
 @router.delete("/sub-places/{sub_place_id}", dependencies=[Depends(require_upload_token)])
-async def archive_sub_place(sub_place_id: int):
+def archive_sub_place(sub_place_id: int):
     """Soft-delete: history is retained, the sub-place is hidden from listings."""
     if not sub_places_table.archive_sub_place(sub_place_id):
         raise HTTPException(status_code=404, detail="Sub-place not found")

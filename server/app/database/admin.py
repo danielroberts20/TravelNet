@@ -71,7 +71,7 @@ async def prune_tables_list():
 
 
 @router.post("/prune/preview", dependencies=[Depends(require_upload_token)])
-async def prune_preview(req: PruneRequest):
+def prune_preview(req: PruneRequest):
     """Return row counts that would be deleted — no data is modified."""
     try:
         with get_conn(read_only=True) as conn:
@@ -84,7 +84,7 @@ async def prune_preview(req: PruneRequest):
 
 
 @router.post("/prune/execute", dependencies=[Depends(require_upload_token)])
-async def prune_execute(req: PruneRequest):
+def prune_execute(req: PruneRequest):
     """Create a pre-prune backup then delete rows older than cutoff."""
     try:
         validate_tables(req.tables or DEFAULT_TABLES)
@@ -105,7 +105,7 @@ async def prune_execute(req: PruneRequest):
 
 
 @router.get("/download", dependencies=[Depends(require_upload_token)])
-async def download(background_tasks: BackgroundTasks):
+def download(background_tasks: BackgroundTasks):
     """Create a point-in-time DB backup and stream it to the caller.
 
     The backup file is scheduled for deletion once the response is sent so it
@@ -122,7 +122,7 @@ async def download(background_tasks: BackgroundTasks):
 
 
 @router.get("/reset", dependencies=[Depends(require_upload_token)])
-async def reset_table(table: str):
+def reset_table(table: str):
     """Delete all rows from a resettable table.
 
     Only tables explicitly listed in RESETTABLE_TABLES are permitted.
@@ -138,7 +138,7 @@ async def reset_table(table: str):
 
 
 @router.post("/truncate-resettable", dependencies=[Depends(require_upload_token)])
-async def truncate_resettable():
+def truncate_resettable():
     """Delete all rows from every resettable table.
 
     Clears each table in FK-safe order (children before parents) so that

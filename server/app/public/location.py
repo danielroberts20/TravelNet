@@ -122,9 +122,18 @@ def get_latest_location() -> Optional[dict]:
     """Return the most recent fuzzed {latitude, longitude, last_synced}, or None."""
     try:
         with get_conn(read_only=True) as conn:
+            # Query the base tables (indexed) rather than the location_unified view,
+            # whose internal ORDER BY forces a full ~500k-row scan on every call.
             row = conn.execute("""
-                SELECT timestamp, latitude, longitude
-                FROM location_unified
+                SELECT timestamp, latitude, longitude FROM (
+                    SELECT * FROM (
+                        SELECT timestamp, latitude, longitude
+                        FROM location_overland ORDER BY timestamp DESC LIMIT 1)
+                    UNION ALL
+                    SELECT * FROM (
+                        SELECT timestamp, latitude, longitude
+                        FROM location_shortcuts ORDER BY timestamp DESC LIMIT 1)
+                )
                 ORDER BY timestamp DESC
                 LIMIT 1
             """).fetchone()
@@ -152,11 +161,15 @@ def get_location_history(since: datetime) -> list[dict]:
     try:
         with get_conn(read_only=True) as conn:
             rows = conn.execute("""
-                SELECT timestamp, latitude, longitude
-                FROM location_unified
-                WHERE timestamp >= ?
+                SELECT timestamp, latitude, longitude FROM (
+                    SELECT timestamp, latitude, longitude
+                    FROM location_overland WHERE timestamp >= ?
+                    UNION ALL
+                    SELECT timestamp, latitude, longitude
+                    FROM location_shortcuts WHERE timestamp >= ?
+                )
                 ORDER BY timestamp ASC
-            """, (since_str,)).fetchall()
+            """, (since_str, since_str)).fetchall()
     except (sqlite3.Error, OSError) as e:
         logger.error(f"Failed to query public location history: {e}")
         return []
