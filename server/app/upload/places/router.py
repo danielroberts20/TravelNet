@@ -292,7 +292,7 @@ async def delete_place(place_id: int, request: DeletePlaceRequest):
         raise HTTPException(status_code=404, detail="Place not found")
     if not known_places_table.soft_delete_place(place_id, to_iso_str(datetime.now(timezone.utc))):
         raise HTTPException(status_code=404, detail="Place not found")
-    logger.warning("Known place %d (%r) deleted via API: %d visit(s), %d sub-place(s) hidden",
+    logger.info("Known place %d (%r) deleted via API: %d visit(s), %d sub-place(s) hidden",
                    place_id, row["label"], row["visit_count"], row["sub_places"])
     return {
         "status": "deleted", "id": place_id, "label": row["label"],

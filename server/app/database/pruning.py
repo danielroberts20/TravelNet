@@ -36,6 +36,8 @@ EXCLUDE_TABLES: set[str] = {
     "api_usage",
     "cost_of_living",
     "flights",
+    "upload_log",        # bookkeeping of upload periods, not time-series data
+    "sub_place_types",   # reference/lookup table
     "sqlite_sequence",
     "sqlite_stat1",
     "sqlite_stat2",
@@ -316,10 +318,6 @@ def _discover(
         elif "created_at" in col_set:
             ts_col_map[tname] = "created_at"
             ts_col_is_fallback[tname] = True
-            logger.warning(
-                "pruning: %s has no preferred timestamp column, using 'created_at'",
-                tname,
-            )
         else:
             ts_col_map[tname] = None
             ts_col_is_fallback[tname] = True
@@ -354,6 +352,13 @@ def _discover(
                 "pruning: %s has no usable timestamp column — skipping", tname
             )
             continue
+        if ts_col_is_fallback.get(tname):
+            # Warn only for tables actually pruned via the created_at fallback;
+            # cascade-only tables (skipped above) never use their own column.
+            logger.warning(
+                "pruning: %s has no preferred timestamp column, using 'created_at'",
+                tname,
+            )
         table_config[tname] = ts_col
 
     # 4. Topological sort (children before parents) via Kahn's algorithm
