@@ -29,6 +29,7 @@ from config.editable import load_overrides
 load_overrides()
 
 from config.general import (
+    DATA_DIR,
     HEALTH_BACKUP_DIR,
     HEALTH_GAP_DIGEST_WEEKDAY,
     HEALTH_GAP_PULL_PAD_HOURS,
@@ -41,6 +42,7 @@ from database.connection import get_conn
 from database.health.gap_events.table import table as gap_events_table
 from health_gaps.hae_client import HAEClient
 from health_gaps.ingest import make_ingest
+from health_gaps.lock import single_run
 from health_gaps.recover import RecoveryDeps, RecoveryParams, prompt_text, run_recovery
 from health_gaps.recovery import notify_and_wait, server_is_up
 from health_gaps.scan import recovery_configured, scan_and_notify
@@ -100,11 +102,17 @@ def recover_health_gaps_flow(
     )
 
     gap_events_table.init()   # idempotent; makes sure the pull columns exist
-    state_conn = get_conn()
-    try:
-        outcome = run_recovery(state_conn, deps, params)
-    finally:
-        state_conn.close()
+    with single_run(DATA_DIR / "health_recovery.lock") as acquired:
+        if not acquired:
+            # A second run would pull the same gaps, double the requests and send a second
+            # "done" notification. Leave it to the run already in progress.
+            log.warning("Another health gap recovery run is already in progress; exiting.")
+            return {"status": "already_running"}
+        state_conn = get_conn()
+        try:
+            outcome = run_recovery(state_conn, deps, params)
+        finally:
+            state_conn.close()
 
     result = {
         "status": outcome.status,
