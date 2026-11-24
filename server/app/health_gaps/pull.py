@@ -87,6 +87,17 @@ def metric_window(event: Event, metric: str, now: datetime, pad_h: float) -> tup
     return start - pad, min(end + pad, now)
 
 
+def _metric_chunks(event: Event, metric: str, now: datetime, pad_h: float, chunk_hours: Optional[float]):
+    lo, hi = metric_window(event, metric, now, pad_h)
+    style = query_style(metric)
+    return (lo, hi), chunk_range(lo, hi, chunk_hours or style.chunk_hours, align_to_start=style.aggregate)
+
+
+def estimate_requests(event: Event, now: datetime, pad_h: float, chunk_hours: Optional[float] = None) -> int:
+    """How many HAE requests pulling ``event`` takes (one per metric per chunk)."""
+    return sum(len(_metric_chunks(event, m, now, pad_h, chunk_hours)[1]) for m in event.metrics)
+
+
 def pull_event(
     client: HAEClient,
     event: Event,
@@ -104,9 +115,7 @@ def pull_event(
     """
     result = EventPull(event.id)
     for metric in event.metrics:
-        lo, hi = metric_window(event, metric, now, pad_h)
-        style = query_style(metric)
-        chunks = chunk_range(lo, hi, chunk_hours or style.chunk_hours, align_to_start=style.aggregate)
+        (lo, hi), chunks = _metric_chunks(event, metric, now, pad_h, chunk_hours)
         mp = MetricPull(metric, (lo, hi), len(chunks))
         result.metrics.append(mp)
 

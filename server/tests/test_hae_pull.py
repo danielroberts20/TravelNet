@@ -143,3 +143,15 @@ def test_chunks_requested_newest_first():
     pull_event(client, ev, NOW, lambda p: None, chunk_hours=6)
     starts = [c[1] for c in client.calls]
     assert starts == sorted(starts, reverse=True)
+
+
+def test_estimate_requests_matches_what_pull_event_actually_sends():
+    from health_gaps.pull import estimate_requests
+    for metrics in ({"heart_rate": ["2026-11-20 08:00:00Z", "2026-11-21 20:00:00Z"]},
+                    {"Step Count": ["2026-11-20 00:00:00Z", "2026-11-23 06:00:00Z"]},
+                    {"heart_rate": ["2026-11-20 08:00:00Z", "2026-11-20 10:00:00Z"],
+                     "Step Count": ["2026-11-20 00:00:00Z", "2026-11-22 00:00:00Z"]}):
+        ev_ = event(metrics)
+        client = FakeClient()
+        pull_event(client, ev_, NOW, lambda p: None, pad_h=12)
+        assert estimate_requests(ev_, NOW, 12) == len(client.calls)

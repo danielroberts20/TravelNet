@@ -315,3 +315,96 @@ def test_messages_follow_the_notification_emoji_convention():
 def test_finish_text_never_says_stop_after_an_interruption():
     t, b = rc.finish_text(rc.RecoveryOutcome(rc.INTERRUPTED, pending=[1]))
     assert "safely stop" not in b and "Check that the HAE server is stopped" in b
+
+
+# --- tiers, budget, dry run ---------------------------------------------------------
+
+def _loud(conn, start, **kw):
+    return add_event(conn, T(start), T(start) + timedelta(hours=24), **kw)
+
+
+def _walking(conn, start):
+    return add_event(conn, T(start), T(start) + timedelta(hours=24), metrics=("Walking Speed",), immediate=0)
+
+
+def _sparse(conn, start):
+    return add_event(conn, T(start), T(start) + timedelta(hours=24), metrics=("VO2 Max",), immediate=0)
+
+
+def test_tiers():
+    from health_gaps.recover import recovery_tier
+    def e(metrics, immediate):
+        return type("E", (), {"metrics": {m: None for m in metrics}, "immediate": immediate})()
+    assert recovery_tier(e(["Step Count"], True)) == 1
+    assert recovery_tier(e(["Walking Speed"], False)) == 2
+    assert recovery_tier(e(["VO2 Max"], False)) == 3
+    assert recovery_tier(e(["VO2 Max", "Walking Speed"], False)) == 2
+
+
+def test_pull_order_is_tier_then_newest_first(conn):
+    sparse = _sparse(conn, "2026-11-22 00:00")
+    walk_old = _walking(conn, "2026-11-10 00:00")
+    loud_old = _loud(conn, "2026-10-01 00:00")
+    walk_new = _walking(conn, "2026-11-20 00:00")
+    loud_new = _loud(conn, "2026-10-05 00:00")
+    out = Run(conn, rescan_effect=set_status("unrecoverable")).go(force=True)
+    assert out.pulled == [loud_new, loud_old, walk_new, walk_old, sparse]
+
+
+def test_max_tier_excludes_lower_priority_gaps_entirely(conn):
+    loud = _loud(conn, "2026-10-01 00:00")
+    walk = _walking(conn, "2026-11-10 00:00")
+    r = Run(conn, rescan_effect=set_status("unrecoverable"))
+    out = r.go(force=True, max_tier=1)
+    assert out.pulled == [loud] and ev.get_event(conn, walk).pull_attempts == 0
+    assert out.remaining == []                      # excluded by tier, not deferred
+
+
+def test_budget_defers_whole_events_never_half_pulls_one(conn):
+    a = _loud(conn, "2026-11-10 00:00")              # 24h gap + 12h pad each side = 48h = 8 chunks
+    b = _loud(conn, "2026-11-01 00:00")
+    c = _loud(conn, "2026-10-20 00:00")
+    r = Run(conn, rescan_effect=set_status("unrecoverable"))
+    out = r.go(force=True, max_requests=10)
+    assert out.pulled == [a] and out.remaining == [b, c]
+    assert ev.get_event(conn, b).pull_attempts == 0 and ev.get_event(conn, c).pull_attempts == 0
+    assert len(r.client.calls) == 8
+    title, body = r.finished[0]
+    assert "Session Done" in title and "2 more gaps remain for the next session" in body
+    assert "safely stop the HAE server" in body
+
+
+def test_first_event_is_always_pulled_even_if_it_exceeds_the_budget(conn):
+    a = _loud(conn, "2026-11-10 00:00")
+    out = Run(conn, rescan_effect=set_status("unrecoverable")).go(force=True, max_requests=1)
+    assert out.pulled == [a] and out.remaining == []
+
+
+def test_unlimited_budget_pulls_everything(conn):
+    ids = [_loud(conn, f"2026-11-{d:02d} 00:00") for d in (10, 12, 14)]
+    out = Run(conn, rescan_effect=set_status("unrecoverable")).go(force=True, max_requests=0)
+    assert sorted(out.pulled) == ids and out.remaining == []
+
+
+def test_interruption_lists_the_unattempted_events_as_remaining(conn):
+    a = _loud(conn, "2026-11-14 00:00")
+    b = _loud(conn, "2026-11-10 00:00")
+    r = Run(conn, client=FakeClient(script={0: HAEUnreachable("gone")}))
+    out = r.go(force=True)
+    assert out.status == rc.INTERRUPTED and out.pulled == [a] and out.remaining == [b]
+
+
+def test_dry_run_pulls_and_counts_but_records_nothing(conn):
+    a = _loud(conn, "2026-11-10 00:00")
+    r = Run(conn, client=FakeClient(default=pts(5)))
+    out = r.go(force=True, dry_run=True)
+    assert out.dry_run and out.pulled == [a] and out.points > 0 and r.client.calls
+    assert r.ingested == [] and r.rescans == 0 and r.prompted                  # the notification still goes out
+    e = ev.get_event(conn, a)
+    assert e.pull_attempts == 0 and e.pulled_at is None and e.last_prompted_at is None and e.status == "confirmed"
+    title, body = r.finished[0]
+    assert "Dry Run" in title and "Nothing was saved" in body and "safely stop the HAE server" in body
+
+
+def test_finish_text_without_remaining_is_unchanged():
+    assert rc.finish_text(rc.RecoveryOutcome(rc.DONE, recovered=[1]))[0] == "🩺 Health Recovery Finished"

@@ -21,6 +21,7 @@ All of the logic lives in health_gaps/recover.py; this module only wires real de
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from prefect import flow, get_run_logger
 from config.editable import load_overrides
@@ -32,6 +33,7 @@ from config.general import (
     HEALTH_GAP_DIGEST_WEEKDAY,
     HEALTH_GAP_PULL_PAD_HOURS,
     HEALTH_GAP_RECOVERY_COOLDOWN_HOURS,
+    HEALTH_GAP_RECOVERY_MAX_REQUESTS,
     HEALTH_GAP_RECOVERY_WAIT_MINUTES,
 )
 from config.settings import settings
@@ -49,8 +51,20 @@ from notifications import (
 
 
 @flow(name="Recover Health Gaps", on_failure=[notify_on_completion], on_completion=[log_on_success])
-def recover_health_gaps_flow(force: bool = False) -> dict:
-    """Pull confirmed health gaps from the phone. ``force`` ignores the notification cooldown."""
+def recover_health_gaps_flow(
+    force: bool = False,
+    max_requests: Optional[int] = None,
+    max_tier: int = 3,
+    dry_run: bool = False,
+) -> dict:
+    """Pull confirmed health gaps from the phone, in a budgeted session.
+
+    force         ignore the notification cooldown and digest-day rules
+    max_requests  HAE requests this session may use (None = HEALTH_GAP_RECOVERY_MAX_REQUESTS, 0 = no limit);
+                  whole gaps only, so a session never leaves one half pulled
+    max_tier      only recover gaps up to this tier (1 loud, 2 walking, 3 sparse-only)
+    dry_run       pull and count, but ingest and record nothing
+    """
     log = get_run_logger()
     if not recovery_configured():
         log.warning("Recovery is not configured (HAE_HOST / HAE_TOKEN / HEALTH_GAP_NOTIFICATION); skipping.")
@@ -80,6 +94,9 @@ def recover_health_gaps_flow(force: bool = False) -> dict:
         cooldown_h=HEALTH_GAP_RECOVERY_COOLDOWN_HOURS,
         digest_weekday=HEALTH_GAP_DIGEST_WEEKDAY,
         force=force,
+        max_requests=HEALTH_GAP_RECOVERY_MAX_REQUESTS if max_requests is None else max_requests,
+        max_tier=max_tier,
+        dry_run=dry_run,
     )
 
     gap_events_table.init()   # idempotent; makes sure the pull columns exist
@@ -96,6 +113,8 @@ def recover_health_gaps_flow(force: bool = False) -> dict:
         "missing": len(outcome.missing),
         "pending": len(outcome.pending),
         "points": outcome.points,
+        "remaining": len(outcome.remaining),
+        "dry_run": dry_run,
     }
     log.info("Health gap recovery: %s", result)
     record_flow_result(result)

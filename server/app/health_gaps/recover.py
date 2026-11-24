@@ -29,7 +29,7 @@ from health_gaps import events as ev_mod
 from health_gaps.config import config_for
 from health_gaps.events import Event
 from health_gaps.hae_client import HAEAuthError, HAEClient, HAEError, HAEProtocolError, HAEUnreachable
-from health_gaps.pull import EventPull, pull_event
+from health_gaps.pull import EventPull, estimate_requests, pull_event
 from health_gaps.recovery import WaitResult
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,9 @@ class RecoveryParams:
     cooldown_h: float = 20.0         # below the daily schedule period, so schedule jitter never skips a day
     digest_weekday: Optional[int] = None   # 0=Mon; on this day digest-only gaps (except sparse ones) may prompt
     force: bool = False              # manual run: ignore the cooldown and prompt for any gap
+    max_requests: Optional[int] = None     # session budget; whole events only (None/0 = unlimited)
+    max_tier: int = 3                # skip gaps in tiers above this (1 loud, 2 walking, 3 sparse-only)
+    dry_run: bool = False            # pull and count, but ingest and record nothing
 
 
 @dataclass
@@ -69,6 +72,8 @@ class RecoveryOutcome:
     points: int = 0
     detail: str = ""
     waited_s: float = 0.0                                   # how long we waited for the server (TIMEOUT)
+    remaining: list[int] = field(default_factory=list)     # not attempted this session (budget / interruption)
+    dry_run: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -96,6 +101,11 @@ def finish_text(o: RecoveryOutcome) -> tuple[str, str]:
         return ("🩺 Health Recovery Timed Out",
                 f"⏱️ The HAE server didn't start within {minutes} min, so nothing was recovered. "
                 f"I'll try again tomorrow.")
+    if o.dry_run:
+        more = f" ({len(o.remaining)} more gaps not pulled this session)" if o.remaining else ""
+        return ("🩺 Health Recovery Dry Run",
+                f"✅ Would add up to {o.points} points across {len(o.pulled)} gaps{more}. "
+                f"Nothing was saved. You can safely stop the HAE server now.")
     parts = []
     if o.recovered:
         parts.append(f"{len(o.recovered)} recovered")
@@ -108,6 +118,11 @@ def finish_text(o: RecoveryOutcome) -> tuple[str, str]:
         return ("🩺 Health Recovery Interrupted",
                 f"⚠️ The phone stopped answering part-way ({summary}). Unfinished gaps will be retried. "
                 f"Check that the HAE server is stopped.")
+    if o.remaining:
+        n = len(o.remaining)
+        return ("🩺 Health Recovery Session Done",
+                f"✅ Session done: {summary}. {n} more gap{'s' if n != 1 else ''} remain for the next session. "
+                f"You can safely stop the HAE server now.")
     return ("🩺 Health Recovery Finished", f"✅ All done: {summary}. You can safely stop the HAE server now.")
 
 
@@ -129,9 +144,19 @@ def worth_prompting(event: Event, is_digest_day: bool) -> bool:
     return is_digest_day and any(c is not None and not c.sparse for c in cfgs)
 
 
+def recovery_tier(event: Event) -> int:
+    """1 = a loud metric is involved, 2 = digest-only (walking...), 3 = sparse metrics only."""
+    if event.immediate:
+        return 1
+    cfgs = [config_for(m) for m in event.metrics]
+    if cfgs and all(c is not None and c.sparse for c in cfgs):
+        return 3
+    return 2
+
+
 def run_recovery(state_conn: sqlite3.Connection, deps: RecoveryDeps, params: RecoveryParams = RecoveryParams()) -> RecoveryOutcome:
     now = deps.now()
-    pending = ev_mod.needing_recovery(state_conn)
+    pending = [e for e in ev_mod.needing_recovery(state_conn) if recovery_tier(e) <= params.max_tier]
     if not pending:
         return RecoveryOutcome(NOTHING_TO_DO)
 
@@ -146,7 +171,8 @@ def run_recovery(state_conn: sqlite3.Connection, deps: RecoveryDeps, params: Rec
         return RecoveryOutcome(COOLDOWN, detail=f"{len(pending)} gap(s) pending, prompted recently")
 
     if not deps.server_up():
-        ev_mod.mark_prompted(state_conn, [e.id for e in pending], now)
+        if not params.dry_run:
+            ev_mod.mark_prompted(state_conn, [e.id for e in pending], now)
         wait = deps.wait_for_server(lambda: deps.prompt(pending))
         logger.info("Recovery: server %s after %.0fs (%d probes)",
                     "up" if wait.up else "NOT up", wait.elapsed_s, wait.probes)
@@ -158,7 +184,7 @@ def run_recovery(state_conn: sqlite3.Connection, deps: RecoveryDeps, params: Rec
         logger.info("Recovery: HAE server already up; skipping the notification")
 
     outcome = _pull_all(state_conn, deps, params, pending)
-    if outcome.pulled:
+    if outcome.pulled and not params.dry_run:
         deps.rescan(deps.now())
         _classify(state_conn, outcome)
     title, body = finish_text(outcome)
@@ -167,27 +193,40 @@ def run_recovery(state_conn: sqlite3.Connection, deps: RecoveryDeps, params: Rec
 
 
 def _pull_all(state_conn, deps: RecoveryDeps, params: RecoveryParams, pending: list[Event]) -> RecoveryOutcome:
-    out = RecoveryOutcome(DONE)
+    out = RecoveryOutcome(DONE, dry_run=params.dry_run)
+    # Loud gaps first, then walking, then sparse; newest first within a tier.
+    ordered = sorted(pending, key=lambda e: (recovery_tier(e), -e.window_start.timestamp()))
+    ingest = (lambda data: None) if params.dry_run else deps.ingest
+    used = 0
     try:
         with deps.make_client() as client:
-            for event in sorted(pending, key=lambda e: e.window_start, reverse=True):   # newest first
-                result: EventPull = pull_event(client, event, deps.now(), deps.ingest, pad_h=params.pad_h)
-                ev_mod.record_pull(state_conn, event.id, deps.now(), complete=result.complete)
+            for i, event in enumerate(ordered):
+                cost = estimate_requests(event, deps.now(), params.pad_h)
+                if params.max_requests and out.pulled and used + cost > params.max_requests:
+                    out.remaining = [e.id for e in ordered[i:]]        # leave whole events for the next session
+                    break
+                result: EventPull = pull_event(client, event, deps.now(), ingest, pad_h=params.pad_h)
+                if not params.dry_run:
+                    ev_mod.record_pull(state_conn, event.id, deps.now(), complete=result.complete)
+                used += cost
                 out.pulled.append(event.id)
                 out.points += result.points
                 if result.interrupted:
                     out.status = INTERRUPTED
+                    out.remaining = [e.id for e in ordered[i + 1:]]
                     break
     except HAEAuthError:
         out.status = AUTH_ERROR
     except HAEUnreachable as e:                 # lost it at the handshake or between events
         logger.warning("Recovery: phone unreachable: %s", e)
         out.status = INTERRUPTED
+        out.remaining = [e.id for e in ordered if e.id not in out.pulled]
     except HAEProtocolError as e:
         logger.error("Recovery: unusable response from HAE: %s", e)
         out.status, out.detail = ERROR, str(e)[:120]
     except HAEError as e:                       # defensive: any other client error
         out.status, out.detail = ERROR, str(e)[:120]
+    logger.info("Recovery: pulled %d event(s), ~%d request(s), %d remaining", len(out.pulled), used, len(out.remaining))
     return out
 
 

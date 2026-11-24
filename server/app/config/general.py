@@ -453,6 +453,8 @@ HEALTH_GAP_RECOVERY_COOLDOWN_HOURS = editable("HEALTH_GAP_RECOVERY_COOLDOWN_HOUR
 
 HEALTH_GAP_RECOVERY_WAIT_MINUTES = editable("HEALTH_GAP_RECOVERY_WAIT_MINUTES", "Minutes to wait for the HAE server to come up after sending the recovery notification", group="Health")(30)
 
+HEALTH_GAP_RECOVERY_MAX_REQUESTS = editable("HEALTH_GAP_RECOVERY_MAX_REQUESTS", "Maximum HAE requests per recovery session (whole gaps only, ~0.8s each). 0 = unlimited. Keeps a session short enough for the phone to stay unlocked", group="Health")(600)
+
 HEALTH_GAP_DIGEST_WEEKDAY = editable("HEALTH_GAP_DIGEST_WEEKDAY", "Weekday (0=Mon) on which digest-only gaps are emailed", group="Health")(0)
 
 HEALTH_UPLOAD_STALE_HOURS = editable("HEALTH_UPLOAD_STALE_HOURS", "Number of hours after which a health upload is considered stale", group="Health")(10)
