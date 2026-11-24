@@ -25,6 +25,7 @@ from scheduled_tasks.send_transaction_reminder import send_transaction_reminder_
 from scheduled_tasks.get_fx_up_to_date import get_fx_up_to_date_flow
 from scheduled_tasks.check_health_gaps import check_health_gaps_flow
 from scheduled_tasks.recover_health_gaps import recover_health_gaps_flow
+from scheduled_tasks.backfill_health_gaps import backfill_health_gaps_flow
 from scheduled_tasks.backup_db import backup_db_flow
 from scheduled_tasks.flag_location_noise import flag_location_noise_flow
 from scheduled_tasks.retroactive_location_scan import retroactive_location_scan_flow
@@ -69,6 +70,7 @@ FLOW_REGISTRY = {
     "send-transaction-reminder":   send_transaction_reminder_flow,
     "check-health-gaps":           check_health_gaps_flow,
     "recover-health-gaps":         recover_health_gaps_flow,
+    "backfill-health-gaps":        backfill_health_gaps_flow,
     "check-journal-staleness-evening":  check_journal_staleness_evening_flow,
     "check-journal-staleness-morning":  check_journal_staleness_morning_flow,
     "send-warn-error-log":         send_warn_error_log_flow,
