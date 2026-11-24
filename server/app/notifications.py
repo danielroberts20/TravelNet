@@ -148,7 +148,18 @@ def label_known_place_notification(title: str = "Title", body: str = "Body", tim
     url = settings.label_known_place_notification
     return _trigger_notification(url, title, body, use_prefix, prefix)
 
-def _trigger_notification(url, title: str = "Title", body: str = "Body", use_prefix: bool = True, prefix: str = None):
+def health_gap_recovery_notification(title: str = "Title", body: str = "Body", use_prefix: bool = True, prefix: str = None):
+    """Fire the Pushcut notification that, when tapped, starts HAE's MCP server on the phone.
+
+    Returns the Pushcut response, or None if it is unconfigured or the request failed.
+    """
+    url = settings.health_gap_notification
+    if not url:
+        logger.warning("HEALTH_GAP_NOTIFICATION is not configured; recovery notification not sent.")
+        return None
+    return _trigger_notification(url, title, body, use_prefix, prefix)
+
+def _trigger_notification(url,title: str = "Title", body: str = "Body", use_prefix: bool = True, prefix: str = None):
     if use_prefix:
         title = f"TravelNet — {title}" if prefix is None else f"{prefix} — {title}"
     payload = {

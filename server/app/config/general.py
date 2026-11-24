@@ -447,6 +447,8 @@ HEALTH_GAP_EXPORT_VERIFY_DELAY_HOURS = editable("HEALTH_GAP_EXPORT_VERIFY_DELAY_
 
 HEALTH_GAP_EXPORT_PAD_HOURS = editable("HEALTH_GAP_EXPORT_PAD_HOURS", "Padding (hours) either side of a gap in the suggested HAE export range", group="Health")(2)
 
+HEALTH_GAP_PULL_PAD_HOURS = editable("HEALTH_GAP_PULL_PAD_HOURS", "Padding (hours) either side of a gap when pulling it from the phone. Generous on purpose: re-pulled rows that already exist are ignored, so extra padding only costs bandwidth", group="Health")(12)
+
 HEALTH_GAP_DIGEST_WEEKDAY = editable("HEALTH_GAP_DIGEST_WEEKDAY", "Weekday (0=Mon) on which digest-only gaps are emailed", group="Health")(0)
 
 HEALTH_UPLOAD_STALE_HOURS = editable("HEALTH_UPLOAD_STALE_HOURS", "Number of hours after which a health upload is considered stale", group="Health")(10)
