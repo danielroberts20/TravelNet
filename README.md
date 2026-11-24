@@ -73,6 +73,7 @@ Data flows from iOS apps and manual uploads into FastAPI ingest endpoints, is en
 - **SQLite over PostgreSQL** — sufficient for write-once telemetry at this scale, zero operational overhead on constrained hardware
 - **Dual-source location** — Overland provides high-frequency GPS; iOS Shortcuts fills gaps when Overland drops out of background. Both sources are unified into a single SQL view (`location_unified`) with a cleaned view (`location_overland_cleaned`) that filters noise by accuracy threshold, displacement spikes, and cluster outliers
 - **Prefect self-hosted** — all scheduled tasks (FX pulls, weather enrichment, backups, health gap checks, log digests) run as Prefect flows with structured logging on the Prefect dashboard and push notifications on completion and failure
+- **Health gap recovery** — the daily gap check finds holes in the Health Auto Export data. When one can be recovered, TravelNet sends a Pushcut notification; tapping it runs a Shortcut that starts HAE's MCP server on the phone. TravelNet detects the server over Tailscale, pulls the missing ranges, ingests them, rescans, and marks each gap *resolved* or *genuinely missing*, then tells you the server can be stopped. A dropped connection never marks a gap missing, and a single-run lock stops overlapping sessions. Operating notes and the full-history audit: [`HEALTH_GAP_AUDIT.md`](HEALTH_GAP_AUDIT.md)
 - **Offsite backup** — SQLite snapshot encrypted with age, uploaded to Cloudflare R2 via rclone
 
 ---
