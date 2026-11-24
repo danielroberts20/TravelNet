@@ -437,13 +437,17 @@ INTERVAL_MINUTES = editable("INTERVAL_MINUTES", "Number of minutes between Short
 
 HEALTH_GAP_LOOKBACK_DAYS = editable("HEALTH_GAP_LOOKBACK_DAYS", "Days of history to analyse for gap detection", group="Health")(7)
 
-HEALTH_GAP_MULTIPLIER = editable("HEALTH_GAP_MULTIPLIER", "Gap must exceed N× median cadence to be flagged", group="Health")(3.0)
+HEALTH_GAP_MIN_NIGHTS = editable("HEALTH_GAP_MIN_NIGHTS", "Consecutive missing sleep nights needed to count as a sleep gap", group="Health")(2)
 
-HEALTH_GAP_MIN_HOURS = editable("HEALTH_GAP_MIN_HOURS", "Absolute floor (hours) — gaps shorter than this are never flagged", group="Health")(24.0)
+HEALTH_MIN_POINTS_AFTER = editable("HEALTH_MIN_POINTS_AFTER", "Records that must follow a closed gap before it is confirmed (otherwise it stays 'open')", group="Health")(5)
 
-HEALTH_MIN_HISTORY_POINTS = editable("HEALTH_MIN_HISTORY_POINTS", "Minimum points needed to compute a reliable median cadence", group="Health")(10)
+HEALTH_GAP_ESCALATE_DAYS = editable("HEALTH_GAP_ESCALATE_DAYS", "Days an open gap may stay unconfirmed before it is escalated to confirmed", group="Health")(3)
 
-HEALTH_MIN_POINTS_AFTER = editable("HEALTH_MIN_POINTS_AFTER", "Fewer than this many records after a gap → marked tentative", group="Health")(5)
+HEALTH_GAP_EXPORT_VERIFY_DELAY_HOURS = editable("HEALTH_GAP_EXPORT_VERIFY_DELAY_HOURS", "Hours after a manual-export check-off before the gap is re-verified", group="Health")(1)
+
+HEALTH_GAP_EXPORT_PAD_HOURS = editable("HEALTH_GAP_EXPORT_PAD_HOURS", "Padding (hours) either side of a gap in the suggested HAE export range", group="Health")(2)
+
+HEALTH_GAP_DIGEST_WEEKDAY = editable("HEALTH_GAP_DIGEST_WEEKDAY", "Weekday (0=Mon) on which digest-only gaps are emailed", group="Health")(0)
 
 HEALTH_UPLOAD_STALE_HOURS = editable("HEALTH_UPLOAD_STALE_HOURS", "Number of hours after which a health upload is considered stale", group="Health")(10)
 
