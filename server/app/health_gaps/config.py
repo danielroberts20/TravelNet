@@ -15,6 +15,8 @@ group        Metrics sharing a group whose gaps overlap in time are merged into
 immediate    True  -> a confirmed gap triggers an email straight away.
              False -> reported in the Monday digest only.
 critical     True  -> a confirmed gap also fires a Pushcut notification.
+sparse       True  -> recorded too rarely for a gap to justify asking the user to start the
+                      HAE server; such a gap is only recovered when a prompt happens anyway.
 
 Metrics not listed here (Resting Heart Rate, Walking Heart Rate Average,
 Cardio Recovery, ...) are sparse by nature and are deliberately not monitored.
@@ -33,6 +35,7 @@ class MetricConfig:
     group: Optional[str] = None
     immediate: bool = True
     critical: bool = False
+    sparse: bool = False   # phone rarely has more than the DB; a gap alone never justifies a recovery prompt
 
 
 # Virtual metric names (not rows in health_quantity)
@@ -65,10 +68,10 @@ METRIC_CONFIG: dict[str, MetricConfig] = {
     "Walking Step Length":               MetricConfig("activity", 24, _WALKING, immediate=False),
     "Walking Double Support Percentage": MetricConfig("activity", 24, _WALKING, immediate=False),
     "Walking Asymmetry Percentage":      MetricConfig("activity", 24, _WALKING, immediate=False),
-    "VO2 Max":                           MetricConfig("activity", 48, None, immediate=False),
+    "VO2 Max":                           MetricConfig("activity", 48, None, immediate=False, sparse=True),
     # --- sleep-only: written only while asleep ---------------------------------
-    "Respiratory Rate":                  MetricConfig("sleep_only", 72, None, immediate=False),
-    "Apple Sleeping Wrist Temperature":  MetricConfig("sleep_only", 96, None, immediate=False),
+    "Respiratory Rate":                  MetricConfig("sleep_only", 72, None, immediate=False, sparse=True),
+    "Apple Sleeping Wrist Temperature":  MetricConfig("sleep_only", 96, None, immediate=False, sparse=True),
 }
 
 # Sleep is nightly, handled as a count of consecutive missing nights.

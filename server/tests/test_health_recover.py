@@ -149,6 +149,39 @@ def test_server_already_up_skips_the_notification(conn):
 
 # --- digest-only gaps --------------------------------------------------------
 
+def test_sparse_gaps_never_start_a_prompt_even_on_digest_day(conn):
+    add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"), metrics=("VO2 Max",), immediate=0)
+    r = Run(conn)
+    assert r.go(digest_weekday=NOW.weekday()).status == rc.DIGEST_ONLY and r.prompted == []
+
+
+def test_walking_gaps_prompt_only_on_the_digest_day(conn):
+    add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"), metrics=("Walking Speed",), immediate=0)
+    quiet = Run(conn)
+    assert quiet.go(digest_weekday=(NOW.weekday() + 1) % 7).status == rc.DIGEST_ONLY and quiet.prompted == []
+    assert Run(conn).go().status == rc.DIGEST_ONLY                     # no digest day configured
+    day = Run(conn, rescan_effect=set_status("unrecoverable"))
+    assert day.go(digest_weekday=NOW.weekday()).status == rc.DONE and day.prompted
+
+
+def test_digest_day_walking_gap_respects_the_cooldown(conn):
+    add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"), metrics=("Walking Speed",), immediate=0,
+              last_prompted_at="2026-11-24T06:00:00Z")
+    assert Run(conn).go(digest_weekday=NOW.weekday()).status == rc.COOLDOWN
+
+
+def test_worth_prompting_rules():
+    from health_gaps.recover import worth_prompting
+    def e(metrics, immediate):
+        return type("E", (), {"metrics": {m: None for m in metrics}, "immediate": immediate})()
+    assert worth_prompting(e(["Step Count"], True), False)
+    assert not worth_prompting(e(["Walking Speed"], False), False)
+    assert worth_prompting(e(["Walking Speed"], False), True)
+    assert not worth_prompting(e(["VO2 Max"], False), True)
+    assert worth_prompting(e(["VO2 Max", "Walking Speed"], False), True)        # one non-sparse metric is enough
+    assert not worth_prompting(e(["Respiratory Rate", "Apple Sleeping Wrist Temperature"], False), True)
+
+
 def test_digest_only_gaps_never_start_a_prompt(conn):
     add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"), metrics=("VO2 Max",), immediate=0)
     r = Run(conn)

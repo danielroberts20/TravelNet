@@ -4,9 +4,10 @@ Recover confirmed health data gaps by pulling them from the phone's HAE MCP serv
 Called as a subflow by the daily check (scheduled_tasks/check_health_gaps.py) and runnable
 on its own (Prefect deployment 'recover-health-gaps', or ./runcron.sh):
 
-  1. Select confirmed gaps a pull could still help (events.needing_recovery). Only gaps
-     that are worth a prompt (not digest-only) start a notification, subject to a cooldown;
-     digest-only gaps ride along when the server is up. force=True ignores both rules.
+  1. Select confirmed gaps a pull could still help (events.needing_recovery). Gaps with a
+     loud metric start a notification (subject to a cooldown); digest-only gaps such as the
+     walking metrics do so only on the weekly digest day; gaps of sparse metrics only ride
+     along when the server is up. force=True ignores these rules.
   2. Send the Pushcut notification whose Shortcut starts HAE's MCP server on the phone, and
      poll the phone's port from that moment until it answers (health_gaps/recovery.py).
   3. Pull each gap newest-first, ingest through the normal health upload path (with a JSONL
@@ -28,6 +29,7 @@ load_overrides()
 
 from config.general import (
     HEALTH_BACKUP_DIR,
+    HEALTH_GAP_DIGEST_WEEKDAY,
     HEALTH_GAP_PULL_PAD_HOURS,
     HEALTH_GAP_RECOVERY_COOLDOWN_HOURS,
     HEALTH_GAP_RECOVERY_WAIT_MINUTES,
@@ -76,6 +78,7 @@ def recover_health_gaps_flow(force: bool = False) -> dict:
     params = RecoveryParams(
         pad_h=HEALTH_GAP_PULL_PAD_HOURS,
         cooldown_h=HEALTH_GAP_RECOVERY_COOLDOWN_HOURS,
+        digest_weekday=HEALTH_GAP_DIGEST_WEEKDAY,
         force=force,
     )
 

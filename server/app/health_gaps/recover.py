@@ -23,9 +23,10 @@ import logging
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Callable, ContextManager
+from typing import Callable, ContextManager, Optional
 
 from health_gaps import events as ev_mod
+from health_gaps.config import config_for
 from health_gaps.events import Event
 from health_gaps.hae_client import HAEAuthError, HAEClient, HAEError, HAEProtocolError, HAEUnreachable
 from health_gaps.pull import EventPull, pull_event
@@ -42,7 +43,8 @@ NOTHING_TO_DO, COOLDOWN, DIGEST_ONLY, TIMEOUT, DONE, INTERRUPTED, AUTH_ERROR, ER
 class RecoveryParams:
     pad_h: float = 12.0
     cooldown_h: float = 20.0         # below the daily schedule period, so schedule jitter never skips a day
-    force: bool = False              # manual run: ignore the cooldown and prompt for digest-only gaps too
+    digest_weekday: Optional[int] = None   # 0=Mon; on this day digest-only gaps (except sparse ones) may prompt
+    force: bool = False              # manual run: ignore the cooldown and prompt for any gap
 
 
 @dataclass
@@ -113,19 +115,34 @@ def finish_text(o: RecoveryOutcome) -> tuple[str, str]:
 # run
 # ---------------------------------------------------------------------------
 
+def worth_prompting(event: Event, is_digest_day: bool) -> bool:
+    """Is this gap worth interrupting the user for?
+
+    Gaps with a loud (immediate) metric always are. Digest-only gaps, e.g. the walking
+    metrics, are only on the weekly digest day, so they are still recovered without a
+    prompt every day. A gap made up solely of sparse metrics (VO2 Max, ...) never is: the
+    phone rarely has more than the DB, so it only rides along when a prompt happens anyway.
+    """
+    if event.immediate:
+        return True
+    cfgs = [config_for(m) for m in event.metrics]
+    return is_digest_day and any(c is not None and not c.sparse for c in cfgs)
+
+
 def run_recovery(state_conn: sqlite3.Connection, deps: RecoveryDeps, params: RecoveryParams = RecoveryParams()) -> RecoveryOutcome:
     now = deps.now()
     pending = ev_mod.needing_recovery(state_conn)
     if not pending:
         return RecoveryOutcome(NOTHING_TO_DO)
 
-    # Only gaps worth interrupting the user for may start a prompt. Digest-only gaps (sparse or
-    # walking-only metrics) never do on their own; they ride along whenever the server is up.
-    worth_prompting = [e for e in pending if e.immediate]
-    due = ev_mod.due_for_prompt(worth_prompting, now, params.cooldown_h)
+    # Only gaps worth interrupting the user for may start a prompt; every other pending gap
+    # rides along whenever the server is up anyway.
+    is_digest_day = params.digest_weekday is not None and now.weekday() == params.digest_weekday
+    promptable = [e for e in pending if worth_prompting(e, is_digest_day)]
+    due = ev_mod.due_for_prompt(promptable, now, params.cooldown_h)
     if not due and not params.force:
-        if not worth_prompting:
-            return RecoveryOutcome(DIGEST_ONLY, detail=f"{len(pending)} digest-only gap(s); not worth a prompt")
+        if not promptable:
+            return RecoveryOutcome(DIGEST_ONLY, detail=f"{len(pending)} gap(s) pending, none worth a prompt today")
         return RecoveryOutcome(COOLDOWN, detail=f"{len(pending)} gap(s) pending, prompted recently")
 
     if not deps.server_up():
