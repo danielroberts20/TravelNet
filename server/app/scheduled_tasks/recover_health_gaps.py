@@ -4,14 +4,15 @@ Recover confirmed health data gaps by pulling them from the phone's HAE MCP serv
 Called as a subflow by the daily check (scheduled_tasks/check_health_gaps.py) and runnable
 on its own (Prefect deployment 'recover-health-gaps', or ./runcron.sh):
 
-  1. Select confirmed gaps a pull could still help (events.needing_recovery), honouring a
-     per-gap notification cooldown (force=True ignores it).
+  1. Select confirmed gaps a pull could still help (events.needing_recovery). Only gaps
+     that are worth a prompt (not digest-only) start a notification, subject to a cooldown;
+     digest-only gaps ride along when the server is up. force=True ignores both rules.
   2. Send the Pushcut notification whose Shortcut starts HAE's MCP server on the phone, and
      poll the phone's port from that moment until it answers (health_gaps/recovery.py).
   3. Pull each gap newest-first, ingest through the normal health upload path (with a JSONL
      backup), rescan, and mark each gap resolved / genuinely missing / still pending.
-  4. Tell the user the outcome. HAE's server cannot be stopped remotely, so the message says
-     when it is safe to stop it by hand.
+  4. Tell the user the outcome: done (safe to stop the HAE server by hand, since it cannot be
+     stopped remotely), interrupted, failed, or timed out ("I'll try again tomorrow").
 
 All of the logic lives in health_gaps/recover.py; this module only wires real dependencies.
 """

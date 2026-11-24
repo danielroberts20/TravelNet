@@ -133,8 +133,11 @@ def test_server_never_comes_up_is_timeout_and_pulls_nothing(conn):
     add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"))
     r = Run(conn, wait_up=False)
     out = r.go()
-    assert out.status == rc.TIMEOUT and r.client.calls == [] and r.finished == [] and r.rescans == 0
+    assert out.status == rc.TIMEOUT and r.client.calls == [] and r.rescans == 0
     assert status_of(conn, 1) == "confirmed" and ev.get_event(conn, 1).pull_attempts == 0
+    title, body = r.finished[0]                           # the user is told, and promised a retry
+    assert "Timed Out" in title and "I'll try again tomorrow" in body
+    assert "safely stop" not in body
 
 
 def test_server_already_up_skips_the_notification(conn):
@@ -142,6 +145,36 @@ def test_server_already_up_skips_the_notification(conn):
     r = Run(conn, up=True, rescan_effect=set_status("unrecoverable"))
     r.go()
     assert r.prompted == [] and r.client.calls
+
+
+# --- digest-only gaps --------------------------------------------------------
+
+def test_digest_only_gaps_never_start_a_prompt(conn):
+    add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"), metrics=("VO2 Max",), immediate=0)
+    r = Run(conn)
+    out = r.go()
+    assert out.status == rc.DIGEST_ONLY and r.prompted == [] and r.client.calls == [] and r.finished == []
+    assert ev.get_event(conn, 1).last_prompted_at is None
+
+
+def test_digest_only_gaps_ride_along_when_an_immediate_gap_prompts(conn):
+    imm = add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"))
+    dig = add_event(conn, T("2026-11-18 00:00"), T("2026-11-19 00:00"), metrics=("VO2 Max",), immediate=0)
+    r = Run(conn, rescan_effect=set_status("unrecoverable"))
+    out = r.go()
+    assert sorted(r.prompted[0]) == [imm, dig] and sorted(out.pulled) == [imm, dig]
+
+
+def test_digest_only_gaps_are_recovered_by_a_forced_manual_run(conn):
+    add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"), metrics=("VO2 Max",), immediate=0)
+    r = Run(conn, rescan_effect=set_status("unrecoverable"))
+    assert r.go(force=True).status == rc.DONE and r.prompted
+
+
+def test_digest_only_gap_does_not_reprompt_while_an_immediate_one_is_in_cooldown(conn):
+    add_event(conn, T("2026-11-20 00:00"), T("2026-11-21 00:00"), last_prompted_at="2026-11-24T06:00:00Z")
+    add_event(conn, T("2026-11-18 00:00"), T("2026-11-19 00:00"), metrics=("VO2 Max",), immediate=0)
+    assert Run(conn).go().status == rc.COOLDOWN
 
 
 # --- outcomes -----------------------------------------------------------------
@@ -228,6 +261,11 @@ def test_prompt_text_pluralises():
     one = rc.prompt_text([object()])[1]
     two = rc.prompt_text([object(), object()])[1]
     assert "1 health gap can" in one and "2 health gaps can" in two and "unlocked" in one
+
+
+def test_timeout_message_uses_the_wait_in_minutes():
+    t, b = rc.finish_text(rc.RecoveryOutcome(rc.TIMEOUT, waited_s=1800))
+    assert t.startswith("🩺") and b.startswith("⏱️") and "30 min" in b and "try again tomorrow" in b
 
 
 def test_messages_follow_the_notification_emoji_convention():

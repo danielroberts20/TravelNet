@@ -33,16 +33,16 @@ from health_gaps.recovery import WaitResult
 
 logger = logging.getLogger(__name__)
 
-NOTHING_TO_DO, COOLDOWN, TIMEOUT, DONE, INTERRUPTED, AUTH_ERROR, ERROR = (
-    "nothing_to_do", "cooldown", "timeout", "done", "interrupted", "auth_error", "error",
+NOTHING_TO_DO, COOLDOWN, DIGEST_ONLY, TIMEOUT, DONE, INTERRUPTED, AUTH_ERROR, ERROR = (
+    "nothing_to_do", "cooldown", "digest_only", "timeout", "done", "interrupted", "auth_error", "error",
 )
 
 
 @dataclass
 class RecoveryParams:
     pad_h: float = 12.0
-    cooldown_h: float = 24.0
-    force: bool = False              # manual run: ignore the notification cooldown
+    cooldown_h: float = 20.0         # below the daily schedule period, so schedule jitter never skips a day
+    force: bool = False              # manual run: ignore the cooldown and prompt for digest-only gaps too
 
 
 @dataclass
@@ -66,6 +66,7 @@ class RecoveryOutcome:
     pending: list[int] = field(default_factory=list)       # still confirmed
     points: int = 0
     detail: str = ""
+    waited_s: float = 0.0                                   # how long we waited for the server (TIMEOUT)
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +89,11 @@ def finish_text(o: RecoveryOutcome) -> tuple[str, str]:
     if o.status == ERROR:
         return ("🩺 Health Recovery Failed",
                 f"❌ {o.detail or 'Unexpected response from the HAE server.'} You can stop the HAE server.")
+    if o.status == TIMEOUT:
+        minutes = max(1, round(o.waited_s / 60))
+        return ("🩺 Health Recovery Timed Out",
+                f"⏱️ The HAE server didn't start within {minutes} min, so nothing was recovered. "
+                f"I'll try again tomorrow.")
     parts = []
     if o.recovered:
         parts.append(f"{len(o.recovered)} recovered")
@@ -113,8 +119,13 @@ def run_recovery(state_conn: sqlite3.Connection, deps: RecoveryDeps, params: Rec
     if not pending:
         return RecoveryOutcome(NOTHING_TO_DO)
 
-    due = ev_mod.due_for_prompt(pending, now, params.cooldown_h)
+    # Only gaps worth interrupting the user for may start a prompt. Digest-only gaps (sparse or
+    # walking-only metrics) never do on their own; they ride along whenever the server is up.
+    worth_prompting = [e for e in pending if e.immediate]
+    due = ev_mod.due_for_prompt(worth_prompting, now, params.cooldown_h)
     if not due and not params.force:
+        if not worth_prompting:
+            return RecoveryOutcome(DIGEST_ONLY, detail=f"{len(pending)} digest-only gap(s); not worth a prompt")
         return RecoveryOutcome(COOLDOWN, detail=f"{len(pending)} gap(s) pending, prompted recently")
 
     if not deps.server_up():
@@ -123,7 +134,9 @@ def run_recovery(state_conn: sqlite3.Connection, deps: RecoveryDeps, params: Rec
         logger.info("Recovery: server %s after %.0fs (%d probes)",
                     "up" if wait.up else "NOT up", wait.elapsed_s, wait.probes)
         if not wait.up:
-            return RecoveryOutcome(TIMEOUT, detail=f"no answer after {wait.elapsed_s:.0f}s")
+            out = RecoveryOutcome(TIMEOUT, detail=f"no answer after {wait.elapsed_s:.0f}s", waited_s=wait.elapsed_s)
+            deps.finish(*finish_text(out))
+            return out
     else:
         logger.info("Recovery: HAE server already up; skipping the notification")
 
