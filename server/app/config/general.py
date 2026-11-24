@@ -449,6 +449,10 @@ HEALTH_GAP_EXPORT_PAD_HOURS = editable("HEALTH_GAP_EXPORT_PAD_HOURS", "Padding (
 
 HEALTH_GAP_PULL_PAD_HOURS = editable("HEALTH_GAP_PULL_PAD_HOURS", "Padding (hours) either side of a gap when pulling it from the phone. Generous on purpose: re-pulled rows that already exist are ignored, so extra padding only costs bandwidth", group="Health")(12)
 
+HEALTH_GAP_RECOVERY_COOLDOWN_HOURS = editable("HEALTH_GAP_RECOVERY_COOLDOWN_HOURS", "Minimum hours between recovery notifications for the same unrecovered gap", group="Health")(24)
+
+HEALTH_GAP_RECOVERY_WAIT_MINUTES = editable("HEALTH_GAP_RECOVERY_WAIT_MINUTES", "Minutes to wait for the HAE server to come up after sending the recovery notification", group="Health")(30)
+
 HEALTH_GAP_DIGEST_WEEKDAY = editable("HEALTH_GAP_DIGEST_WEEKDAY", "Weekday (0=Mon) on which digest-only gaps are emailed", group="Health")(0)
 
 HEALTH_UPLOAD_STALE_HOURS = editable("HEALTH_UPLOAD_STALE_HOURS", "Number of hours after which a health upload is considered stale", group="Health")(10)

@@ -43,6 +43,7 @@ SCHEDULE_CONFIGS = {
 
     # Health
     "check-health-gaps":                ("0 9 * * *",               "Daily check for missing or partial health metric days"),
+    "recover-health-gaps":              (None,                      "Manual: Pull confirmed health gaps from the phone (HAE server). Notifies you to start it"),
 
     # Journal
     "check-journal-staleness-evening":  (f"0 {JOURNAL_REMIND_EVENING_HOUR} * * *", "Daily check for stale evening journal entries"),

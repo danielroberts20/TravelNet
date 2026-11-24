@@ -10,9 +10,12 @@ Scheduled: Every day at 09:00 (see config/schedules.py).
     health_gap_events. Detection runs daily because data lost in a gap is
     unrecoverable; only *notification* is gated on state changes.
   - Emails only when a gap is newly confirmed (or, for digest-only metrics,
-    on the weekly digest day). Pushcut for critical gaps. Silent otherwise.
-  - Confirmed gaps can be fixed by a manual Health Auto Export; check them off
-    via POST /metadata/health-gaps/<id>/exported and the next run verifies.
+    on the weekly digest day). Silent otherwise.
+  - Then hands confirmed gaps to the recovery flow (scheduled_tasks/recover_health_gaps.py):
+    a Pushcut notification asks you to start HAE's server on the phone, and the gaps are
+    pulled from it and verified straight away. That notification replaces the old critical
+    push. If recovery is not configured the old behaviour applies: critical Pushcut, and
+    a manual Health Auto Export checked off via POST /metadata/health-gaps/<id>/exported.
 """
 
 from __future__ import annotations
@@ -27,22 +30,13 @@ from config.editable import load_overrides
 load_overrides()
 
 from config.general import (
-    HEALTH_GAP_DIGEST_WEEKDAY,
-    HEALTH_GAP_ESCALATE_DAYS,
-    HEALTH_GAP_EXPORT_PAD_HOURS,
-    HEALTH_GAP_EXPORT_VERIFY_DELAY_HOURS,
-    HEALTH_GAP_LOOKBACK_DAYS,
-    HEALTH_GAP_MIN_NIGHTS,
-    HEALTH_MIN_POINTS_AFTER,
     HEALTH_UPLOAD_STALE_HOURS,
     HEALTH_STALE_ALERT_FILE,
 )
-from config.settings import settings
 from database.connection import get_conn
-from database.health.gap_events.table import table as gap_events_table
-from health_gaps.events import Params
-from health_gaps.runner import compute_scan_start, load_health_data, run_check
-from notifications import error_notification, notify_on_completion, log_on_success, record_flow_result, send_email, send_notification
+from health_gaps.scan import recovery_configured, scan_and_notify
+from notifications import error_notification, notify_on_completion, log_on_success, record_flow_result
+from scheduled_tasks.recover_health_gaps import recover_health_gaps_flow
 
 
 # ---------------------------------------------------------------------------
@@ -141,51 +135,24 @@ def check_health_upload_recency() -> dict:
 
 @task(name="detect_and_notify_health_gaps")
 def detect_and_notify_health_gaps() -> dict:
+    return scan_and_notify(get_run_logger())
+
+
+@task(name="recover_health_gaps")
+def recover_gaps_from_phone() -> dict:
+    """Ask the user to start HAE's server and pull confirmed gaps from the phone.
+
+    Never raises: a recovery problem must not fail the daily check (the recovery flow
+    sends its own failure notification).
+    """
     log = get_run_logger()
-    now = datetime.now(timezone.utc)
-    params = Params(
-        min_points_after=HEALTH_MIN_POINTS_AFTER,
-        escalate_days=HEALTH_GAP_ESCALATE_DAYS,
-        export_verify_delay_h=HEALTH_GAP_EXPORT_VERIFY_DELAY_HOURS,
-        export_pad_h=HEALTH_GAP_EXPORT_PAD_HOURS,
-    )
-
-    gap_events_table.init()   # idempotent; flow may run before the API restarts
-    state_conn = get_conn()
+    if not recovery_configured():
+        return {"status": "disabled"}
     try:
-        scan_start = compute_scan_start(state_conn, now, HEALTH_GAP_LOOKBACK_DAYS)
-        read_conn = get_conn(read_only=True)
-        try:
-            data = load_health_data(read_conn, scan_start)
-        finally:
-            read_conn.close()
-
-        def _email(subject: str, body: str) -> None:
-            log.info("Gap report:\n%s", body)
-            send_email(subject=subject, body=body, **settings.smtp_config)
-
-        def _push(text: str) -> None:
-            log.warning("Critical health gap: %s", text)
-            send_notification(title="Health data gap", body=text, time_sensitive=True)
-
-        report = run_check(
-            state_conn, data, now, scan_start,
-            send_email=_email, push=_push,
-            digest_weekday=HEALTH_GAP_DIGEST_WEEKDAY,
-            min_nights=HEALTH_GAP_MIN_NIGHTS,
-            params=params,
-        )
-    finally:
-        state_conn.close()
-
-    result = {
-        "newly_confirmed": len(report.newly_confirmed),
-        "held_for_digest": len(report.held_for_digest),
-        "awaiting_export": len(report.awaiting_export),
-        "ongoing": len(report.ongoing),
-    }
-    log.info("Health gap check: %s", result)
-    return result
+        return recover_health_gaps_flow()
+    except Exception as e:
+        log.warning("Health gap recovery failed: %s", e)
+        return {"status": "error"}
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +164,9 @@ def check_health_gaps_flow() -> dict:
     """Daily health monitor: upload recency, then persistent gap detection."""
     recency = check_health_upload_recency()
     gaps = detect_and_notify_health_gaps()
+    recovery = recover_gaps_from_phone()
 
-    result = {"upload_stale": recency["stale"], "stale_hours": recency["stale_hours"], **gaps}
+    result = {"upload_stale": recency["stale"], "stale_hours": recency["stale_hours"], **gaps,
+              "recovery": recovery.get("status")}
     record_flow_result(result)
     return result

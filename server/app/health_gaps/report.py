@@ -20,12 +20,10 @@ def should_email(report: Report, is_digest_day: bool) -> bool:
     return is_digest_day and bool(report.held_for_digest)
 
 
-def subject(report: Report, is_digest_day: bool) -> str:
+def subject(report: Report, is_digest_day: bool, auto_recovery: bool = False) -> str:
     n_new = len(report.newly_confirmed) + (len(report.held_for_digest) if is_digest_day else 0)
-    return (
-        f"{SUBJECT_PREFIX} — {n_new} new, "
-        f"{len(report.awaiting_export)} awaiting export, {len(report.ongoing)} ongoing"
-    )
+    waiting = "awaiting recovery" if auto_recovery else "awaiting export"
+    return f"{SUBJECT_PREFIX} — {n_new} new, {len(report.awaiting_export)} {waiting}, {len(report.ongoing)} ongoing"
 
 
 def _span(ev: Event) -> str:
@@ -48,28 +46,40 @@ def _fmt_event(ev: Event, now: datetime, pad_h: float, with_export: bool) -> str
     return "\n".join(lines)
 
 
-def build_body(report: Report, now: datetime, is_digest_day: bool, pad_h: float) -> str:
+def build_body(report: Report, now: datetime, is_digest_day: bool, pad_h: float, auto_recovery: bool = False) -> str:
     new = list(report.newly_confirmed) + (list(report.held_for_digest) if is_digest_day else [])
     new_ids = {e.id for e in new}
     lines = [f"Health gap check — {now:%Y-%m-%d}", ""]
 
-    lines += ["NEW CONFIRMED GAPS  (data missing — re-export from Health Auto Export)", "-" * 50]
+    if auto_recovery:
+        lines += ["NEW CONFIRMED GAPS  (a Pushcut notification will ask you to start the HAE server so",
+                  "                    they can be recovered automatically; the export range is the manual fallback)",
+                  "-" * 50]
+    else:
+        lines += ["NEW CONFIRMED GAPS  (data missing — re-export from Health Auto Export)", "-" * 50]
     lines += [_fmt_event(e, now, pad_h, True) + "\n" for e in new]
 
     others = [e for e in report.awaiting_export if e.id not in new_ids]
     if others:
-        lines += ["STILL AWAITING MANUAL EXPORT", "-" * 50]
+        lines += ["STILL AWAITING RECOVERY" if auto_recovery else "STILL AWAITING MANUAL EXPORT", "-" * 50]
         lines += [_fmt_event(e, now, pad_h, True) + "\n" for e in others]
 
     if report.ongoing:
         lines += ["ONGOING / UNCONFIRMED  (no action yet)", "-" * 50]
         lines += [_fmt_event(e, now, pad_h, False) + "\n" for e in report.ongoing]
 
-    lines += [
-        "After exporting, check the gap off so the next daily run can verify it:",
-        "  POST /metadata/health-gaps/<id>/exported   (still empty afterwards → marked genuinely missing)",
-        "  POST /metadata/health-gaps/<id>/dismiss    (mark genuinely missing without exporting)",
-    ]
+    if auto_recovery:
+        lines += [
+            "Manual fallback: after exporting by hand, check the gap off so the next daily run can verify it:",
+            "  POST /metadata/health-gaps/<id>/exported   (still empty afterwards → marked genuinely missing)",
+            "  POST /metadata/health-gaps/<id>/dismiss    (mark genuinely missing without recovering)",
+        ]
+    else:
+        lines += [
+            "After exporting, check the gap off so the next daily run can verify it:",
+            "  POST /metadata/health-gaps/<id>/exported   (still empty afterwards → marked genuinely missing)",
+            "  POST /metadata/health-gaps/<id>/dismiss    (mark genuinely missing without exporting)",
+        ]
     return "\n".join(lines)
 
 

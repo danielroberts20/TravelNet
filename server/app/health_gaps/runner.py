@@ -97,6 +97,7 @@ def run_check(
     digest_weekday: int = 0,
     min_nights: int = 2,
     params: Params = Params(),
+    auto_recovery: bool = False,
 ) -> Report:
     """Detect, reconcile persisted state, and notify only about what is new."""
     candidates = cluster_gaps(find_gaps(data, now, min_nights), now)
@@ -108,8 +109,8 @@ def run_check(
     ev_mod.mark_pushed(state_conn, [e.id for e in report.to_push], now)
 
     if should_email(report, is_digest_day):
-        body = build_body(report, now, is_digest_day, params.export_pad_h)
-        send_email(subject(report, is_digest_day), body)
+        body = build_body(report, now, is_digest_day, params.export_pad_h, auto_recovery)
+        send_email(subject(report, is_digest_day, auto_recovery), body)
         told = report.newly_confirmed + (report.held_for_digest if is_digest_day else [])
         ev_mod.mark_notified(state_conn, [e.id for e in told], now)
     return report
