@@ -230,6 +230,17 @@ def test_prompt_text_pluralises():
     assert "1 health gap can" in one and "2 health gaps can" in two and "unlocked" in one
 
 
+def test_messages_follow_the_notification_emoji_convention():
+    """Topical emoji leads the title, a status emoji leads the body (as in the existing notifications)."""
+    assert rc.prompt_text([object()])[0].startswith("🩺")
+    done = rc.finish_text(rc.RecoveryOutcome(rc.DONE, recovered=[1]))
+    assert done[0].startswith("🩺") and done[1].startswith("✅")
+    assert rc.finish_text(rc.RecoveryOutcome(rc.INTERRUPTED))[1].startswith("⚠️")
+    for status in (rc.AUTH_ERROR, rc.ERROR):
+        t, b = rc.finish_text(rc.RecoveryOutcome(status))
+        assert t.startswith("🩺") and b.startswith("❌")
+
+
 def test_finish_text_never_says_stop_after_an_interruption():
     t, b = rc.finish_text(rc.RecoveryOutcome(rc.INTERRUPTED, pending=[1]))
     assert "safely stop" not in b and "Check that the HAE server is stopped" in b

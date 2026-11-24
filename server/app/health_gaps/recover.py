@@ -75,19 +75,19 @@ class RecoveryOutcome:
 def prompt_text(events: list[Event]) -> tuple[str, str]:
     n = len(events)
     return (
-        "Health data gap",
-        f"{n} health gap{'s' if n != 1 else ''} can be recovered. Tap to start the HAE server, "
+        "🩺 Health Data Gap",
+        f"📲 {n} health gap{'s' if n != 1 else ''} can be recovered. Tap to start the HAE server, "
         f"then leave the phone unlocked until you're told it's done.",
     )
 
 
 def finish_text(o: RecoveryOutcome) -> tuple[str, str]:
     if o.status == AUTH_ERROR:
-        return ("Health recovery failed",
-                "The HAE server rejected the token. Update HAE_TOKEN, then stop the HAE server.")
+        return ("🩺 Health Recovery Failed",
+                "❌ The HAE server rejected the token. Update HAE_TOKEN, then stop the HAE server.")
     if o.status == ERROR:
-        return ("Health recovery failed", f"{o.detail or 'Unexpected response from the HAE server.'} "
-                                          f"You can stop the HAE server.")
+        return ("🩺 Health Recovery Failed",
+                f"❌ {o.detail or 'Unexpected response from the HAE server.'} You can stop the HAE server.")
     parts = []
     if o.recovered:
         parts.append(f"{len(o.recovered)} recovered")
@@ -97,10 +97,10 @@ def finish_text(o: RecoveryOutcome) -> tuple[str, str]:
         parts.append(f"{len(o.pending)} still pending")
     summary = ", ".join(parts) or "nothing to change"
     if o.status == INTERRUPTED:
-        return ("Health recovery interrupted",
-                f"The phone stopped answering part-way ({summary}). Unfinished gaps will be retried. "
+        return ("🩺 Health Recovery Interrupted",
+                f"⚠️ The phone stopped answering part-way ({summary}). Unfinished gaps will be retried. "
                 f"Check that the HAE server is stopped.")
-    return ("Health recovery finished", f"All done: {summary}. You can safely stop the HAE server now.")
+    return ("🩺 Health Recovery Finished", f"✅ All done: {summary}. You can safely stop the HAE server now.")
 
 
 # ---------------------------------------------------------------------------
