@@ -117,11 +117,24 @@ def test_auth_error_propagates():
         pull_event(FakeClient(script={("heart_rate", 0): HAEAuthError("401")}), ev, NOW, lambda p: None)
 
 
-def test_summarised_metric_uses_few_large_chunks():
-    ev = event({"Step Count": ["2026-11-20 00:00:00Z", "2026-11-22 00:00:00Z"]})   # 52h with pad
+def test_summarised_window_is_exact_and_continues_the_stored_hourly_grid():
+    ev = event({"Step Count": ["2026-11-20 00:13:00Z", "2026-11-22 00:00:00Z"]})
+    # raw metrics get padding; summarised start one hour after the last stored row, no pad
+    assert metric_window(ev, "Step Count", NOW, 12) == (T("2026-11-20 01:13"), T("2026-11-22 00:00"))
+
+
+def test_summarised_chunks_stay_on_the_start_grid():
+    ev = event({"Step Count": ["2026-11-20 00:00:00Z", "2026-11-23 06:00:00Z"]})   # 1h in -> 77h
     client = FakeClient()
     pull_event(client, ev, NOW, lambda p: None)
-    assert len(client.calls) == 2                       # 48h chunks, not 9 x 6h
+    starts = sorted(c[1] for c in client.calls)
+    assert starts == [T("2026-11-20 01:00"), T("2026-11-22 01:00")]               # start, start+48h
+    assert max(c[2] for c in client.calls) == T("2026-11-23 06:00")               # ends at the next stored row
+
+
+def test_raw_metric_is_padded_summarised_is_not():
+    raw = event({"heart_rate": ["2026-11-20 08:00:00Z", "2026-11-20 10:00:00Z"]})
+    assert metric_window(raw, "heart_rate", NOW, 12) == (T("2026-11-19 20:00"), T("2026-11-20 22:00"))
 
 
 def test_chunks_requested_newest_first():

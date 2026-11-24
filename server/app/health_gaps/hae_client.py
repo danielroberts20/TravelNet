@@ -97,16 +97,29 @@ def format_hae_date(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S +0000")
 
 
-def chunk_range(start: datetime, end: datetime, hours: float = DEFAULT_CHUNK_HOURS) -> list[tuple[datetime, datetime]]:
+def chunk_range(
+    start: datetime, end: datetime, hours: float = DEFAULT_CHUNK_HOURS, *, align_to_start: bool = False,
+) -> list[tuple[datetime, datetime]]:
     """Split [start, end] into consecutive windows of at most ``hours``, newest first.
 
     Newest first so that if the phone drops partway the most recent data, which is
     the least likely to have been recovered some other way, is already in.
+
+    ``align_to_start`` puts every chunk edge on the start + k*hours grid (the last chunk
+    is the short one). Summarised metrics need it: HAE anchors each hourly bucket to the
+    query's start time, so a chunk starting off-grid would shift its buckets.
     """
     if end <= start:
         return []
     step = timedelta(hours=hours)
     chunks: list[tuple[datetime, datetime]] = []
+    if align_to_start:
+        lo = start
+        while lo < end:
+            chunks.append((lo, min(lo + step, end)))
+            lo += step
+        chunks.reverse()
+        return chunks
     cursor = end
     while cursor > start:
         lo = max(start, cursor - step)

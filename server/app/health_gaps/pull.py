@@ -65,14 +65,25 @@ class EventPull:
 
 
 def metric_window(event: Event, metric: str, now: datetime, pad_h: float) -> tuple[datetime, datetime]:
-    """The metric's own gap window, padded. Falls back to the event window."""
+    """The window to ask the phone for.
+
+    Raw metrics: the metric's own gap window, padded generously. Rows that already exist are
+    ignored on insert, so padding only costs bandwidth and protects the gap's edges.
+
+    Summarised metrics (hourly buckets anchored to the query start): padding would produce
+    buckets that straddle rows already stored, double-counting the overlap. Instead the query
+    starts one hour after the last stored row (so the new buckets continue its hourly grid)
+    and ends at the first stored row after the gap, with no padding.
+    """
     span = event.metrics.get(metric)
-    pad = timedelta(hours=pad_h)
     if span:
         start = parse(span[0])
         end = parse(span[1]) if span[1] else now
     else:
         start, end = event.window_start, event.window_end or now
+    if query_style(metric).aggregate:
+        return start + timedelta(hours=1), min(end, now)
+    pad = timedelta(hours=pad_h)
     return start - pad, min(end + pad, now)
 
 
@@ -95,7 +106,7 @@ def pull_event(
     for metric in event.metrics:
         lo, hi = metric_window(event, metric, now, pad_h)
         style = query_style(metric)
-        chunks = chunk_range(lo, hi, chunk_hours or style.chunk_hours)
+        chunks = chunk_range(lo, hi, chunk_hours or style.chunk_hours, align_to_start=style.aggregate)
         mp = MetricPull(metric, (lo, hi), len(chunks))
         result.metrics.append(mp)
 

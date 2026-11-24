@@ -249,3 +249,13 @@ def test_summarised_metric_is_requested_hourly_by_default():
     c.get_health_metrics("Step Count", T("2026-11-24 00:00"), T("2026-11-24 03:00"))
     args = s.calls[2]["json"]["params"]["arguments"]
     assert args["aggregate"] is True and args["interval"] == "hours" and args["metrics"] == "step_count"
+
+
+def test_chunk_range_align_to_start_keeps_the_grid_and_newest_first():
+    start, end = T("2026-11-20 00:13"), T("2026-11-23 06:00")
+    chunks = chunk_range(start, end, hours=48, align_to_start=True)
+    assert chunks == [
+        (T("2026-11-22 00:13"), T("2026-11-23 06:00")),
+        (T("2026-11-20 00:13"), T("2026-11-22 00:13")),
+    ]
+    assert chunk_range(start, start, 48, align_to_start=True) == []
