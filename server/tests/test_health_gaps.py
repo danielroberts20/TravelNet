@@ -99,6 +99,23 @@ def test_continuous_metric_flags_gap_over_threshold():
     assert len(gaps) == 1 and gaps[0].end == T("2026-10-25 23:25")
 
 
+def test_vo2_max_threshold_is_seven_days_and_sparse():
+    cfg = config_for("VO2 Max")
+    assert cfg.threshold_h == 168 and cfg.sparse and not cfg.immediate
+
+
+def test_vo2_max_normal_cadence_is_not_a_gap():
+    """Readings 4-5 days apart are normal for VO2 Max (median ~99h on this trip)."""
+    ts = [T("2026-10-01 10:00"), T("2026-10-05 18:00"), T("2026-10-10 09:00"), T("2026-10-14 12:00")]
+    assert detect_metric_gaps("VO2 Max", ts, T("2026-10-15 00:00")) == []
+
+
+def test_vo2_max_gap_over_seven_days_is_flagged():
+    ts = [T("2026-10-01 10:00"), T("2026-10-10 09:00"), T("2026-10-12 09:00")]     # 8.96-day hole
+    gaps = detect_metric_gaps("VO2 Max", ts, T("2026-10-13 00:00"))
+    assert len(gaps) == 1 and gaps[0].start == T("2026-10-01 10:00") and gaps[0].end == T("2026-10-10 09:00")
+
+
 def test_unmonitored_sparse_metric_is_ignored():
     ts = [T("2026-10-01 00:00")]
     assert detect_metric_gaps("Resting Heart Rate", ts, T("2026-11-01 00:00")) == []

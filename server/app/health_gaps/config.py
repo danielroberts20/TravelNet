@@ -68,7 +68,10 @@ METRIC_CONFIG: dict[str, MetricConfig] = {
     "Walking Step Length":               MetricConfig("activity", 24, _WALKING, immediate=False),
     "Walking Double Support Percentage": MetricConfig("activity", 24, _WALKING, immediate=False),
     "Walking Asymmetry Percentage":      MetricConfig("activity", 24, _WALKING, immediate=False),
-    "VO2 Max":                           MetricConfig("activity", 48, None, immediate=False, sparse=True),
+    # Apple only records VO2 Max after qualifying outdoor activity: readings were a median of ~99h
+    # apart (49-336h) over the first five months of the trip, so 48h flagged normal behaviour.
+    # 7 days leaves only the genuinely long silences.
+    "VO2 Max":                           MetricConfig("activity", 168, None, immediate=False, sparse=True),
     # --- sleep-only: written only while asleep ---------------------------------
     "Respiratory Rate":                  MetricConfig("sleep_only", 72, None, immediate=False, sparse=True),
     "Apple Sleeping Wrist Temperature":  MetricConfig("sleep_only", 96, None, immediate=False, sparse=True),
