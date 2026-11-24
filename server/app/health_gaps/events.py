@@ -52,6 +52,10 @@ class Event:
     notified_status: Optional[str]
     pushed_at: Optional[str]
     exported_at: Optional[str]
+    pulled_at: Optional[str] = None          # a complete pull from the phone finished
+    pull_attempts: int = 0
+    last_pull_at: Optional[str] = None
+    last_prompted_at: Optional[str] = None   # last recovery notification naming this event
 
     @property
     def hours(self) -> Optional[float]:
@@ -93,6 +97,10 @@ def _row_to_event(row: sqlite3.Row) -> Event:
         notified_status=row["notified_status"],
         pushed_at=row["pushed_at"],
         exported_at=row["exported_at"],
+        pulled_at=row["pulled_at"],
+        pull_attempts=row["pull_attempts"],
+        last_pull_at=row["last_pull_at"],
+        last_prompted_at=row["last_prompted_at"],
     )
 
 
@@ -146,6 +154,19 @@ def _overlaps(ev: Event, cand: Candidate, now: datetime) -> bool:
     return ev.group_key == cand.group_key and cand.start <= ev_end and ev.window_start <= c_end
 
 
+def _verified_absent(ev: Event, cand: Candidate, now: datetime, verify_after: timedelta) -> bool:
+    """A recovery step has run and the gap is still there, so the data is genuinely absent.
+
+    Manual export: the user checked it off and the settling delay has passed.
+    Pull from the phone: the data was ingested before the rescan, so no delay, but only if
+    the gap had already closed when the pull ran (otherwise the pull could not have covered
+    it) and never for an ongoing gap, where more data may still arrive.
+    """
+    if ev.exported_at and now - parse(ev.exported_at) >= verify_after:
+        return True
+    return bool(ev.pulled_at and cand.end is not None and parse(ev.pulled_at) >= cand.end)
+
+
 def _metrics_json(cand: Candidate) -> str:
     return json.dumps({m: [fmt(s), fmt(e) if e else None] for m, (s, e) in cand.metrics.items()})
 
@@ -192,8 +213,8 @@ def reconcile(
 
         status = _decide_status(cand, OPEN if ev.status == RESOLVED else ev.status, now, params)
         resolved_at = None
-        if ev.exported_at and now - parse(ev.exported_at) >= verify_after:
-            status = UNRECOVERABLE                      # exported, still empty
+        if _verified_absent(ev, cand, now, verify_after):
+            status = UNRECOVERABLE                      # recovery ran, still empty
             resolved_at = now_s
 
         merged = dict(ev.metrics)
@@ -261,6 +282,43 @@ def mark_notified(conn: sqlite3.Connection, event_ids: list[int], now: datetime)
 def mark_pushed(conn: sqlite3.Connection, event_ids: list[int], now: datetime) -> None:
     for i in event_ids:
         conn.execute("UPDATE health_gap_events SET pushed_at = ? WHERE id = ?", (fmt(now), i))
+    conn.commit()
+
+
+def needing_recovery(conn: sqlite3.Connection) -> list[Event]:
+    """Confirmed gaps a pull from the phone could still help with.
+
+    Never pulled, or pulled before the gap closed (so the pull cannot have covered it).
+    """
+    out = []
+    for ev in list_events(conn, (CONFIRMED,)):
+        if ev.pulled_at is None or (ev.window_end is not None and parse(ev.pulled_at) < ev.window_end):
+            out.append(ev)
+    return out
+
+
+def due_for_prompt(events: list[Event], now: datetime, cooldown_h: float) -> list[Event]:
+    """Events worth (re-)notifying the user about: never prompted, or not within the cooldown."""
+    cutoff = now - timedelta(hours=cooldown_h)
+    return [e for e in events if e.last_prompted_at is None or parse(e.last_prompted_at) <= cutoff]
+
+
+def mark_prompted(conn: sqlite3.Connection, event_ids: list[int], now: datetime) -> None:
+    for i in event_ids:
+        conn.execute("UPDATE health_gap_events SET last_prompted_at = ? WHERE id = ?", (fmt(now), i))
+    conn.commit()
+
+
+def record_pull(conn: sqlite3.Connection, event_id: int, now: datetime, *, complete: bool) -> None:
+    """Record a pull attempt. ``complete`` means the phone answered every chunk for every
+    metric; only then is pulled_at set, which lets the next rescan call the gap genuinely
+    absent. An interrupted or partly failed pull must pass complete=False."""
+    now_s = fmt(now)
+    conn.execute(
+        "UPDATE health_gap_events SET pull_attempts = pull_attempts + 1, last_pull_at = ?, "
+        "pulled_at = CASE WHEN ? THEN ? ELSE pulled_at END WHERE id = ?",
+        (now_s, int(complete), now_s, event_id),
+    )
     conn.commit()
 
 

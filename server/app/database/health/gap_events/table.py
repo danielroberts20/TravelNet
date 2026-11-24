@@ -47,9 +47,21 @@ CREATE TABLE IF NOT EXISTS health_gap_events (
     pushed_at        TEXT,                     -- Pushcut sent (critical events)
     exported_at      TEXT,                     -- user checked off a manual HAE export
     resolved_at      TEXT,
-    note             TEXT
+    note             TEXT,
+    pulled_at        TEXT,                     -- a COMPLETE pull from the phone finished (see events.record_pull)
+    pull_attempts    INTEGER NOT NULL DEFAULT 0,
+    last_pull_at     TEXT,                     -- last pull attempt, complete or not
+    last_prompted_at TEXT                      -- last recovery notification that included this event
 );
 """
+
+# Columns added after the first release; added to existing tables by init_schema().
+_ADDED_COLUMNS = (
+    ("pulled_at", "TEXT"),
+    ("pull_attempts", "INTEGER NOT NULL DEFAULT 0"),
+    ("last_pull_at", "TEXT"),
+    ("last_prompted_at", "TEXT"),
+)
 
 INDEXES = (
     "CREATE INDEX IF NOT EXISTS idx_hge_status ON health_gap_events(status)",
@@ -59,6 +71,10 @@ INDEXES = (
 
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.execute(SCHEMA)
+    have = {r[1] for r in conn.execute("PRAGMA table_info(health_gap_events)")}
+    for name, decl in _ADDED_COLUMNS:
+        if name not in have:                      # idempotent migration of pre-existing tables
+            conn.execute(f"ALTER TABLE health_gap_events ADD COLUMN {name} {decl}")
     for ddl in INDEXES:
         conn.execute(ddl)
 

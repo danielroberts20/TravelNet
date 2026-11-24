@@ -290,3 +290,101 @@ def test_awaiting_export_listed_while_unchecked(conn):
     assert [e.id for e in report.awaiting_export] == [1]
     ev.mark_exported(conn, 1, T("2026-10-26 09:30"))
     assert h.run("2026-10-26 09:45").awaiting_export == []
+
+
+# --------------------------------------------------------------------------
+# recovery by pulling from the phone (events.record_pull / needing_recovery)
+# --------------------------------------------------------------------------
+
+def test_complete_pull_that_fills_the_gap_resolves_it(conn):
+    h, _ = _confirmed_step_gap(conn)
+    ev.record_pull(conn, 1, T("2026-10-25 10:00"), complete=True)
+    h.full["Step Count"] = series("2026-10-15 00:00", "2026-11-09 00:00", 1.0)   # pulled data ingested
+    h.run("2026-10-25 10:05")
+    assert h.statuses() == [(1, "resolved")]
+
+
+def test_complete_pull_that_stays_empty_is_unrecoverable_with_no_delay(conn):
+    h, _ = _confirmed_step_gap(conn)
+    ev.record_pull(conn, 1, T("2026-10-25 10:00"), complete=True)
+    h.run("2026-10-25 10:00")                         # rescan straight after the pull
+    assert h.statuses() == [(1, "unrecoverable")]
+    for d in range(26, 31):
+        h.run(f"2026-10-{d} 09:00")
+    assert h.statuses() == [(1, "unrecoverable")]
+
+
+def test_incomplete_pull_never_marks_a_gap_absent(conn):
+    h, _ = _confirmed_step_gap(conn)
+    ev.record_pull(conn, 1, T("2026-10-25 10:00"), complete=False)   # phone dropped mid-run
+    h.run("2026-10-25 10:05")
+    e = ev.get_event(conn, 1)
+    assert e.status == "confirmed" and e.pulled_at is None
+    assert e.pull_attempts == 1 and e.last_pull_at is not None
+    assert [x.id for x in ev.needing_recovery(conn)] == [1]
+
+
+def test_failed_attempt_does_not_clear_an_earlier_complete_pull(conn):
+    h, _ = _confirmed_step_gap(conn)
+    ev.record_pull(conn, 1, T("2026-10-25 10:00"), complete=True)
+    ev.record_pull(conn, 1, T("2026-10-25 11:00"), complete=False)
+    e = ev.get_event(conn, 1)
+    assert e.pulled_at is not None and e.pull_attempts == 2
+
+
+def test_ongoing_gap_is_never_declared_absent_by_a_pull(conn):
+    full = {"Step Count": series("2026-10-10 00:00", "2026-11-05 00:00", 1.0,
+                                 hole=("2026-10-20 00:00", "2026-10-26 00:00"))}
+    h = Harness(conn, full)
+    h.run("2026-10-24 09:00")
+    assert h.statuses() == [(1, "confirmed")]         # ongoing for >3 days: escalated
+    assert ev.get_event(conn, 1).window_end is None
+    ev.record_pull(conn, 1, T("2026-10-24 10:00"), complete=True)
+    h.run("2026-10-24 10:05")
+    assert h.statuses() == [(1, "confirmed")]         # phone had nothing yet; data may still arrive
+
+
+def test_pull_made_before_the_gap_closed_does_not_verify_it(conn):
+    full = {"Step Count": series("2026-10-10 00:00", "2026-11-05 00:00", 1.0,
+                                 hole=("2026-10-20 00:00", "2026-10-26 00:00"))}
+    h = Harness(conn, full)
+    h.run("2026-10-24 09:00")
+    ev.record_pull(conn, 1, T("2026-10-24 10:00"), complete=True)
+    h.run("2026-10-27 09:00")                          # feed is back; the gap has now closed
+    e = ev.get_event(conn, 1)
+    assert e.status == "confirmed" and e.window_end is not None
+    assert [x.id for x in ev.needing_recovery(conn)] == [1]   # the old pull cannot have covered it
+
+
+def test_needing_recovery_lifecycle(conn):
+    h, _ = _confirmed_step_gap(conn)
+    assert [e.id for e in ev.needing_recovery(conn)] == [1]
+    ev.record_pull(conn, 1, T("2026-10-25 10:00"), complete=True)
+    assert ev.needing_recovery(conn) == []             # pulled after the gap closed
+
+
+def test_due_for_prompt_respects_cooldown(conn):
+    _confirmed_step_gap(conn)
+    now = T("2026-10-25 12:00")
+    events = ev.needing_recovery(conn)
+    assert [e.id for e in ev.due_for_prompt(events, now, 24)] == [1]       # never prompted
+    ev.mark_prompted(conn, [1], now)
+    events = ev.needing_recovery(conn)
+    assert ev.due_for_prompt(events, now + timedelta(hours=23), 24) == []
+    assert [e.id for e in ev.due_for_prompt(events, now + timedelta(hours=24), 24)] == [1]
+
+
+def test_init_schema_migrates_a_pre_existing_table():
+    c = sqlite3.connect(":memory:")
+    c.row_factory = sqlite3.Row
+    c.execute("""CREATE TABLE health_gap_events (
+        id INTEGER PRIMARY KEY, group_key TEXT NOT NULL, metrics TEXT NOT NULL, window_start TEXT NOT NULL,
+        window_end TEXT, status TEXT NOT NULL DEFAULT 'open', critical INTEGER NOT NULL DEFAULT 0,
+        immediate INTEGER NOT NULL DEFAULT 1, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+        notified_status TEXT, last_notified TEXT, pushed_at TEXT, exported_at TEXT, resolved_at TEXT, note TEXT)""")
+    c.execute("INSERT INTO health_gap_events (group_key, metrics, window_start, first_seen, last_seen)"
+              " VALUES ('g', '{}', '2026-10-01T00:00:00Z', 'x', 'x')")
+    init_schema(c)
+    init_schema(c)                                     # idempotent
+    e = ev.get_event(c, 1)
+    assert e.pull_attempts == 0 and e.pulled_at is None and e.last_prompted_at is None

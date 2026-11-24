@@ -358,6 +358,7 @@ def _gap_event_json(ev: "health_gap_events.Event") -> dict:
         "window_start": ev.window_start.isoformat(),
         "window_end": ev.window_end.isoformat() if ev.window_end else None,
         "exported_at": ev.exported_at,
+        "pulled_at": ev.pulled_at, "pull_attempts": ev.pull_attempts,
         "export_range": [start.isoformat(), end.isoformat()],
     }
 
