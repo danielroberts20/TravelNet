@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from database.base import BaseTable
 from database.connection import get_conn, to_iso_str
+from database.health.dedupe import HEALTH_QUANTITY, ensure_null_safe_unique
 
 
 @dataclass
@@ -62,6 +63,9 @@ class HealthQuantityTable(BaseTable[HealthQuantityRecord]):
             CREATE INDEX IF NOT EXISTS idx_hquantity_source
                 ON health_quantity(source);
             """)
+
+            # UNIQUE(.., source) does not dedupe NULL sources; see health/dedupe.py.
+            ensure_null_safe_unique(conn, HEALTH_QUANTITY)
 
     def insert(self, record: HealthQuantityRecord) -> None:
         """Insert a single-value health metric row. Idempotent on (timestamp, metric, source)."""

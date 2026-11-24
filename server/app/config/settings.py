@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     journal_notification: str = Field(alias="JOURNAL_NOTIFICATION")
     retro_notification: str = Field(alias="RETRO_JOURNAL_NOTIFICATION")
     label_known_place_notification: str = Field(alias="LABEL_KNOWN_PLACE_NOTIFICATION")
+    # Pushcut notification whose action runs a Shortcut that starts HAE's MCP server on the phone.
+    health_gap_notification: Optional[str] = Field(default=None, alias="HEALTH_GAP_NOTIFICATION")
+
+    # --- Health Auto Export MCP server (phone, reached over Tailscale) ---
+    hae_host: Optional[str] = Field(default=None, alias="HAE_HOST")
+    hae_port: int = Field(default=9000, alias="HAE_PORT")
+    hae_token: Optional[str] = Field(default=None, alias="HAE_TOKEN")
 
     # --- External APIs ---
     fx_api_key: str = Field(alias="FX_API_KEY")

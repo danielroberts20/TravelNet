@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from database.base import BaseTable
 from database.connection import get_conn, to_iso_str
+from database.health.dedupe import HEALTH_HEART_RATE, ensure_null_safe_unique
 
 
 @dataclass
@@ -56,6 +57,8 @@ class HeartRateTable(BaseTable[HeartRateRecord]):
                 CREATE INDEX IF NOT EXISTS idx_hhr_ts_bpm
                     ON health_heart_rate(timestamp, avg_bpm);
             """)
+
+            ensure_null_safe_unique(conn, HEALTH_HEART_RATE)   # NULL sources; see health/dedupe.py
 
     def insert(self, record: HeartRateRecord) -> None:
         """Insert a Heart Rate triplet row. Idempotent on (timestamp, source)."""

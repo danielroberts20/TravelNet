@@ -11,6 +11,7 @@ import socket as _socket
 
 from auth import require_upload_token
 from database.exchange.fx import get_api_usage
+from health_gaps import events as health_gap_events
 from database.location.gap_annotations.table import table as gap_annotations_table, GapAnnotationRecord
 from metadata.system import get_db_stats, get_pending_digest_count, get_uptime, read_last_lines_efficient
 from metadata.uploads import get_fx_latest_date, get_last_uploads, get_last_watchdog_heartbeat, get_row_counts
@@ -338,3 +339,58 @@ def push_pc_state(body: PcStateRequest):
     if not sent:
         raise HTTPException(status_code=503, detail="Could not reach Pico display")
     return {"status": "sent", "state": body.state}
+
+
+# ---------------------------------------------------------------------------
+# Health gap events - manual export check-off
+# ---------------------------------------------------------------------------
+
+class HealthGapDismissRequest(BaseModel):
+    note: str | None = None
+
+
+def _gap_event_json(ev: "health_gap_events.Event") -> dict:
+    now = datetime.now(ZoneInfo("UTC"))
+    start, end = ev.export_range(now, 2.0)
+    return {
+        "id": ev.id, "status": ev.status, "critical": ev.critical,
+        "metrics": sorted(ev.metrics),
+        "window_start": ev.window_start.isoformat(),
+        "window_end": ev.window_end.isoformat() if ev.window_end else None,
+        "exported_at": ev.exported_at,
+        "pulled_at": ev.pulled_at, "pull_attempts": ev.pull_attempts,
+        "export_range": [start.isoformat(), end.isoformat()],
+    }
+
+
+@router.get("/health-gaps", dependencies=[Depends(require_upload_token)])
+def list_health_gaps(status: str | None = Query(None, pattern="^(open|confirmed|resolved|unrecoverable)$")):
+    """List health gap events, optionally filtered by status."""
+    with get_conn(read_only=True) as conn:
+        events = health_gap_events.list_events(conn, (status,) if status else None)
+    return [_gap_event_json(e) for e in events]
+
+
+def _gap_action(fn, event_id: int, *args):
+    conn = get_conn()
+    try:
+        return _gap_event_json(fn(conn, event_id, datetime.now(ZoneInfo("UTC")), *args))
+    except LookupError:
+        raise HTTPException(status_code=404, detail="No such health gap event")
+    except health_gap_events.EventStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    finally:
+        conn.close()
+
+
+@router.post("/health-gaps/{event_id}/exported", dependencies=[Depends(require_upload_token)])
+def mark_health_gap_exported(event_id: int):
+    """Check off a manual HAE export. The next daily run verifies it: data present
+    -> resolved, still empty -> unrecoverable (genuinely not there)."""
+    return _gap_action(health_gap_events.mark_exported, event_id)
+
+
+@router.post("/health-gaps/{event_id}/dismiss", dependencies=[Depends(require_upload_token)])
+def dismiss_health_gap(event_id: int, body: HealthGapDismissRequest = Body(default=HealthGapDismissRequest())):
+    """Mark a gap genuinely unrecoverable without exporting."""
+    return _gap_action(health_gap_events.dismiss, event_id, body.note)
