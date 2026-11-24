@@ -58,6 +58,10 @@ def query_style(gap_metric: str) -> QueryStyle:
 
 _DISPLAY_TO_SNAKE ={display: snake for snake, display in SNAKE_TO_DISPLAY.items()}
 _VIRTUAL_TO_SNAKE = {HEART_RATE: "heart_rate", SLEEP: "sleep_analysis"}
+# Where TravelNet's canonical snake_case name differs from the one HAE accepts. The REST export (and
+# the MCP server) call Resting Energy "basal_energy_burned"; processing.SNAKE_ALIASES maps it the other
+# way on ingest. Asking the MCP server for "resting_energy" fails with "No valid metrics selected".
+_HAE_SPELLING = {"resting_energy": "basal_energy_burned"}
 
 
 class HAEError(Exception):
@@ -85,7 +89,8 @@ def hae_metric_name(gap_metric: str) -> str:
     if gap_metric in _VIRTUAL_TO_SNAKE:
         return _VIRTUAL_TO_SNAKE[gap_metric]
     try:
-        return _DISPLAY_TO_SNAKE[gap_metric]
+        snake = _DISPLAY_TO_SNAKE[gap_metric]
+        return _HAE_SPELLING.get(snake, snake)
     except KeyError:
         raise KeyError(f"no Health Auto Export name known for metric {gap_metric!r}") from None
 

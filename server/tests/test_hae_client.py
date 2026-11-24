@@ -259,3 +259,16 @@ def test_chunk_range_align_to_start_keeps_the_grid_and_newest_first():
         (T("2026-11-20 00:13"), T("2026-11-22 00:13")),
     ]
     assert chunk_range(start, start, 48, align_to_start=True) == []
+
+
+def test_resting_energy_uses_the_spelling_the_mcp_server_accepts():
+    """HAE rejects "resting_energy" with 'No valid metrics selected'; it calls the metric basal_energy_burned."""
+    assert hae_metric_name("Resting Energy") == "basal_energy_burned"
+
+
+def test_resting_energy_request_sends_the_hae_spelling():
+    c, s = client(INIT, INITIALIZED, tool_result({"data": {"metrics": []}}))
+    c.connect()
+    c.get_health_metrics("Resting Energy", T("2026-11-24 00:00"), T("2026-11-24 03:00"))
+    args = s.calls[2]["json"]["params"]["arguments"]
+    assert args["metrics"] == "basal_energy_burned" and args["aggregate"] is True      # still summarised hourly
