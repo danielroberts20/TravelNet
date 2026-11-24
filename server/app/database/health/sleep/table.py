@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from database.base import BaseTable
 from database.connection import get_conn, to_iso_str
+from database.health.dedupe import HEALTH_SLEEP, ensure_null_safe_unique
 
 
 @dataclass
@@ -52,6 +53,8 @@ class SleepTable(BaseTable[SleepRecord]):
                 CREATE INDEX IF NOT EXISTS idx_hsleep_stage
                     ON health_sleep(stage);
             """)
+
+            ensure_null_safe_unique(conn, HEALTH_SLEEP)   # NULL sources; see health/dedupe.py
 
     def insert(self, record: SleepRecord) -> None:
         """Insert a single sleep stage interval. Idempotent on (start_ts, stage, source)."""
