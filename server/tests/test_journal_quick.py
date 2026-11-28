@@ -207,3 +207,9 @@ def test_covers_end_alone_means_a_single_day(client, db):
     assert _post(client, text="x", covers_end="2026-11-26").status_code == 200
     (row,) = _rows(db)
     assert row["covers_start"] == row["covers_end"] == "2026-11-26"
+
+
+def test_drafted_flag_marks_source_but_stays_retro(client, db):
+    _post(client, text="Edited draft", drafted=True, covers_date="2026-11-20")
+    (row,) = _rows(db)
+    assert row["source"] == "drafted" and row["provenance"] == "retro" and row["lag_days"] == 8

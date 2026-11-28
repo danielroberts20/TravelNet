@@ -20,6 +20,8 @@ from database.journal.sync import push_entry_ids
 from database.journal.table import JournalEntryRecord, insert_entry
 
 router = APIRouter()
+from upload.journal.manage import router as manage_router
+router.include_router(manage_router)
 logger = logging.getLogger(__name__)
 
 JOURNAL_LATEST_FILE = DATA_DIR / "journal_latest.json"
@@ -60,6 +62,7 @@ class QuickEntryPayload(BaseModel):
     covers_start: Optional[str] = None   # YYYY-MM-DD; first day of a multi-day entry
     covers_end: Optional[str] = None     # YYYY-MM-DD; last day (defaults to covers_start / today)
     full: bool = False                   # full-length entry (Journal Full Shortcut): source 'full'
+    drafted: bool = False                # started from an AI draft the user then confirmed: source 'drafted'
     # Template one-liners from the full-length entry; folded into the text so they are searchable.
     best_moment: Optional[str] = None
     low_moment: Optional[str] = None
@@ -141,7 +144,7 @@ def build_quick_entry(conn, payload: QuickEntryPayload, now: Optional[datetime] 
         ts_utc=ts_str,
         local_date=local_date,
         text=text,
-        source="full" if payload.full else ("retro" if retro else "quick"),
+        source="drafted" if payload.drafted else ("full" if payload.full else ("retro" if retro else "quick")),
         provenance="retro" if retro else "contemporaneous",
         tz=ctx["tz"],
         utc_offset=ctx["utc_offset"],
