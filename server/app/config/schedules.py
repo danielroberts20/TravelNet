@@ -49,6 +49,7 @@ SCHEDULE_CONFIGS = {
     # Journal
     "check-journal-staleness-evening":  (f"0 {JOURNAL_REMIND_EVENING_HOUR} * * *", "Daily check for stale evening journal entries"),
     "check-journal-staleness-morning":  (f"0 {JOURNAL_REMIND_MORNING_HOUR} * * *", "Daily check for stale morning journal entries"),
+    "sync-journal-to-trevor":           ("30 4 * * *",             "Nightly full reconcile of journal_entries into Trevor's vector store"),
 
     # Notifications & digests
     "send-warn-error-log":              ("0 6 * * *",               "Daily flush and email of WARNING/ERROR log digest"),

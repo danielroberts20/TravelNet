@@ -44,8 +44,11 @@ def db(tmp_path):
     # create journal_entries through the real table definition
     with patch("database.journal.table.get_conn", _get_conn):
         JournalTable().init()
+    # Background work (daily_summary refresh + Trevor push) is covered in test_journal_sync.py.
     with patch.object(journal_router_mod, "get_conn", _get_conn), \
-         patch.object(journal_router_mod, "JOURNAL_LATEST_FILE", tmp_path / "latest.json"):
+         patch.object(journal_router_mod, "JOURNAL_LATEST_FILE", tmp_path / "latest.json"), \
+         patch.object(journal_router_mod, "_after_save") as after:
+        _get_conn.after_save = after
         yield _get_conn
 
 
@@ -169,3 +172,14 @@ def test_numbers_sent_as_strings_are_accepted(client, db):
     assert _post(client, text="x", mood="4", rating="7", energy="3").status_code == 200
     (row,) = _rows(db)
     assert (row["mood_self"], row["rating"], row["energy"]) == (4, 7, 3)
+
+
+def test_saved_entry_schedules_background_sync_for_its_days(client, db):
+    _post(client, text="x", covers_date="2026-11-20")
+    ((ids, days), _), = db.after_save.call_args_list
+    assert len(ids) == 1 and days == ["2026-11-20", "2026-11-20"]
+
+
+def test_duplicate_does_not_reschedule_sync(client, db):
+    _post(client, text="x", client_id="a"); _post(client, text="x", client_id="a")
+    assert db.after_save.call_count == 1

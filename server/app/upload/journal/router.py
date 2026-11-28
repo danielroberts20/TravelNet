@@ -16,6 +16,7 @@ from auth import require_upload_token
 from config.general import DATA_DIR, JOURNAL_DIR
 from database.connection import get_conn
 from database.journal.enrich import enrich, latest_timezone
+from database.journal.sync import push_entry_ids
 from database.journal.table import JournalEntryRecord, insert_entry
 
 router = APIRouter()
@@ -130,8 +131,80 @@ def build_quick_entry(conn, payload: QuickEntryPayload, now: Optional[datetime] 
     )
 
 
+def _after_save(ids: list[str], days: list[Optional[str]]) -> None:
+    """Background work after entries are stored: update daily_summary, then push to Trevor.
+
+    Neither step may fail the request, and a failed push is retried by the nightly reconcile.
+    """
+    from scheduled_tasks.daily_summary.journal import refresh_journal_days
+    try:
+        refresh_journal_days(d for d in days if d)
+    except Exception as e:
+        logger.error("daily_summary journal refresh failed: %s", e)
+    push_entry_ids(ids)
+
+
+class ImportEntry(BaseModel):
+    """An already-parsed Apple Journal entry (parsed by Trevor, which owns the HTML parser)."""
+    import_key: str = Field(min_length=1, max_length=200)   # source filename stem
+    ts_utc: str                                              # ISO UTC, Z suffix
+    local_date: str                                          # YYYY-MM-DD in the writer's timezone
+    utc_offset: Optional[str] = None
+    text: str = Field(min_length=1, max_length=50000)
+    rating: Optional[int] = None     # out-of-range values are kept in enrichment, not rejected
+    energy: Optional[int] = None
+    tags: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    enrichment: dict = Field(default_factory=dict)           # location/weather/mood as exported
+
+
+class ImportPayload(BaseModel):
+    entries: list[ImportEntry] = Field(max_length=2000)
+
+
+@router.post("/import", dependencies=[Depends(require_upload_token)])
+def upload_journal_import(payload: ImportPayload, background_tasks: BackgroundTasks):
+    """Import parsed Apple Journal entries into journal_entries (idempotent on import_key)."""
+    inserted, ids, days = 0, [], []
+    with get_conn() as conn:
+        for e in payload.entries:
+            try:
+                datetime.fromisoformat(e.ts_utc.replace("Z", "+00:00"))
+                date.fromisoformat(e.local_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Bad timestamp/date for {e.import_key}")
+            # Old template scales were not enforced (e.g. energy 8 on a 1-5 field). Keep
+            # the raw value in enrichment and leave the constrained column empty.
+            enrichment = dict(e.enrichment)
+            rating, energy = e.rating, e.energy
+            if rating is not None and not 1 <= rating <= 10:
+                enrichment["rating_raw"], rating = rating, None
+            if energy is not None and not 1 <= energy <= 5:
+                enrichment["energy_raw"], energy = energy, None
+            rec = JournalEntryRecord(
+                id=f"apple:{e.import_key}",
+                ts_utc=e.ts_utc, local_date=e.local_date, utc_offset=e.utc_offset,
+                text=e.text.strip(), source="import", provenance="contemporaneous",
+                covers_start=e.local_date, covers_end=e.local_date,
+                rating=rating, energy=energy, tags=e.tags,
+                latitude=e.latitude, longitude=e.longitude,
+                enrichment_json=json.dumps(enrichment), import_key=e.import_key,
+            )
+            if insert_entry(conn, rec):
+                inserted += 1
+                ids.append(rec.id)
+                days.append(rec.local_date)
+
+    if ids:
+        background_tasks.add_task(_after_save, ids, days)
+    logger.info("Journal import: %d received, %d inserted", len(payload.entries), inserted)
+    return {"status": "success", "received": len(payload.entries),
+            "inserted": inserted, "skipped": len(payload.entries) - inserted}
+
+
 @router.post("/quick", dependencies=[Depends(require_upload_token)])
-def upload_journal_quick(payload: QuickEntryPayload):
+def upload_journal_quick(payload: QuickEntryPayload, background_tasks: BackgroundTasks):
     """Quick journal capture. Stored in journal_entries, enriched from TravelNet's own data.
 
     Synchronous on purpose (unlike most uploads): the Shortcut should only report
@@ -144,6 +217,9 @@ def upload_journal_quick(payload: QuickEntryPayload):
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         added = insert_entry(conn, record)
+
+    if added:
+        background_tasks.add_task(_after_save, [record.id], [record.covers_start, record.covers_end])
 
     if added and record.provenance == "contemporaneous":
         # Keep the staleness reminders in step until they read journal_entries directly.

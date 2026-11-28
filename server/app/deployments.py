@@ -21,6 +21,7 @@ from scheduled_tasks.check_journal_staleness import (
     check_journal_staleness_evening_flow,
     check_journal_staleness_morning_flow,
 )
+from scheduled_tasks.sync_journal_to_trevor import sync_journal_to_trevor_flow
 from scheduled_tasks.send_transaction_reminder import send_transaction_reminder_flow
 from scheduled_tasks.get_fx_up_to_date import get_fx_up_to_date_flow
 from scheduled_tasks.check_health_gaps import check_health_gaps_flow
@@ -73,6 +74,7 @@ FLOW_REGISTRY = {
     "backfill-health-gaps":        backfill_health_gaps_flow,
     "check-journal-staleness-evening":  check_journal_staleness_evening_flow,
     "check-journal-staleness-morning":  check_journal_staleness_morning_flow,
+    "sync-journal-to-trevor":           sync_journal_to_trevor_flow,
     "send-warn-error-log":         send_warn_error_log_flow,
     "send-cron-digest":            send_cron_digest_flow,
     "backup-db":                   backup_db_flow,
