@@ -17,9 +17,9 @@ from scheduled_tasks.weekly_location_analysis import weekly_location_analysis_fl
 from scheduled_tasks.detect_country_transitions import detect_country_transitions_flow
 from scheduled_tasks.detect_timezone_transitions import detect_timezone_transitions_flow
 from scheduled_tasks.detect_flights import detect_flights_flow
-from scheduled_tasks.check_journal_staleness import (
-    check_journal_staleness_evening_flow,
-    check_journal_staleness_morning_flow,
+from scheduled_tasks.journal_reminder import (
+    journal_reminder_schedule_flow,
+    journal_reminder_notify_flow,
 )
 from scheduled_tasks.sync_journal_to_trevor import sync_journal_to_trevor_flow
 from scheduled_tasks.send_transaction_reminder import send_transaction_reminder_flow
@@ -72,8 +72,8 @@ FLOW_REGISTRY = {
     "check-health-gaps":           check_health_gaps_flow,
     "recover-health-gaps":         recover_health_gaps_flow,
     "backfill-health-gaps":        backfill_health_gaps_flow,
-    "check-journal-staleness-evening":  check_journal_staleness_evening_flow,
-    "check-journal-staleness-morning":  check_journal_staleness_morning_flow,
+    "journal-reminder-schedule":        journal_reminder_schedule_flow,
+    "journal-reminder-notify":          journal_reminder_notify_flow,
     "sync-journal-to-trevor":           sync_journal_to_trevor_flow,
     "send-warn-error-log":         send_warn_error_log_flow,
     "send-cron-digest":            send_cron_digest_flow,

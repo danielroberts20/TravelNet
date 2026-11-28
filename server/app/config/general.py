@@ -463,8 +463,15 @@ HEALTH_UPLOAD_STALE_HOURS = editable("HEALTH_UPLOAD_STALE_HOURS", "Number of hou
 # Journal
 # ---------------------------------------------------------------------------
 
-JOURNAL_REMIND_EVENING_HOUR = editable("JOURNAL_REMIND_EVENING_HOUR", "Hour of the day to remind users to write an evening journal entry", group="Journal")(20)  # 20:00 local — used as reference, baked into cron
-JOURNAL_REMIND_MORNING_HOUR = editable("JOURNAL_REMIND_MORNING_HOUR", "Hour of the day to remind users to write a morning journal entry", group="Journal")(9)   # 09:00 local — used as reference, baked into cron
+JOURNAL_SCHEDULE_HOUR = editable("JOURNAL_SCHEDULE_HOUR", "Local hour at which the journal reminder planner runs each day (baked into its cron). It picks a quiet moment later that day, so it must run before your usual first quiet hour.", group="Journal")(9)
+JOURNAL_BACKLOG_AFTER_DAYS = editable("JOURNAL_BACKLOG_AFTER_DAYS", "After this many consecutive uncovered days, stop the daily quick-entry nudge and switch to one weekly full-length catch-up nudge.", group="Journal")(3)
+JOURNAL_BACKLOG_INTERVAL_DAYS = editable("JOURNAL_BACKLOG_INTERVAL_DAYS", "Minimum days between weekly backlog nudges.", group="Journal")(7)
+JOURNAL_RETRO_COUNT_DAYS = editable("JOURNAL_RETRO_COUNT_DAYS", "A single-day retro entry only counts as 'journalled' for reminders if written within this many days of the day it covers. Multi-day entries always count for every day they cover.", group="Journal")(3)
+JOURNAL_ACTIVITY_WEEKS = editable("JOURNAL_ACTIVITY_WEEKS", "Weeks of step and location history used to learn when you are typically quiet. Recent weeks weigh more.", group="Journal")(6)
+JOURNAL_WAKE_BUFFER_MINUTES = editable("JOURNAL_WAKE_BUFFER_MINUTES", "Never nudge until you have typically been awake this long.", group="Journal")(120)
+JOURNAL_SLEEP_BUFFER_MINUTES = editable("JOURNAL_SLEEP_BUFFER_MINUTES", "Never nudge within this many minutes of your typical sleep onset.", group="Journal")(90)
+JOURNAL_FALLBACK_HOUR = editable("JOURNAL_FALLBACK_HOUR", "Hour (0-23) preferred when there is no activity data to learn from (cold start, and the tie-breaker).", group="Journal")(20)
+JOURNAL_LEARN_MIN_ENTRIES = editable("JOURNAL_LEARN_MIN_ENTRIES", "Contemporaneous entries needed before the hours you actually write at are blended into the timing model.", group="Journal")(8)
 
 # ---------------------------------------------------------------------------
 # Daily Summary

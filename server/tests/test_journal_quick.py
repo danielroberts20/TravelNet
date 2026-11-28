@@ -177,9 +177,33 @@ def test_numbers_sent_as_strings_are_accepted(client, db):
 def test_saved_entry_schedules_background_sync_for_its_days(client, db):
     _post(client, text="x", covers_date="2026-11-20")
     ((ids, days), _), = db.after_save.call_args_list
-    assert len(ids) == 1 and days == ["2026-11-20", "2026-11-20"]
+    assert len(ids) == 1 and days == ["2026-11-20"]
 
 
 def test_duplicate_does_not_reschedule_sync(client, db):
     _post(client, text="x", client_id="a"); _post(client, text="x", client_id="a")
     assert db.after_save.call_count == 1
+
+
+def test_full_entry_spanning_days_is_retro_with_folded_oneliners(client, db):
+    r = _post(client, text="A long weekend.", full=True, covers_start="2026-11-25", covers_end="2026-11-28",
+              best_moment="the beach", low_moment="None", who_with="kate", rating=7)
+    assert r.status_code == 200, r.text
+    (row,) = _rows(db)
+    assert row["source"] == "full" and row["provenance"] == "retro"
+    assert (row["covers_start"], row["covers_end"], row["lag_days"]) == ("2026-11-25", "2026-11-28", 0)
+    assert row["text"] == "A long weekend.\n\nBest moment: the beach\nWho with: kate"
+    ((_, days), _), = db.after_save.call_args_list
+    assert days == ["2026-11-25", "2026-11-26", "2026-11-27", "2026-11-28"]
+
+
+def test_range_validation(client, db):
+    assert _post(client, text="x", covers_start="2026-11-20", covers_end="2026-11-10").status_code == 400
+    assert _post(client, text="x", covers_start="2026-11-01", covers_end="2026-11-28").status_code == 400  # > 14 days
+    assert _post(client, text="x", covers_end="2026-12-05").status_code == 400                              # future
+
+
+def test_covers_end_alone_means_a_single_day(client, db):
+    assert _post(client, text="x", covers_end="2026-11-26").status_code == 200
+    (row,) = _rows(db)
+    assert row["covers_start"] == row["covers_end"] == "2026-11-26"

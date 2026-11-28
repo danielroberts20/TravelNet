@@ -2,7 +2,7 @@ import hashlib
 import io
 import json
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 import zipfile
@@ -56,7 +56,16 @@ class QuickEntryPayload(BaseModel):
     """One quick journal capture (iOS Shortcut)."""
     text: str = Field(min_length=1, max_length=20000)
     timestamp: Optional[str] = None      # ISO 8601; defaults to now. Naive = current local timezone.
-    covers_date: Optional[str] = None    # YYYY-MM-DD; set when writing about an earlier day (retro)
+    covers_date: Optional[str] = None    # YYYY-MM-DD; shorthand for a single earlier day (retro)
+    covers_start: Optional[str] = None   # YYYY-MM-DD; first day of a multi-day entry
+    covers_end: Optional[str] = None     # YYYY-MM-DD; last day (defaults to covers_start / today)
+    full: bool = False                   # full-length entry (Journal Full Shortcut): source 'full'
+    # Template one-liners from the full-length entry; folded into the text so they are searchable.
+    best_moment: Optional[str] = None
+    low_moment: Optional[str] = None
+    who_with: Optional[str] = None
+    transport: Optional[str] = None
+    rough_spend: Optional[str] = None
     mood: Optional[int] = Field(default=None, ge=1, le=5)         # 1-5 tap
     rating: Optional[int] = Field(default=None, ge=1, le=10)      # day rating
     energy: Optional[int] = Field(default=None, ge=1, le=5)
@@ -69,10 +78,25 @@ class QuickEntryPayload(BaseModel):
         # Shortcuts' JSON builder sends "" (or 0) for a skipped optional field.
         return None if v in ("", 0, "0", None) or (isinstance(v, str) and not v.strip()) else v
 
-    @field_validator("timestamp", "covers_date", "tags", "client_id", mode="before")
+    @field_validator("timestamp", "covers_date", "covers_start", "covers_end", "tags", "client_id",
+                     "best_moment", "low_moment", "who_with", "transport", "rough_spend", mode="before")
     @classmethod
     def _blank_text_is_unset(cls, v):
         return None if isinstance(v, str) and not v.strip() else v
+
+
+MAX_COVERS_DAYS = 14   # a single entry may span at most two weeks
+
+_NOTHING = {"", "none", "n/a", "na", "-", "nothing", "no"}
+
+
+def _fold_oneliners(text: str, p: "QuickEntryPayload") -> str:
+    """Append the full-length template one-liners to the text, skipping empty answers."""
+    lines = [f"{label}: {v.strip()}" for label, v in (
+        ("Best moment", p.best_moment), ("Low moment", p.low_moment), ("Who with", p.who_with),
+        ("Transport", p.transport), ("Rough spend", p.rough_spend),
+    ) if v and v.strip().lower() not in _NOTHING]
+    return text + ("\n\n" + "\n".join(lines) if lines else "")
 
 
 def build_quick_entry(conn, payload: QuickEntryPayload, now: Optional[datetime] = None) -> JournalEntryRecord:
@@ -92,33 +116,38 @@ def build_quick_entry(conn, payload: QuickEntryPayload, now: Optional[datetime] 
     ctx = enrich(conn, ts_utc)
     local_date = ctx["local_date"]
 
-    covers = None
-    if payload.covers_date:
-        covers = date.fromisoformat(payload.covers_date)
-        if covers > date.fromisoformat(local_date):
-            raise ValueError("covers_date cannot be in the future")
-    retro = covers is not None and covers < date.fromisoformat(local_date)
+    today = date.fromisoformat(local_date)
+    first = payload.covers_start or payload.covers_date
+    last = payload.covers_end or payload.covers_date
+    start = date.fromisoformat(first or last or local_date)
+    end = date.fromisoformat(last or first or local_date)
+    if end < start:
+        raise ValueError("covers_end is before covers_start")
+    if end > today:
+        raise ValueError("covers_date cannot be in the future")
+    if (end - start).days + 1 > MAX_COVERS_DAYS:
+        raise ValueError(f"an entry can cover at most {MAX_COVERS_DAYS} days")
+    retro = start < today          # any covered day before today: written after the fact
 
     if retro:
-        # Location/weather/steps would describe when it was *written*, not the day it covers.
+        # Location/weather/steps would describe when it was *written*, not the days it covers.
         ctx = {k: ctx[k] for k in ("tz", "local_date", "utc_offset")}
     loc = ctx.get("location") or {}
 
-    text = payload.text.strip()
+    text = _fold_oneliners(payload.text.strip(), payload)
     ts_str = ts_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-    covers_str = covers.isoformat() if covers else local_date
     return JournalEntryRecord(
         id=payload.client_id or hashlib.sha256(f"{ts_str}|{text}".encode()).hexdigest()[:20],
         ts_utc=ts_str,
         local_date=local_date,
         text=text,
-        source="retro" if retro else "quick",
+        source="full" if payload.full else ("retro" if retro else "quick"),
         provenance="retro" if retro else "contemporaneous",
         tz=ctx["tz"],
         utc_offset=ctx["utc_offset"],
-        covers_start=covers_str,
-        covers_end=covers_str,
-        lag_days=(date.fromisoformat(local_date) - covers).days if retro else None,
+        covers_start=start.isoformat(),
+        covers_end=end.isoformat(),
+        lag_days=(today - end).days if retro else None,
         rating=payload.rating,
         energy=payload.energy,
         tags=payload.tags.strip() if payload.tags and payload.tags.strip() else None,
@@ -219,7 +248,9 @@ def upload_journal_quick(payload: QuickEntryPayload, background_tasks: Backgroun
         added = insert_entry(conn, record)
 
     if added:
-        background_tasks.add_task(_after_save, [record.id], [record.covers_start, record.covers_end])
+        span = (date.fromisoformat(record.covers_end) - date.fromisoformat(record.covers_start)).days
+        days = [(date.fromisoformat(record.covers_start) + timedelta(days=i)).isoformat() for i in range(span + 1)]
+        background_tasks.add_task(_after_save, [record.id], days)
 
     if added and record.provenance == "contemporaneous":
         # Keep the staleness reminders in step until they read journal_entries directly.

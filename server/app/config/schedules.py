@@ -10,7 +10,7 @@ update_timezone.py imported from deployments.py.
 
 # {deployment_name: (cron_expression_or_None, description)}
 # None cron = manual-only deployment (no automatic schedule).
-from config.general import JOURNAL_REMIND_EVENING_HOUR, JOURNAL_REMIND_MORNING_HOUR
+from config.general import JOURNAL_SCHEDULE_HOUR
 
 
 SCHEDULE_CONFIGS = {
@@ -47,8 +47,8 @@ SCHEDULE_CONFIGS = {
     "backfill-health-gaps":             (None,                      "Manual: Scan the whole health history for gaps (dry run unless write=true)"),
 
     # Journal
-    "check-journal-staleness-evening":  (f"0 {JOURNAL_REMIND_EVENING_HOUR} * * *", "Daily check for stale evening journal entries"),
-    "check-journal-staleness-morning":  (f"0 {JOURNAL_REMIND_MORNING_HOUR} * * *", "Daily check for stale morning journal entries"),
+    "journal-reminder-schedule":        (f"0 {JOURNAL_SCHEDULE_HOUR} * * *", "Plan today's journal nudge (daily quick-entry, or the weekly backlog catch-up) for a learned quiet moment"),
+    "journal-reminder-notify":          (None,                      "Manual: Send a journal reminder. Scheduled by the schedule flow"),
     "sync-journal-to-trevor":           ("30 4 * * *",             "Nightly full reconcile of journal_entries into Trevor's vector store"),
 
     # Notifications & digests
