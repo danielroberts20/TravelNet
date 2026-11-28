@@ -13,6 +13,11 @@
 #   The leg where today >= arrival AND (departure is null OR today <= departure).
 #   Actual dates take precedence over planned dates.
 #   Set meta.current_leg_override to force a specific leg id.
+#
+# NOTE (revisited countries): USA, Australia and NZ each appear more than once.
+# Every leg has a unique id (usa_2027, australia_rwc, new_zealand_2) so the
+# current-leg inference above never sees overlapping date ranges. Anything that
+# groups by country (countries_cumulative, per-country stats) should dedupe.
 
 meta:
   status_override: null       # null | pre_departure | travelling | finished
@@ -21,10 +26,10 @@ meta:
   base_city: "London"
   trip_start: "2026-06-11"    # date of first departure — used for countdown
   display:
-    pill: "Pre-departure · Testing TravelNet"
-    label: "London, UK"
-    description: "Hardening TravelNet infrastructure before departure in June 2026."
-    location: "London, UK"
+    pill: "Travelling · Melbourne"
+    label: "Melbourne, Australia"
+    description: "On a Working Holiday in Melbourne, with TravelNet running live."
+    location: "Melbourne, Australia"
   map:
     lon: -0.1
     lat: 51.5
@@ -59,6 +64,9 @@ portfolio:
 
 # Ordered list of map stops for the route visualisation.
 # Includes top-level legs and any notable sub-legs (e.g. Seattle).
+# Revisited places reuse the same coordinates with an empty label so the map
+# draws the route line back to them without stacking duplicate labels.
+# If travel.ts cannot handle empty labels, drop the revisit entries instead.
 map_route:
   - leg_id: home
     lon: -0.1
@@ -85,6 +93,16 @@ map_route:
     lat: -25.0
     label: "AUS"
     above: false
+  - leg_id: usa_2027
+    lon: -80.0
+    lat: 37.0
+    label: ""
+    above: true
+  - leg_id: australia_rwc
+    lon: 153.0
+    lat: -27.5
+    label: ""
+    above: false
   - leg_id: new_zealand
     lon: 172.0
     lat: -41.0
@@ -95,6 +113,11 @@ map_route:
     lat: 15.0
     label: "SE Asia"
     above: true
+  - leg_id: new_zealand_2
+    lon: 172.0
+    lat: -41.0
+    label: ""
+    above: false
   - leg_id: canada
     lon: -95.0
     lat: 56.0
@@ -113,7 +136,7 @@ legs:
       departure: "2026-09-06"
     actual:
       arrival: "2026-06-11"
-      departure: null
+      departure: "2026-09-06"
     notes: "Philadelphia/DC pre-camp, summer camp lifeguard/counsellor (~2 months), post-camp labouring, Seattle mini-trip."
     display:
       pill: "J-1 · Summer Camp · USA"
@@ -141,7 +164,7 @@ legs:
       - from: "JFK"
         to: "SEA"
         date_planned: "2026-08-31"
-        notes: "Not booked yet."
+        notes: null
     sub_legs:
       - id: usa_philly
         name: "Philadelphia / DC"
@@ -149,32 +172,32 @@ legs:
           arrival: "2026-06-11"
           departure: "2026-06-16"
         actual:
-          arrival: null
-          departure: null
+          arrival: "2026-06-11"
+          departure: "2026-06-16"
       - id: usa_camp
         name: "Summer Camp"
         planned:
           arrival: "2026-06-16"
           departure: "2026-08-16"
         actual:
-          arrival: null
-          departure: null
+          arrival: "2026-06-16"
+          departure: "2026-08-16"
       - id: usa_travel
         name: "Post Camp Travel"
         planned:
           arrival: "2026-08-16"
           departure: "2026-09-02"
         actual:
-          arrival: null
-          departure: null
+          arrival: "2026-08-16"
+          departure: "2026-09-02"
       - id: usa_seattle
         name: "Seattle"
         planned:
           arrival: "2026-09-02"
           departure: "2026-09-06"
         actual:
-          arrival: null
-          departure: null
+          arrival: "2026-09-02"
+          departure: "2026-09-06"
 
   - id: fiji
     name: "Fiji"
@@ -186,8 +209,8 @@ legs:
       arrival: "2026-09-08"
       departure: "2026-09-11"
     actual:
-      arrival: null
-      departure: null
+      arrival: "2026-09-08"
+      departure: "2026-09-11"
     notes: "3-night stopover en route USA → Australia."
     display:
       pill: "Stopover · Fiji"
@@ -222,11 +245,11 @@ legs:
     stopover: false
     planned:
       arrival: "2026-09-11"
-      departure: "2027-09-10"
+      departure: "2027-06-11"   # leaves ~11 Jun 2027 for camp; WHV itself runs to ~10 Sep 2027
     actual:
       arrival: "2026-09-11"
       departure: null
-    notes: "First WHV leg. ML pipeline begins here using US data as baseline."
+    notes: "First WHV leg. ML pipeline begins here using US data as baseline. Leaves from Sydney ~11 Jun 2027 to reach camp (WHV time left unused)."
     display:
       pill: "WHV · Australia · ML begins"
       label: "Australia — Working Holiday"
@@ -260,6 +283,134 @@ legs:
           arrival: null
           departure: null
 
+  - id: usa_2027
+    name: "USA (Camp 2027)"
+    country: "United States"
+    emoji: "🇺🇸"
+    visa: "J-1 (summer camp)"
+    stopover: false
+    planned:
+      arrival: "2027-06-11"
+      departure: "2027-09-28"
+    actual:
+      arrival: null
+      departure: null
+    notes: "Fifth summer at camp. Contract 15 Jun – 15 Aug 2027; likely arrives a few days early. Short stopover en route (TBC), ~3-4 weeks post-camp labour, then US travel until flying direct to Sydney for the RWC."
+    display:
+      pill: "J-1 · Summer Camp · USA"
+      label: "USA — Summer Camp 2027"
+      description: "Back to camp for a fifth summer, post-camp labouring, and some US travel before the Rugby World Cup."
+      location: "United States"
+      km_cumulative: 33700   # approx — recompute from flights
+      countries_cumulative: 3
+    map:
+      lon: -80.0
+      lat: 37.0
+      label: ""
+      above: true
+    currency: "USD"
+    timezone: "America/New_York"
+    working: true
+    budget_weekly_gbp: 150
+    visa_notes: "J-1 exchange visitor — no freelance work permitted. Contract dates 15 Jun – 15 Aug 2027; confirm post-camp labour fits the sponsor/J-1 end date and grace period."
+    # Planned inter-leg flights into this leg
+    flights:
+      - from: "SYD"
+        to: null
+        date_planned: "2027-06-11"
+        notes: "Flying out of Sydney (cheaper than Melbourne). Destination airport TBC; stopover only if the cheapest fare allows an extended layover. Not booked yet."
+    sub_legs:
+      - id: usa_2027_stopover
+        name: "Stopover en route"
+        planned:
+          arrival: "2027-06-11"
+          departure: "2027-06-13"
+        actual:
+          arrival: null
+          departure: null
+      - id: usa_2027_camp
+        name: "Summer Camp"
+        planned:
+          arrival: "2027-06-13"      # contract start 15 Jun; arriving early
+          departure: "2027-08-15"
+        actual:
+          arrival: null
+          departure: null
+      - id: usa_2027_labour
+        name: "Post-camp labour"
+        planned:
+          arrival: "2027-08-15"
+          departure: "2027-09-12"    # ~3-4 weeks
+        actual:
+          arrival: null
+          departure: null
+      - id: usa_2027_travel
+        name: "US travel"
+        planned:
+          arrival: "2027-09-12"
+          departure: "2027-09-28"
+        actual:
+          arrival: null
+          departure: null
+
+  - id: australia_rwc
+    name: "Australia (Rugby World Cup)"
+    country: "Australia"
+    emoji: "🏉"
+    visa: "Tourist (eVisitor/ETA — check which applies)"
+    stopover: false
+    planned:
+      arrival: "2027-09-30"
+      departure: "2027-10-05"
+    actual:
+      arrival: null
+      departure: null
+    notes: "Short trip for England v Tonga, Sat 2 Oct 2027, 8:15pm, Brisbane Stadium (Suncorp). Fly direct from the US to Sydney, then Brisbane. Revisit spots missed on the East Coast trip and meet friends."
+    display:
+      pill: "RWC 2027 · Brisbane"
+      label: "Australia — Rugby World Cup"
+      description: "A few days in Brisbane for England v Tonga at the 2027 Rugby World Cup."
+      location: "Australia"
+      km_cumulative: 46000   # approx — recompute from flights
+      countries_cumulative: 3
+    map:
+      lon: 153.0
+      lat: -27.5
+      label: ""
+      above: false
+    currency: "AUD"
+    timezone: "Australia/Brisbane"
+    working: false
+    budget_weekly_gbp: 250
+    visa_notes: "Tourist visa only — no work. Working Holiday Visa expires ~10 Sep 2027."
+    # Planned inter-leg flights into this leg
+    flights:
+      - from: null
+        to: "SYD"
+        date_planned: "2027-09-28"
+        notes: "Direct from the US (crosses date line, lands ~30 Sep). Likely Sydney as it tends to be the cheapest. Not booked yet."
+      - from: "SYD"
+        to: "BNE"
+        date_planned: "2027-10-01"
+        notes: "Domestic. Not booked yet."
+    sub_legs:
+      - id: aus_rwc_sydney
+        name: "Sydney"
+        planned:
+          arrival: "2027-09-30"
+          departure: "2027-10-01"
+        actual:
+          arrival: null
+          departure: null
+      - id: aus_rwc_brisbane
+        name: "Brisbane — England v Tonga"
+        planned:
+          arrival: "2027-10-01"
+          departure: "2027-10-05"
+        actual:
+          arrival: null
+          departure: null
+
   - id: new_zealand
     name: "New Zealand"
     country: "New Zealand"
@@ -267,18 +418,18 @@ legs:
     visa: "Working Holiday Visa (WHV)"
     stopover: false
     planned:
-      arrival: "2027-07-01"
+      arrival: "2027-10-05"
       departure: "2027-12-01"
     actual:
       arrival: null
       departure: null
-    notes: ""
+    notes: "Settle in, build friends and job connections, first shoulder-season roadtrip before heading to SE Asia."
     display:
       pill: "WHV · New Zealand"
       label: "New Zealand — Working Holiday"
-      description: "Second Working Holiday Visa leg."
+      description: "Second Working Holiday Visa leg. Settling in before SE Asia."
       location: "New Zealand"
-      km_cumulative: 21000
+      km_cumulative: 48500   # approx — recompute from flights
       countries_cumulative: 4
     map:
       lon: 172.0
@@ -289,13 +440,13 @@ legs:
     timezone: "Pacific/Auckland"
     working: true
     budget_weekly_gbp: 250
-    visa_notes: "WHV — 12 months from entry date"
+    visa_notes: "UK WHV: 12, 23 or 36 months, no work cap. Must enter within 12 months of grant (cannot be delayed). Take 23 or 36 months so it covers the whole stay (needs medical + chest X-ray evidence). Multiple entry, so SE Asia trip is fine."
     # Planned inter-leg flights into this leg
     flights:
-      - from: "MEL"
+      - from: "BNE"
         to: "AKL"
-        date_planned: "2027-07-01"
-        notes: null
+        date_planned: "2027-10-05"
+        notes: "Not booked yet."
     sub_legs: []
 
   - id: se_asia
@@ -306,17 +457,17 @@ legs:
     stopover: false
     planned:
       arrival: "2027-12-01"
-      departure: "2028-04-01"
+      departure: "2028-04-01"   # may end ~1 Mar if 4 months isn't needed
     actual:
       arrival: null
       departure: null
-    notes: "3–4 months backpacking. Countries TBC."
+    notes: "3–4 months on the classic British backpacker route (Thailand, Laos, Vietnam, Cambodia — order and extras TBC). Return to NZ from March/April."
     display:
       pill: "SE Asia · Banana Pancake Trail"
       label: "SE Asia — Backpacking"
-      description: "3–4 months on the Banana Pancake Trail. Countries TBC."
+      description: "3–4 months on the classic Banana Pancake Trail: Thailand, Laos, Vietnam and Cambodia."
       location: "SE Asia"
-      km_cumulative: 32000
+      km_cumulative: 59500   # approx — recompute from flights
       countries_cumulative: 8
     map:
       lon: 102.0
@@ -336,25 +487,63 @@ legs:
         notes: null
     sub_legs: []
 
+  - id: new_zealand_2
+    name: "New Zealand (return)"
+    country: "New Zealand"
+    emoji: "🇳🇿"
+    visa: "Working Holiday Visa (WHV)"
+    stopover: false
+    planned:
+      arrival: "2028-04-01"       # or ~1 Mar if SE Asia is shorter
+      departure: "2028-11-01"     # TBC — set by Canada timing
+    actual:
+      arrival: null
+      departure: null
+    notes: "Back from SE Asia: work, NZ winter, a second shoulder-season roadtrip after winter (many South Island hikes are closed in winter). Leaves for Canada late 2028."
+    display:
+      pill: "WHV · New Zealand · Return"
+      label: "New Zealand — Back for winter"
+      description: "Return to New Zealand after SE Asia: work, winter, and shoulder-season roadtrips."
+      location: "New Zealand"
+      km_cumulative: 71500   # approx — recompute from flights
+      countries_cumulative: 8
+    map:
+      lon: 172.0
+      lat: -41.0
+      label: ""
+      above: false
+    currency: "NZD"
+    timezone: "Pacific/Auckland"
+    working: true
+    budget_weekly_gbp: 250
+    visa_notes: "Same UK WHV as the first NZ leg (must be a 23 or 36 month visa to still be valid)."
+    # Planned inter-leg flights into this leg — origin is SE Asia (multiple countries)
+    flights:
+      - from: null
+        to: "AKL"
+        date_planned: "2028-04-01"
+        notes: "Origin depends on final SE Asia country. Not booked yet."
+    sub_legs: []
+
   - id: canada
     name: "Canada"
     country: "Canada"
     emoji: "🇨🇦"
-    visa: "Working Holiday Visa (WHV)"
+    visa: "IEC Working Holiday"
     stopover: false
     planned:
-      arrival: "2028-04-01"
-      departure: null         # open-ended
+      arrival: "2028-11-01"       # TBC — late 2028, set by IEC invitation timing
+      departure: "2029-05-31"     # May 2029; exact day TBC
     actual:
       arrival: null
       departure: null
-    notes: "Final WHV leg. Trip end date TBC."
+    notes: "Final leg. Late 2028 to ~May 2029, leaves whenever ready; aim to be back in the UK for summer 2029. Needs an IEC invitation (2028 season: pools open ~mid/late Dec 2027, close ~Oct 2028). POE letter is valid for 1 year, so entry must be before it expires."
     display:
-      pill: "WHV · Canada · Final leg"
+      pill: "IEC · Canada · Final leg"
       label: "Canada — Working Holiday"
-      description: "Final Working Holiday Visa leg. End date TBC."
+      description: "Final Working Holiday leg in Canada, ending around May 2029."
       location: "Canada"
-      km_cumulative: 48000
+      km_cumulative: 80000   # approx — recompute from flights
       countries_cumulative: 9
     map:
       lon: -95.0
@@ -365,11 +554,11 @@ legs:
     timezone: null
     working: true
     budget_weekly_gbp: 300
-    visa_notes: "IEC WHV — 24 months"
-    # Planned inter-leg flights into this leg — origin country unknown (SE Asia, multiple)
+    visa_notes: "IEC Working Holiday permit (up to 24 months, will use ~6). UK pool is oversubscribed — join the pool as soon as it opens."
+    # Planned inter-leg flights into this leg
     flights:
-      - from: null
+      - from: "AKL"
         to: "YVR"
-        date_planned: "2028-04-01"
-        notes: null
+        date_planned: "2028-11-01"
+        notes: "Not booked yet."
     sub_legs: []
