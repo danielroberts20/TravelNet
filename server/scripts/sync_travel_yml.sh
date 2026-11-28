@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# sync_travel_yml.sh   Commit and push travel.yml to main if (and only if) it has changed.
+# sync_travel_yml.sh [trigger]   Commit and push travel.yml to main if (and only if) it has changed.
 #
 # Run by travelnet.service as ExecStartPre (every boot / `systemctl restart travelnet`).
 # Pushing to main triggers .github/workflows/notify-portfolio.yml, which updates the portfolio.
@@ -15,6 +15,7 @@
 # Overrides (tests only): TRAVEL_REPO_DIR, TRAVEL_SYNC_BRANCH, TRAVEL_SYNC_REMOTE,
 #                         TRAVEL_SYNC_NET_WAIT_S
 
+TRIGGER=${1:-manual}   # restart | save | cron | manual; recorded in the commit message
 REPO=${TRAVEL_REPO_DIR:-/home/dan/services/TravelNet}
 BRANCH=${TRAVEL_SYNC_BRANCH:-main}
 REMOTE=${TRAVEL_SYNC_REMOTE:-origin}
@@ -46,7 +47,7 @@ main() {
             || { log "$FILE is not valid YAML, NOT committing"; return 0; }
         git add -- "$FILE"
         # Pathspec commit: only travel.yml, even if something else is staged.
-        git commit -q -m "chore(travel): sync travel.yml on restart [$(date -u +%FT%TZ)]" -- "$FILE" \
+        git commit -q -m "chore(travel): auto-sync travel.yml ($TRIGGER) [$(date -u +%FT%TZ)]" -- "$FILE" \
             || { log "commit failed"; return 0; }
         log "committed $FILE"
     fi
@@ -77,6 +78,6 @@ main() {
 exec 9>/tmp/sync_travel_yml.lock
 flock -n 9 || { log "already running"; exit 0; }
 export -f main log
-export REPO BRANCH REMOTE NET_WAIT_S FILE
+export TRIGGER REPO BRANCH REMOTE NET_WAIT_S FILE
 timeout 180 bash -c main || log "timed out or errored (rc=$?)"
 exit 0

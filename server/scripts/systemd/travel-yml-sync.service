@@ -12,4 +12,4 @@ Wants=network-online.target
 Type=oneshot
 User=dan
 # Debounce: let a burst of saves settle so they become one commit / one portfolio sync.
-ExecStart=/bin/bash -c 'sleep 20; exec /home/dan/services/TravelNet/server/scripts/sync_travel_yml.sh'
+ExecStart=/bin/bash -c 'sleep 20; exec /home/dan/services/TravelNet/server/scripts/sync_travel_yml.sh save'
