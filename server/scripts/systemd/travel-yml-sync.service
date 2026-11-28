@@ -1,0 +1,15 @@
+# Commits and pushes travel.yml after an edit. Triggered by travel-yml-sync.path.
+# Install:
+#   sudo cp /home/dan/services/TravelNet/server/scripts/systemd/travel-yml-sync.{path,service} /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now travel-yml-sync.path
+[Unit]
+Description=Sync travel.yml to GitHub after an edit
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=dan
+# Debounce: let a burst of saves settle so they become one commit / one portfolio sync.
+ExecStart=/bin/bash -c 'sleep 20; exec /home/dan/services/TravelNet/server/scripts/sync_travel_yml.sh'

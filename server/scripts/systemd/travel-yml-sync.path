@@ -1,0 +1,11 @@
+# Fires travel-yml-sync.service whenever travel.yml is written (e.g. Dashboard "Validate & Save").
+# Install: see travel-yml-sync.service.
+[Unit]
+Description=Watch travel.yml for edits
+
+[Path]
+PathChanged=/home/dan/services/TravelNet/travel.yml
+Unit=travel-yml-sync.service
+
+[Install]
+WantedBy=multi-user.target
