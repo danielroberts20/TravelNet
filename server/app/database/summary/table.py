@@ -259,7 +259,21 @@ class DailySummaryTable(BaseTable[DailySummaryRecord]):
                 )
             except Exception:
                 pass  # Column already exists
+            self._init_journal_columns(conn)
     
+    def _init_journal_columns(self, conn) -> None:
+        """Journal columns (owned by scheduled_tasks.daily_summary.journal)."""
+        for ddl in (
+            "ALTER TABLE daily_summary ADD COLUMN journal_written INTEGER",
+            "ALTER TABLE daily_summary ADD COLUMN journal_entry_count INTEGER",
+            "ALTER TABLE daily_summary ADD COLUMN journal_retro INTEGER",
+            "ALTER TABLE daily_summary ADD COLUMN journal_complete INTEGER NOT NULL DEFAULT 0",
+        ):
+            try:
+                conn.execute(ddl)
+            except Exception:
+                pass  # Column already exists
+
     def init_complete_view(self):
         with get_conn() as conn:
             conn.execute("""

@@ -27,6 +27,7 @@ from config.general import RECOMPUTE_WINDOW_DAYS
 from scheduled_tasks.daily_summary.health   import compute_health_flow
 from scheduled_tasks.daily_summary.location import compute_location_flow
 from scheduled_tasks.daily_summary.pi       import compute_pi_flow
+from scheduled_tasks.daily_summary.journal  import compute_journal_flow
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +104,7 @@ def compute_daily_summary_flow():
         ("location", compute_location_flow),
         ("health",   compute_health_flow),
         ("pi",       compute_pi_flow),
+        ("journal",  compute_journal_flow),
     ]
 
     results = {name: {"ok": 0, "failed": 0} for name, _ in order}

@@ -36,6 +36,7 @@ EXCLUDE_TABLES: set[str] = {
     "api_usage",
     "cost_of_living",
     "flights",
+    "journal_entries",   # the user's own words: irreplaceable, never pruned
     "sqlite_sequence",
     "sqlite_stat1",
     "sqlite_stat2",

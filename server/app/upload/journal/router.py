@@ -1,17 +1,23 @@
+import hashlib
 import io
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 import zipfile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile  # type: ignore
 import httpx
-from pydantic import BaseModel  # type: ignore
+from pydantic import BaseModel, Field, field_validator  # type: ignore
 
 from config.settings import settings
 from auth import require_upload_token
 from config.general import DATA_DIR, JOURNAL_DIR
+from database.connection import get_conn
+from database.journal.enrich import enrich, latest_timezone
+from database.journal.sync import push_entry_ids
+from database.journal.table import JournalEntryRecord, insert_entry
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -44,6 +50,230 @@ async def upload_journal_latest(payload: JournalLatestPayload):
 
     logger.info(f"Journal latest timestamp updated to {payload.timestamp}")
     return {"status": "success", "timestamp": payload.timestamp}
+
+
+class QuickEntryPayload(BaseModel):
+    """One quick journal capture (iOS Shortcut)."""
+    text: str = Field(min_length=1, max_length=20000)
+    timestamp: Optional[str] = None      # ISO 8601; defaults to now. Naive = current local timezone.
+    covers_date: Optional[str] = None    # YYYY-MM-DD; shorthand for a single earlier day (retro)
+    covers_start: Optional[str] = None   # YYYY-MM-DD; first day of a multi-day entry
+    covers_end: Optional[str] = None     # YYYY-MM-DD; last day (defaults to covers_start / today)
+    full: bool = False                   # full-length entry (Journal Full Shortcut): source 'full'
+    # Template one-liners from the full-length entry; folded into the text so they are searchable.
+    best_moment: Optional[str] = None
+    low_moment: Optional[str] = None
+    who_with: Optional[str] = None
+    transport: Optional[str] = None
+    rough_spend: Optional[str] = None
+    mood: Optional[int] = Field(default=None, ge=1, le=5)         # 1-5 tap
+    rating: Optional[int] = Field(default=None, ge=1, le=10)      # day rating
+    energy: Optional[int] = Field(default=None, ge=1, le=5)
+    tags: Optional[str] = None           # comma-separated
+    client_id: Optional[str] = Field(default=None, max_length=100)  # makes retries idempotent
+
+    @field_validator("mood", "rating", "energy", mode="before")
+    @classmethod
+    def _blank_number_is_unset(cls, v):
+        # Shortcuts' JSON builder sends "" (or 0) for a skipped optional field.
+        return None if v in ("", 0, "0", None) or (isinstance(v, str) and not v.strip()) else v
+
+    @field_validator("timestamp", "covers_date", "covers_start", "covers_end", "tags", "client_id",
+                     "best_moment", "low_moment", "who_with", "transport", "rough_spend", mode="before")
+    @classmethod
+    def _blank_text_is_unset(cls, v):
+        return None if isinstance(v, str) and not v.strip() else v
+
+
+MAX_COVERS_DAYS = 14   # a single entry may span at most two weeks
+
+_NOTHING = {"", "none", "n/a", "na", "-", "nothing", "no"}
+
+
+def _fold_oneliners(text: str, p: "QuickEntryPayload") -> str:
+    """Append the full-length template one-liners to the text, skipping empty answers."""
+    lines = [f"{label}: {v.strip()}" for label, v in (
+        ("Best moment", p.best_moment), ("Low moment", p.low_moment), ("Who with", p.who_with),
+        ("Transport", p.transport), ("Rough spend", p.rough_spend),
+    ) if v and v.strip().lower() not in _NOTHING]
+    return text + ("\n\n" + "\n".join(lines) if lines else "")
+
+
+def build_quick_entry(conn, payload: QuickEntryPayload, now: Optional[datetime] = None) -> JournalEntryRecord:
+    """Turn a payload into a record, enriching from TravelNet's own data.
+
+    Raises ValueError for bad timestamps/dates (mapped to HTTP 400 by the endpoint).
+    """
+    now = now or datetime.now(timezone.utc)
+    if payload.timestamp:
+        ts = datetime.fromisoformat(payload.timestamp.replace("Z", "+00:00"))
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=latest_timezone(conn))
+        ts_utc = ts.astimezone(timezone.utc)
+    else:
+        ts_utc = now
+
+    ctx = enrich(conn, ts_utc)
+    local_date = ctx["local_date"]
+
+    today = date.fromisoformat(local_date)
+    first = payload.covers_start or payload.covers_date
+    last = payload.covers_end or payload.covers_date
+    start = date.fromisoformat(first or last or local_date)
+    end = date.fromisoformat(last or first or local_date)
+    if end < start:
+        raise ValueError("covers_end is before covers_start")
+    if end > today:
+        raise ValueError("covers_date cannot be in the future")
+    if (end - start).days + 1 > MAX_COVERS_DAYS:
+        raise ValueError(f"an entry can cover at most {MAX_COVERS_DAYS} days")
+    retro = start < today          # any covered day before today: written after the fact
+
+    if retro:
+        # Location/weather/steps would describe when it was *written*, not the days it covers.
+        ctx = {k: ctx[k] for k in ("tz", "local_date", "utc_offset")}
+    loc = ctx.get("location") or {}
+
+    text = _fold_oneliners(payload.text.strip(), payload)
+    ts_str = ts_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return JournalEntryRecord(
+        id=payload.client_id or hashlib.sha256(f"{ts_str}|{text}".encode()).hexdigest()[:20],
+        ts_utc=ts_str,
+        local_date=local_date,
+        text=text,
+        source="full" if payload.full else ("retro" if retro else "quick"),
+        provenance="retro" if retro else "contemporaneous",
+        tz=ctx["tz"],
+        utc_offset=ctx["utc_offset"],
+        covers_start=start.isoformat(),
+        covers_end=end.isoformat(),
+        lag_days=(today - end).days if retro else None,
+        rating=payload.rating,
+        energy=payload.energy,
+        tags=payload.tags.strip() if payload.tags and payload.tags.strip() else None,
+        mood_self=payload.mood,
+        valence_self=(payload.mood - 3) / 2 if payload.mood else None,
+        latitude=loc.get("latitude"),
+        longitude=loc.get("longitude"),
+        place_id=loc.get("place_id"),
+        enrichment_json=json.dumps({k: v for k, v in ctx.items() if k not in ("tz", "local_date", "utc_offset")}) ,
+    )
+
+
+def _after_save(ids: list[str], days: list[Optional[str]]) -> None:
+    """Background work after entries are stored: update daily_summary, then push to Trevor.
+
+    Neither step may fail the request, and a failed push is retried by the nightly reconcile.
+    """
+    from scheduled_tasks.daily_summary.journal import refresh_journal_days
+    try:
+        refresh_journal_days(d for d in days if d)
+    except Exception as e:
+        logger.error("daily_summary journal refresh failed: %s", e)
+    push_entry_ids(ids)
+
+
+class ImportEntry(BaseModel):
+    """An already-parsed Apple Journal entry (parsed by Trevor, which owns the HTML parser)."""
+    import_key: str = Field(min_length=1, max_length=200)   # source filename stem
+    ts_utc: str                                              # ISO UTC, Z suffix
+    local_date: str                                          # YYYY-MM-DD in the writer's timezone
+    utc_offset: Optional[str] = None
+    text: str = Field(min_length=1, max_length=50000)
+    rating: Optional[int] = None     # out-of-range values are kept in enrichment, not rejected
+    energy: Optional[int] = None
+    tags: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    enrichment: dict = Field(default_factory=dict)           # location/weather/mood as exported
+
+
+class ImportPayload(BaseModel):
+    entries: list[ImportEntry] = Field(max_length=2000)
+
+
+@router.post("/import", dependencies=[Depends(require_upload_token)])
+def upload_journal_import(payload: ImportPayload, background_tasks: BackgroundTasks):
+    """Import parsed Apple Journal entries into journal_entries (idempotent on import_key)."""
+    inserted, ids, days = 0, [], []
+    with get_conn() as conn:
+        for e in payload.entries:
+            try:
+                datetime.fromisoformat(e.ts_utc.replace("Z", "+00:00"))
+                date.fromisoformat(e.local_date)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Bad timestamp/date for {e.import_key}")
+            # Old template scales were not enforced (e.g. energy 8 on a 1-5 field). Keep
+            # the raw value in enrichment and leave the constrained column empty.
+            enrichment = dict(e.enrichment)
+            rating, energy = e.rating, e.energy
+            if rating is not None and not 1 <= rating <= 10:
+                enrichment["rating_raw"], rating = rating, None
+            if energy is not None and not 1 <= energy <= 5:
+                enrichment["energy_raw"], energy = energy, None
+            rec = JournalEntryRecord(
+                id=f"apple:{e.import_key}",
+                ts_utc=e.ts_utc, local_date=e.local_date, utc_offset=e.utc_offset,
+                text=e.text.strip(), source="import", provenance="contemporaneous",
+                covers_start=e.local_date, covers_end=e.local_date,
+                rating=rating, energy=energy, tags=e.tags,
+                latitude=e.latitude, longitude=e.longitude,
+                enrichment_json=json.dumps(enrichment), import_key=e.import_key,
+            )
+            if insert_entry(conn, rec):
+                inserted += 1
+                ids.append(rec.id)
+                days.append(rec.local_date)
+
+    if ids:
+        background_tasks.add_task(_after_save, ids, days)
+    logger.info("Journal import: %d received, %d inserted", len(payload.entries), inserted)
+    return {"status": "success", "received": len(payload.entries),
+            "inserted": inserted, "skipped": len(payload.entries) - inserted}
+
+
+@router.post("/quick", dependencies=[Depends(require_upload_token)])
+def upload_journal_quick(payload: QuickEntryPayload, background_tasks: BackgroundTasks):
+    """Quick journal capture. Stored in journal_entries, enriched from TravelNet's own data.
+
+    Synchronous on purpose (unlike most uploads): the Shortcut should only report
+    success once the entry is actually stored, since this is the user's own words.
+    Resending the same client_id (or identical timestamp+text) is a no-op.
+    """
+    with get_conn() as conn:
+        try:
+            record = build_quick_entry(conn, payload)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        added = insert_entry(conn, record)
+
+    if added:
+        span = (date.fromisoformat(record.covers_end) - date.fromisoformat(record.covers_start)).days
+        days = [(date.fromisoformat(record.covers_start) + timedelta(days=i)).isoformat() for i in range(span + 1)]
+        background_tasks.add_task(_after_save, [record.id], days)
+
+    if added and record.provenance == "contemporaneous":
+        # Keep the staleness reminders in step until they read journal_entries directly.
+        local_iso = datetime.fromisoformat(record.ts_utc.replace("Z", "+00:00"))
+        try:
+            from zoneinfo import ZoneInfo
+            local_iso = local_iso.astimezone(ZoneInfo(record.tz))
+        except Exception:
+            pass
+        with open(JOURNAL_LATEST_FILE, "w") as f:
+            json.dump({"timestamp": local_iso.isoformat(),
+                       "uploaded_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}, f, indent=2)
+
+    logger.info("Journal quick entry %s (%s, %s)", "stored" if added else "duplicate",
+                record.provenance, record.local_date)
+    return {
+        "status": "success",
+        "id": record.id,
+        "duplicate": not added,
+        "local_date": record.local_date,
+        "provenance": record.provenance,
+        "enriched": sorted(json.loads(record.enrichment_json or "{}").keys()),
+    }
 
 
 def _validate_journal_zip(data: bytes) -> zipfile.ZipFile:
